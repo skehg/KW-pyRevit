@@ -1,9 +1,10 @@
 <Window x:Class="pyRevit.SelectViewTemplate"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="Select Views or View Templates" Width="450" Height="500" ResizeMode="NoResize" WindowStartupLocation="CenterOwner">
+    Title="Select Views or View Templates" Width="700" Height="560" ResizeMode="CanResize" MinWidth="640" MinHeight="500" WindowStartupLocation="CenterOwner">
     <Grid Margin="15">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -17,20 +18,26 @@
                 <ComboBoxItem Content="Views Only"/>
                 <ComboBoxItem Content="View Templates Only"/>
             </ComboBox>
+
+            <TextBlock Text="View Type:" VerticalAlignment="Center" Margin="15,0,5,0"/>
+            <ComboBox x:Name="ViewTypeFilterCombo" Width="220" SelectedIndex="0"/>
         </StackPanel>
         
         <TextBox Grid.Row="1" x:Name="SearchBox" Height="25" Margin="0,0,0,10" 
                  ToolTip="Type to filter the list" />
+
+        <TextBlock Grid.Row="2" Text="Use Ctrl/Shift for multi-select." Foreground="Gray" Margin="0,0,0,8"/>
                  
-        <ListBox Grid.Row="2" x:Name="SelectionList" Margin="0,0,0,10" SelectionMode="Extended">
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <TextBlock Text="{Binding}" Padding="5"/>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+        <DataGrid Grid.Row="3" x:Name="SelectionList" Margin="0,0,0,10" SelectionMode="Extended"
+                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                <DataGridTextColumn Header="Kind" Binding="{Binding ItemType}" Width="120"/>
+                <DataGridTextColumn Header="View Type" Binding="{Binding ViewTypeName}" Width="180"/>
+            </DataGrid.Columns>
+        </DataGrid>
         
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="Cancel" Width="80" Margin="0,0,5,0" x:Name="CancelBtn"/>
             <Button Content="Next" Width="80" x:Name="NextBtn"/>
         </StackPanel>
