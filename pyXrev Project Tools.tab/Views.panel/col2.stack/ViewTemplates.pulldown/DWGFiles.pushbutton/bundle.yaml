@@ -1,9 +1,9 @@
 title:
-  en_us: DWG Layers QWEN
+  en_us: DWG Files
   fr_fr: french title
   es_es: spanish title
 tooltip: 
-  en_us: Turn on or off DWG Layers and change their settings
+  en_us: Turn on or off DWG files
   fr_fr: french tooltip
   es_es: spanish tooltip
 # highlight: new
