@@ -1,8 +1,14 @@
 # -*- coding: utf-8 -*-
 from pyrevit import revit, DB, forms
 import System
+import re
 from System.Windows.Controls import CheckBox
 doc = revit.doc
+
+
+def natural_sort_key(value):
+    text = (value or "").lower()
+    return [int(part) if part.isdigit() else part for part in re.split(r'(\d+)', text)]
 
 # ---------------------------------------------------------
 # Load WPF UI
@@ -15,20 +21,63 @@ def select_levels_dialog(doc):
     xaml_path = __file__.replace("script.py", "SelectLevels.xaml")
     dlg = forms.WPFWindow(xaml_path)
 
-    # Collect and sort levels by elevation (lowest first)
-    all_levels = sorted(
-        DB.FilteredElementCollector(doc).OfClass(DB.Level).ToElements(),
-        key=lambda lvl: lvl.Elevation
-    )
+    # Collect levels once and handle sorting/filtering in the UI callbacks
+    all_levels = list(DB.FilteredElementCollector(doc).OfClass(DB.Level).ToElements())
 
-    # Create a checkbox for each level
     dlg.level_checkboxes = []
-    for lvl in all_levels:
-        cb = CheckBox()
-        cb.Content = lvl.Name
-        cb.Tag = lvl
-        dlg.levelsPanel.Children.Add(cb)
-        dlg.level_checkboxes.append(cb)
+    dlg.level_states = {}
+
+    def _level_id(level):
+        return level.Id.IntegerValue
+
+    def sync_states_from_visible():
+        for cb in dlg.level_checkboxes:
+            level = cb.Tag
+            dlg.level_states[_level_id(level)] = bool(cb.IsChecked)
+
+    def get_sorted_filtered_levels():
+        levels = list(all_levels)
+        sort_option = dlg.sortCombo.SelectedItem
+        if sort_option == "Name":
+            levels = sorted(levels, key=lambda lvl: natural_sort_key(lvl.Name))
+        else:
+            levels = sorted(levels, key=lambda lvl: lvl.Elevation)
+
+        filter_text = (dlg.filterBox.Text or "").strip().lower()
+        if filter_text:
+            levels = [lvl for lvl in levels if filter_text in (lvl.Name or "").lower()]
+        return levels
+
+    def rebuild_level_checkboxes():
+        sync_states_from_visible()
+        dlg.levelsPanel.Children.Clear()
+        dlg.level_checkboxes = []
+
+        for lvl in get_sorted_filtered_levels():
+            cb = CheckBox()
+            cb.Content = lvl.Name
+            cb.Tag = lvl
+
+            level_id = _level_id(lvl)
+            if dlg.level_states.get(level_id, False):
+                cb.IsChecked = True
+
+            dlg.levelsPanel.Children.Add(cb)
+            dlg.level_checkboxes.append(cb)
+
+    def sort_changed(sender, args):
+        rebuild_level_checkboxes()
+
+    def filter_changed(sender, args):
+        rebuild_level_checkboxes()
+
+    dlg.sortCombo.Items.Add("Height (Level)")
+    dlg.sortCombo.Items.Add("Name")
+    dlg.sortCombo.SelectedIndex = 0
+    dlg.sortCombo.SelectionChanged += sort_changed
+    dlg.filterBox.TextChanged += filter_changed
+
+    rebuild_level_checkboxes()
 
     # --- Button events ---
     def ok_click(sender, args):
@@ -42,10 +91,12 @@ def select_levels_dialog(doc):
     def select_all(sender, args):
         for cb in dlg.level_checkboxes:
             cb.IsChecked = True
+            dlg.level_states[_level_id(cb.Tag)] = True
 
     def select_none(sender, args):
         for cb in dlg.level_checkboxes:
             cb.IsChecked = False
+            dlg.level_states[_level_id(cb.Tag)] = False
 
     dlg.okButton.Click += ok_click
     dlg.cancelButton.Click += cancel_click
@@ -58,7 +109,8 @@ def select_levels_dialog(doc):
         return None
 
     # Return selected levels
-    selected = [cb.Tag for cb in dlg.level_checkboxes if cb.IsChecked]
+    sync_states_from_visible()
+    selected = [lvl for lvl in all_levels if dlg.level_states.get(_level_id(lvl), False)]
     return selected
 
 # ---------------------------------------------------------
@@ -90,6 +142,7 @@ scope_boxes = DB.FilteredElementCollector(doc)\
     .OfCategory(DB.BuiltInCategory.OST_VolumeOfInterest)\
     .WhereElementIsNotElementType()\
     .ToElements()
+scope_boxes = sorted(scope_boxes, key=lambda sb: natural_sort_key(sb.Name))
 
 window.scopeBoxMap = {}
 
@@ -120,13 +173,14 @@ struct_templates = [t for t in templates if t.ViewType == DB.ViewType.Engineerin
 
 def populate_template_combo(combo, items):
     combo.Items.Add("<None>")
-    for t in items:
+    sorted_items = sorted(items, key=lambda t: natural_sort_key(t.Name))
+    for t in sorted_items:
         combo.Items.Add(t.Name)
     combo.SelectedIndex = 0
 
 populate_template_combo(window.floorTemplateCombo, floor_templates)
 populate_template_combo(window.ceilingTemplateCombo, ceiling_templates)
-populate_template_combo(window.structTemplateCombo, floor_templates)
+populate_template_combo(window.structTemplateCombo, struct_templates)
 
 # ---------------------------------------------------------
 # Button Events

@@ -10,6 +10,23 @@
     <GroupBox Header="Select Levels" Margin="0 0 0 12">
         <DockPanel Margin="10">
 
+            <!-- Sort and filter controls -->
+            <StackPanel Orientation="Horizontal"
+                        DockPanel.Dock="Top"
+                        Margin="0,0,0,10">
+                <TextBlock Text="Sort By:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,6,0"/>
+                <ComboBox x:Name="sortCombo"
+                          Width="120"
+                          Margin="0,0,10,0"/>
+                <TextBlock Text="Filter:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,6,0"/>
+                <TextBox x:Name="filterBox"
+                         Width="140"/>
+            </StackPanel>
+
             <!-- Scrollable list of levels -->
             <ScrollViewer VerticalScrollBarVisibility="Auto"
                           DockPanel.Dock="Top"
