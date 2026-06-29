@@ -9,7 +9,6 @@ __author__ = 'Xrev'
 
 import clr
 import os
-import json
 import re
 clr.AddReference('PresentationCore')
 clr.AddReference('PresentationFramework')
@@ -21,14 +20,55 @@ from System.Windows.Markup import XamlReader
 from System.Collections.ObjectModel import ObservableCollection
 from Autodesk.Revit.DB import *
 from Autodesk.Revit.UI.Selection import ObjectType
-from pyrevit import revit, forms, coreutils
+from pyrevit import revit, forms, script as _pyscript
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
 
 SCRIPT_DIR = os.path.dirname(__file__)
-PARAM_CACHE_FILE = os.path.join(SCRIPT_DIR, 'param_cache.json')
 HELP_EXAMPLES_FILE = os.path.join(SCRIPT_DIR, 'help_examples.md')
+
+_ENV_PREFIX = 'XrevReValue'
+_SESSION_SETTING_DEFAULTS = {
+    'mode': 'type',
+    'delimiters': r'-_/,\|',
+    'orig_param': '',
+    'param1': '',
+    'param2': '',
+    'param3': '',
+    'param4': '',
+    'param5': '',
+    'pattern': '{val1}',
+    'counter_start': 'A',
+    'counter_increment': '1',
+    'find_text': '',
+    'replace_text': '',
+}
+
+
+def _session_key(name):
+    return '{}_{}'.format(_ENV_PREFIX, name)
+
+
+def load_session_settings():
+    """Load tool settings that persist only for the current Revit session."""
+    settings = dict(_SESSION_SETTING_DEFAULTS)
+    for name in _SESSION_SETTING_DEFAULTS:
+        try:
+            saved = _pyscript.get_envvar(_session_key(name))
+            if saved is not None:
+                settings[name] = str(saved)
+        except Exception:
+            pass
+    return settings
+
+
+def save_session_setting(name, value):
+    """Save a single setting for the current Revit session."""
+    try:
+        _pyscript.set_envvar(_session_key(name), '' if value is None else str(value))
+    except Exception:
+        pass
 
 # ============================================================================
 # DEFAULT TOKENIZATION CONFIG
@@ -261,7 +301,7 @@ def build_counter_generator(start_text, increment_text):
     increment_text = '' if increment_text is None else str(increment_text).strip()
 
     if not start_text:
-        return None, 'Start value is required when counter is enabled.'
+        return None, 'Start value is required when using {count} or {param6}.'
 
     if not increment_text:
         increment_text = '1'
@@ -325,6 +365,9 @@ def apply_pattern(input_text, pattern, param_dict, tokenizer_func=None):
     
     def replace_match(m):
         inner = m.group(1).strip()
+
+        if inner.lower() == 'original':
+            return param_dict.get('original', '')
 
         if inner.lower() == 'count':
             return param_dict.get('count', '')
@@ -557,28 +600,6 @@ def _safe_set_parameter_value(element, param_name, new_value, is_instance_mode):
     return False
 
 
-def load_param_cache():
-    """Load cached parameters from JSON file"""
-    if os.path.exists(PARAM_CACHE_FILE):
-        try:
-            with open(PARAM_CACHE_FILE, 'r') as f:
-                data = json.load(f)
-                return data.get('parameters', []), data.get('selections', {})
-        except:
-            pass
-    return [], {}
-
-
-def save_param_cache(available_params, selections):
-    """Save parameters and selections to JSON file"""
-    try:
-        data = {'parameters': available_params, 'selections': selections}
-        with open(PARAM_CACHE_FILE, 'w') as f:
-            json.dump(data, f, indent=2)
-    except:
-        pass
-
-
 def _get_element_type(element):
     """Get ElementType for an element, or return the element if already a type."""
     if element is None:
@@ -646,9 +667,6 @@ def collect_all_parameters(elements, is_instance_mode):
             pass
     
     available_params = sorted(list(param_set))
-    _, cached_selections = load_param_cache()
-    save_param_cache(available_params, cached_selections)
-    
     return available_params, param_values_map
 
 
@@ -699,7 +717,7 @@ class PreviewItem(object):
         self.final = False
         self.tooltip = ''
     
-    def format_value(self, pattern, param_values, tokenizer_func, counter_value=''):
+    def format_value(self, pattern, param_values, tokenizer_func, counter_value='', original_value='', find_text='', replace_text=''):
         """Format new name using tokenization and parameter substitution"""
         if self.final:
             return
@@ -718,12 +736,19 @@ class PreviewItem(object):
             for i, val in enumerate(param_values, 1):
                 param_dict['param{}'.format(i)] = val if val else ''
 
+            param_dict['original'] = '' if original_value is None else str(original_value)
+
             # Counter aliases: {param6} and {count}
             param_dict['param6'] = '' if counter_value is None else str(counter_value)
             param_dict['count'] = '' if counter_value is None else str(counter_value)
             
             # Use the tokenization + parameter substitution pattern application
-            self.NewName = apply_pattern(self.CurrentName, pattern, param_dict, tokenizer_func)
+            new_name = apply_pattern(self.CurrentName, pattern, param_dict, tokenizer_func)
+
+            if find_text:
+                new_name = new_name.replace(find_text, replace_text)
+
+            self.NewName = new_name
             self.tooltip = 'OK'
             
         except Exception as ex:
@@ -747,6 +772,7 @@ class ReValueDialog(object):
         self.available_params = []
         self.param_values_map = {}
         self.result = False
+        self._suspend_events = False
         
         # Get controls - mode toggle
         self.radio_type = self.window.FindName('radio_type')
@@ -771,9 +797,12 @@ class ReValueDialog(object):
         self.txt_pattern = self.window.FindName('txt_pattern')
 
         # Get controls - optional counter
-        self.chk_enable_counter = self.window.FindName('chk_enable_counter')
         self.txt_counter_start = self.window.FindName('txt_counter_start')
         self.txt_counter_increment = self.window.FindName('txt_counter_increment')
+
+        # Get controls - final value find/replace
+        self.txt_find = self.window.FindName('txt_find')
+        self.txt_replace = self.window.FindName('txt_replace')
         
         # Get controls - tokenization display
         self.txt_tokenization = self.window.FindName('txt_tokenization')
@@ -797,13 +826,14 @@ class ReValueDialog(object):
         for combo in self.param_combos:
             combo.SelectionChanged += self.OnSettingsChanged
 
-        if self.chk_enable_counter:
-            self.chk_enable_counter.Checked += self.OnSettingsChanged
-            self.chk_enable_counter.Unchecked += self.OnSettingsChanged
         if self.txt_counter_start:
             self.txt_counter_start.TextChanged += self.OnSettingsChanged
         if self.txt_counter_increment:
             self.txt_counter_increment.TextChanged += self.OnSettingsChanged
+        if self.txt_find:
+            self.txt_find.TextChanged += self.OnSettingsChanged
+        if self.txt_replace:
+            self.txt_replace.TextChanged += self.OnSettingsChanged
         
         self.txt_pattern.TextChanged += self.OnSettingsChanged
         self.preview_grid.SelectedCellsChanged += self.OnGridSelectionChanged
@@ -819,44 +849,46 @@ class ReValueDialog(object):
         
     def initialize_data(self):
         """Initialize parameter list and preview items"""
+        self._suspend_events = True
+        session_settings = load_session_settings()
+
         # Set mode
+        self.is_instance_mode = str(session_settings.get('mode', 'type')).lower() == 'instance'
         if self.radio_type:
             self.radio_type.IsChecked = not self.is_instance_mode
         if self.radio_instance:
             self.radio_instance.IsChecked = self.is_instance_mode
         
-        # Set default delimiters
+        # Set delimiters
         if self.txt_delimiters:
-            self.txt_delimiters.Text = DEFAULT_DELIMITERS
+            saved_delims = session_settings.get('delimiters', DEFAULT_DELIMITERS)
+            self.txt_delimiters.Text = saved_delims if saved_delims else DEFAULT_DELIMITERS
 
-        # Set default counter values (disabled by default)
-        if self.chk_enable_counter:
-            self.chk_enable_counter.IsChecked = False
-        if self.txt_counter_start and not self.txt_counter_start.Text:
-            self.txt_counter_start.Text = 'A'
-        if self.txt_counter_increment and not self.txt_counter_increment.Text:
-            self.txt_counter_increment.Text = '1'
+        # Set counter inputs
+        if self.txt_counter_start:
+            self.txt_counter_start.Text = session_settings.get('counter_start', 'A') or 'A'
+        if self.txt_counter_increment:
+            self.txt_counter_increment.Text = session_settings.get('counter_increment', '1') or '1'
+        if self.txt_find:
+            self.txt_find.Text = session_settings.get('find_text', '') or ''
+        if self.txt_replace:
+            self.txt_replace.Text = session_settings.get('replace_text', '') or ''
         
-        # Collect all parameters and cache them
+        # Collect all parameters
         self.available_params, self.param_values_map = collect_all_parameters(
             self.elements, self.is_instance_mode)
-        
-        # Load previous selections from cache
-        _, cached_selections = load_param_cache()
         
         # Populate original parameter combo box
         if self.combo_orig_param:
             self.combo_orig_param.Items.Add('')
             for param_name in self.available_params:
                 self.combo_orig_param.Items.Add(param_name)
-            
-            param_key = 'orig_param'
-            if param_key in cached_selections:
-                prev_selection = cached_selections[param_key]
-                try:
-                    self.combo_orig_param.SelectedItem = prev_selection
-                except:
-                    self.combo_orig_param.SelectedIndex = 0
+
+            prev_selection = session_settings.get('orig_param', '')
+            if prev_selection and prev_selection in self.available_params:
+                self.combo_orig_param.SelectedItem = prev_selection
+            else:
+                self.combo_orig_param.SelectedIndex = 0
         
         # Populate parameter combo boxes (5 slots)
         for i, combo in enumerate(self.param_combos):
@@ -864,14 +896,13 @@ class ReValueDialog(object):
                 combo.Items.Add('')
                 for param_name in self.available_params:
                     combo.Items.Add(param_name)
-                
+
                 param_key = 'param{}'.format(i + 1)
-                if param_key in cached_selections:
-                    prev_selection = cached_selections[param_key]
-                    try:
-                        combo.SelectedItem = prev_selection
-                    except:
-                        combo.SelectedIndex = 0
+                prev_selection = session_settings.get(param_key, '')
+                if prev_selection and prev_selection in self.available_params:
+                    combo.SelectedItem = prev_selection
+                else:
+                    combo.SelectedIndex = 0
         
         # Create preview items
         for elem in self.elements:
@@ -909,11 +940,55 @@ class ReValueDialog(object):
         # Set grid data source
         self.preview_grid.ItemsSource = self.preview_items
         
-        # Set default pattern
-        self.txt_pattern.Text = '{val1}'
+        # Set pattern
+        self.txt_pattern.Text = session_settings.get('pattern', '{val1}') or '{val1}'
         
+        self._suspend_events = False
+
+        # Store normalized values into current-session settings.
+        self.persist_settings()
+
+        # Build initial preview.
+        self.update_preview()
+
         # Update tokenization display for first item
         self.update_tokenization_display()
+
+    def _selected_combo_text(self, combo):
+        """Get selected ComboBox item text safely."""
+        if not combo or not combo.SelectedItem:
+            return ''
+        return str(combo.SelectedItem).strip()
+
+    def _pattern_uses_counter(self):
+        """Return True when pattern contains {count} or {param6}."""
+        pattern = self.txt_pattern.Text if self.txt_pattern else ''
+        if not pattern:
+            return False
+        return re.search(r'\{\s*(count|param6)\s*\}', pattern, re.IGNORECASE) is not None
+
+    def persist_settings(self):
+        """Persist current UI settings for this Revit session only."""
+        mode = 'instance' if self.is_instance_mode else 'type'
+        save_session_setting('mode', mode)
+        save_session_setting('delimiters', self.get_delimiters())
+        save_session_setting('orig_param', self._selected_combo_text(self.combo_orig_param))
+
+        for i, combo in enumerate(self.param_combos):
+            save_session_setting('param{}'.format(i + 1), self._selected_combo_text(combo))
+
+        pattern = self.txt_pattern.Text if self.txt_pattern else ''
+        save_session_setting('pattern', pattern)
+
+        start_text = self.txt_counter_start.Text if self.txt_counter_start else 'A'
+        increment_text = self.txt_counter_increment.Text if self.txt_counter_increment else '1'
+        save_session_setting('counter_start', start_text)
+        save_session_setting('counter_increment', increment_text)
+
+        find_text = self.txt_find.Text if self.txt_find else ''
+        replace_text = self.txt_replace.Text if self.txt_replace else ''
+        save_session_setting('find_text', find_text)
+        save_session_setting('replace_text', replace_text)
     
     def get_delimiters(self):
         """Get current delimiters from UI"""
@@ -1046,8 +1121,8 @@ class ReValueDialog(object):
                 self.txt_tokenization.Text = 'Tokens: (none)'
 
     def get_counter_generator(self):
-        """Build counter generator based on optional counter UI settings."""
-        if not self.chk_enable_counter or not self.chk_enable_counter.IsChecked:
+        """Build counter generator only when pattern asks for a counter token."""
+        if not self._pattern_uses_counter():
             return None, None
 
         start_text = self.txt_counter_start.Text if self.txt_counter_start else ''
@@ -1072,27 +1147,43 @@ class ReValueDialog(object):
         
         for idx, item in enumerate(self.preview_items):
             # CurrentName column always reflects the selected tokenization source.
-            item.CurrentName = self.get_original_source_text(item.Element)
+            original_source = self.get_original_source_text(item.Element)
+            item.CurrentName = original_source
             param_values = self.get_selected_param_values(item.Element)
             counter_value = counter_gen(idx) if counter_gen else ''
-            item.format_value(pattern, param_values, tokenizer_func, counter_value)
+            find_text = self.txt_find.Text if self.txt_find else ''
+            replace_text = self.txt_replace.Text if self.txt_replace else ''
+            item.format_value(
+                pattern,
+                param_values,
+                tokenizer_func,
+                counter_value,
+                original_source,
+                find_text,
+                replace_text,
+            )
         
         self.preview_grid.Items.Refresh()
         self.update_tokenization_display()
     
     def OnModeChanged(self, sender, args):
         """Called when instance/type mode changes"""
+        if self._suspend_events:
+            return
+
         # Re-initialize with new mode
         if self.radio_instance:
             self.is_instance_mode = self.radio_instance.IsChecked
         else:
             self.is_instance_mode = False
+
+        self._suspend_events = True
         
         # Recollect parameters and reinitialize
         self.available_params, self.param_values_map = collect_all_parameters(
             self.elements, self.is_instance_mode)
 
-        _, cached_selections = load_param_cache()
+        session_settings = load_session_settings()
 
         # Clear and rebuild original parameter combo
         if self.combo_orig_param:
@@ -1101,7 +1192,7 @@ class ReValueDialog(object):
             for param_name in self.available_params:
                 self.combo_orig_param.Items.Add(param_name)
 
-            prev_orig = cached_selections.get('orig_param', '')
+            prev_orig = session_settings.get('orig_param', '')
             if prev_orig and prev_orig in self.available_params:
                 self.combo_orig_param.SelectedItem = prev_orig
             else:
@@ -1115,7 +1206,7 @@ class ReValueDialog(object):
                 combo.Items.Add(param_name)
 
             param_key = 'param{}'.format(i + 1)
-            prev_selection = cached_selections.get(param_key, '')
+            prev_selection = session_settings.get(param_key, '')
             if prev_selection and prev_selection in self.available_params:
                 combo.SelectedItem = prev_selection
             else:
@@ -1153,12 +1244,17 @@ class ReValueDialog(object):
             
             preview_item = PreviewItem(elem, current_name)
             self.preview_items.Add(preview_item)
-        
+
+        self._suspend_events = False
+        self.persist_settings()
         self.preview_grid.Items.Refresh()
         self.update_preview()
     
     def OnSettingsChanged(self, sender, args):
         """Called when patterns or parameters change"""
+        if self._suspend_events:
+            return
+        self.persist_settings()
         self.update_preview()
     
     def OnGridSelectionChanged(self, sender, args):

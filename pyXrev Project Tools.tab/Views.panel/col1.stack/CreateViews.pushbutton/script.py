@@ -1,25 +1,154 @@
 # -*- coding: utf-8 -*-
-from pyrevit import revit, DB, forms
+from pyrevit import revit, DB, forms, script
 import System
 import re
+import traceback
 from System.Windows.Controls import CheckBox
 doc = revit.doc
+DEFAULT_NAME_PATTERN = "{phase_abbrev~upper}-{level~upper}-{plan_type~upper}"
+CFG_NAME_PATTERN_KEY = "createviews_name_pattern"
+HISTORY_LIMIT = 25
+
+TEXT_HISTORY_FIELDS = [
+    ("phaseAbbrevBox", "createviews_hist_phase_abbrev", ""),
+    ("prefixBox", "createviews_hist_prefix", ""),
+    ("suffixBox", "createviews_hist_suffix", ""),
+    ("floorNameBox", "createviews_hist_floor_name", "Floor"),
+    ("ceilingNameBox", "createviews_hist_ceiling_name", "Ceiling"),
+    ("structNameBox", "createviews_hist_struct_name", "Structural")
+]
+
+
+def show_error(message):
+    text = message or "Unknown error."
+    try:
+        forms.alert(text)
+        return
+    except:
+        pass
+
+    try:
+        System.Windows.MessageBox.Show(text, "Create Views Error")
+        return
+    except:
+        pass
+
+    print(text)
 
 
 def natural_sort_key(value):
     text = (value or "").lower()
     return [int(part) if part.isdigit() else part for part in re.split(r'(\d+)', text)]
 
+
+def cfg_get(name, default_value=None):
+    cfg = script.get_config()
+    try:
+        value = getattr(cfg, name)
+        if value is None:
+            return default_value
+        return value
+    except:
+        return default_value
+
+
+def cfg_set(name, value):
+    cfg = script.get_config()
+    setattr(cfg, name, value)
+
+
+def as_text(value, default_value=""):
+    if value is None:
+        return default_value
+    try:
+        return str(value)
+    except:
+        return default_value
+
+
+def parse_history(raw_value):
+    raw_text = as_text(raw_value, "")
+    if not raw_text:
+        return []
+
+    items = []
+    seen = set()
+    for part in raw_text.split("\n"):
+        text = (part or "").strip()
+        if not text:
+            continue
+        key = text.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append(text)
+    return items
+
+
+def read_history(key):
+    return parse_history(cfg_get(key, ""))
+
+
+def write_history(key, items):
+    cfg_set(key, "\n".join(items[:HISTORY_LIMIT]))
+
+
+def setup_history_combo(combo, history_key, default_value):
+    items = read_history(history_key)
+    combo.Items.Clear()
+    for item in items:
+        combo.Items.Add(item)
+
+    if items:
+        combo.Text = items[0]
+    else:
+        combo.Text = default_value or ""
+
+
+def update_history(key, value):
+    text = (value or "").strip()
+    items = []
+    if text:
+        items.append(text)
+
+    for existing in read_history(key):
+        if text and existing.lower() == text.lower():
+            continue
+        items.append(existing)
+
+    write_history(key, items)
+
 # ---------------------------------------------------------
 # Load WPF UI
 # ---------------------------------------------------------
 xaml_path = __file__.replace("script.py", "CreateViews.xaml")
-window = forms.WPFWindow(xaml_path)
+try:
+    window = forms.WPFWindow(xaml_path)
+except Exception:
+    show_error("Failed to load CreateViews.xaml:\n\n{}".format(traceback.format_exc()))
+    forms.alert("Create Views cannot start due to a UI load error.", exitscript=True)
+
+# Load persisted Name Pattern preference (if available)
+persisted_pattern = cfg_get(CFG_NAME_PATTERN_KEY, DEFAULT_NAME_PATTERN)
+try:
+    window.namePatternBox.Text = persisted_pattern or DEFAULT_NAME_PATTERN
+except:
+    window.namePatternBox.Text = DEFAULT_NAME_PATTERN
+
+for field_name, history_key, default_value in TEXT_HISTORY_FIELDS:
+    try:
+        setup_history_combo(getattr(window, field_name), history_key, default_value)
+    except:
+        pass
 
 def select_levels_dialog(doc):
     # Load the XAML
     xaml_path = __file__.replace("script.py", "SelectLevels.xaml")
-    dlg = forms.WPFWindow(xaml_path)
+    try:
+        dlg = forms.WPFWindow(xaml_path)
+    except Exception:
+        show_error("Failed to load SelectLevels.xaml:\n\n{}".format(traceback.format_exc()))
+        return None
 
     # Collect levels once and handle sorting/filtering in the UI callbacks
     all_levels = list(DB.FilteredElementCollector(doc).OfClass(DB.Level).ToElements())
@@ -119,6 +248,9 @@ def select_levels_dialog(doc):
 phase_collector = DB.FilteredElementCollector(doc).OfClass(DB.Phase)
 phases = list(phase_collector)
 
+if not phases:
+    forms.alert("No phases found in this document.", exitscript=True)
+
 # Sort by Revit's internal phase sequence number
 phases = sorted(
     phases,
@@ -186,6 +318,18 @@ populate_template_combo(window.structTemplateCombo, struct_templates)
 # Button Events
 # ---------------------------------------------------------
 def ok_click(sender, args):
+    try:
+        entered_pattern = (window.namePatternBox.Text or "").strip() or DEFAULT_NAME_PATTERN
+        cfg_set(CFG_NAME_PATTERN_KEY, entered_pattern)
+
+        for field_name, history_key, _default_value in TEXT_HISTORY_FIELDS:
+            combo = getattr(window, field_name)
+            update_history(history_key, as_text(getattr(combo, "Text", None), ""))
+
+        script.save_config()
+    except:
+        pass
+
     window.DialogResult = True
     window.Close()
 
@@ -199,20 +343,38 @@ window.cancelButton.Click += cancel_click
 # ---------------------------------------------------------
 # Show UI
 # ---------------------------------------------------------
-result = window.ShowDialog()
+try:
+    result = window.ShowDialog()
+except Exception:
+    show_error("Failed to show Create Views dialog:\n\n{}".format(traceback.format_exc()))
+    forms.alert("Create Views dialog failed to open.", exitscript=True)
+
 if not result:
     forms.alert("Cancelled.", exitscript=True)
 
-selected_phase_name = window.phaseBox.SelectedItem
-selected_phase = phase_map[selected_phase_name]
+def selected_text(combo, default_value=""):
+    text = as_text(getattr(combo, "Text", None), "").strip()
+    if text:
+        return text
 
-prefix = window.prefixBox.Text or ""
-suffix = window.suffixBox.Text or ""
-raw_phase = window.phaseAbbrevBox.Text
-phase_abbrev = raw_phase + "-" if raw_phase else ""#selected_phase.Name
-floor_label = window.floorNameBox.Text or "Floor"
-ceiling_label = window.ceilingNameBox.Text or "Ceiling"
-struct_label = window.structNameBox.Text or "Structural"
+    item = combo.SelectedItem
+    if item is None:
+        return default_value
+    return as_text(item, default_value)
+
+selected_phase_name = selected_text(window.phaseBox)
+selected_phase = phase_map.get(selected_phase_name)
+if selected_phase is None:
+    selected_phase = phases[-1]
+
+prefix = selected_text(window.prefixBox, "")
+suffix = selected_text(window.suffixBox, "")
+name_pattern = (window.namePatternBox.Text or "").strip() or DEFAULT_NAME_PATTERN
+raw_phase = selected_text(window.phaseAbbrevBox, "")
+phase_abbrev = raw_phase or ""
+floor_label = selected_text(window.floorNameBox, "Floor")
+ceiling_label = selected_text(window.ceilingNameBox, "Ceiling")
+struct_label = selected_text(window.structNameBox, "Structural")
 #phase_label = selected_phase.Name
 
 # ---------------------------------------------------------
@@ -260,6 +422,16 @@ floor_vft = get_vft(DB.ViewFamily.FloorPlan) if create_floor else None
 ceiling_vft = get_vft(DB.ViewFamily.CeilingPlan) if create_ceiling else None
 struct_vft = get_vft(DB.ViewFamily.StructuralPlan) if create_struct else None
 
+missing_vfts = []
+if create_floor and not floor_vft:
+    missing_vfts.append("Floor Plan")
+if create_ceiling and not ceiling_vft:
+    missing_vfts.append("Ceiling Plan")
+if create_struct and not struct_vft:
+    missing_vfts.append("Structural Plan")
+if missing_vfts:
+    forms.alert("Could not find ViewFamilyType for: {}".format(", ".join(missing_vfts)), exitscript=True)
+
 # ---------------------------------------------------------
 # Create Views
 # ---------------------------------------------------------
@@ -277,70 +449,118 @@ def safe_name(name):
     illegal = '\\/:{}[]|;<>?'
     return ''.join(c for c in name if c not in illegal)
 
-with revit.Transaction("Create Views"):
-    for lvl in levels:
-        level_name = lvl.Name
-        selected_scope = window.scopeBoxMap[window.scopeBoxCombo.SelectedItem]
+def apply_token_case(text, case_name):
+    value = text or ""
+    if not case_name:
+        return value
 
-        # FLOOR PLAN
-        if create_floor and floor_vft:
-            name = safe_name("{}{}{}-{}{}".format(prefix, phase_abbrev, level_name, floor_label, suffix))
-            template_name = window.floorTemplateCombo.SelectedItem  # or ceiling/struct
-            if name not in existing_names:
-                v = DB.ViewPlan.Create(doc, floor_vft.Id, lvl.Id)
-                v.Name = name
-                v.get_Parameter(DB.BuiltInParameter.VIEW_PHASE).Set(selected_phase.Id)
-                created.append(name)
-            else:
-                skipped.append(name)
-            if template_name != "<None>":
-                template = next((t for t in templates if t.Name == template_name), None)
-                if template:
-                    v.ViewTemplateId = template.Id
-            if selected_scope:
-                param = v.get_Parameter(DB.BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP)
-                if param:
-                    param.Set(selected_scope.Id)
+    case_key = case_name.strip().lower()
+    if case_key == "upper":
+        return value.upper()
+    if case_key == "title":
+        return value.title()
+    return value
 
-        # CEILING PLAN
-        if create_ceiling and ceiling_vft:
-            name = safe_name("{}{}{}-{}{}".format(prefix, phase_abbrev, level_name, ceiling_label, suffix))
-            template_name = window.ceilingTemplateCombo.SelectedItem  # or ceiling/struct
-            if template_name != "<None>":
-                template = next((t for t in templates if t.Name == template_name), None)
-                if template:
-                    v.ViewTemplateId = template.Id
-            if selected_scope:
-                param = v.get_Parameter(DB.BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP)
-                if param:
-                    param.Set(selected_scope.Id)
-            if name not in existing_names:
-                v = DB.ViewPlan.Create(doc, ceiling_vft.Id, lvl.Id)
-                v.Name = name
-                v.get_Parameter(DB.BuiltInParameter.VIEW_PHASE).Set(selected_phase.Id)
-                created.append(name)
-            else:
-                skipped.append(name)
+def render_name_pattern(pattern, token_values):
+    def _replace(match):
+        expr = (match.group(1) or "").strip()
+        if not expr:
+            return ""
 
-        # STRUCTURAL PLAN
-        if create_struct and struct_vft:
-            name = safe_name("{}{}{}-{}{}".format(prefix, phase_abbrev, level_name, struct_label, suffix))
-            template_name = window.structTemplateCombo.SelectedItem  # or ceiling/struct
-            if template_name != "<None>":
-                template = next((t for t in templates if t.Name == template_name), None)
-                if template:
-                    v.ViewTemplateId = template.Id
-            if selected_scope:
-                param = v.get_Parameter(DB.BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP)
-                if param:
-                    param.Set(selected_scope.Id)
-            if name not in existing_names:
-                v = DB.ViewPlan.Create(doc, struct_vft.Id, lvl.Id)
-                v.Name = name
-                v.get_Parameter(DB.BuiltInParameter.VIEW_PHASE).Set(selected_phase.Id)
-                created.append(name)
-            else:
-                skipped.append(name)        
+        token_part = expr
+        case_part = None
+        if "~" in expr:
+            token_part, case_part = expr.split("~", 1)
+
+        token_key = token_part.strip().lower()
+        token_value = token_values.get(token_key)
+        if token_value is None:
+            return match.group(0)
+
+        return apply_token_case(token_value, case_part)
+
+    return re.sub(r'\{([^{}]+)\}', _replace, pattern or "")
+
+def build_view_name(pattern, token_values, prefix_text, suffix_text):
+    base_name = render_name_pattern(pattern, token_values)
+    return safe_name("{}{}{}".format(prefix_text or "", base_name, suffix_text or ""))
+
+def create_plan_view(level, vft, plan_label, template_name, selected_scope, pattern):
+    scope_name = selected_scope.Name if selected_scope else ""
+    token_values = {
+        "phase": selected_phase.Name,
+        "phase_abbrev": phase_abbrev,
+        "plan_type": plan_label,
+        "scopebox": scope_name,
+        "level": level.Name
+    }
+
+    name = build_view_name(pattern, token_values, prefix, suffix).strip()
+    if not name:
+        skipped.append("<empty name for level '{}' plan '{}'>".format(level.Name, plan_label))
+        return
+
+    if name in existing_names:
+        skipped.append(name)
+        return
+
+    v = DB.ViewPlan.Create(doc, vft.Id, level.Id)
+    v.Name = name
+    v.get_Parameter(DB.BuiltInParameter.VIEW_PHASE).Set(selected_phase.Id)
+
+    if template_name != "<None>":
+        template = next((t for t in templates if t.Name == template_name), None)
+        if template:
+            v.ViewTemplateId = template.Id
+
+    if selected_scope:
+        param = v.get_Parameter(DB.BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP)
+        if param:
+            param.Set(selected_scope.Id)
+
+    existing_names.add(name)
+    created.append(name)
+
+try:
+    with revit.Transaction("Create Views"):
+        selected_scope_name = selected_text(window.scopeBoxCombo, "<None>")
+        selected_scope = window.scopeBoxMap.get(selected_scope_name)
+
+        for lvl in levels:
+            # FLOOR PLAN
+            if create_floor and floor_vft:
+                create_plan_view(
+                    lvl,
+                    floor_vft,
+                    floor_label,
+                    selected_text(window.floorTemplateCombo, "<None>"),
+                    selected_scope,
+                    name_pattern
+                )
+
+            # CEILING PLAN
+            if create_ceiling and ceiling_vft:
+                create_plan_view(
+                    lvl,
+                    ceiling_vft,
+                    ceiling_label,
+                    selected_text(window.ceilingTemplateCombo, "<None>"),
+                    selected_scope,
+                    name_pattern
+                )
+
+            # STRUCTURAL PLAN
+            if create_struct and struct_vft:
+                create_plan_view(
+                    lvl,
+                    struct_vft,
+                    struct_label,
+                    selected_text(window.structTemplateCombo, "<None>"),
+                    selected_scope,
+                    name_pattern
+                )
+except Exception:
+    forms.alert("Create Views failed:\n\n{}".format(traceback.format_exc()), exitscript=True)
 # ---------------------------------------------------------
 # Report
 # ---------------------------------------------------------

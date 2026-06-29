@@ -120,32 +120,66 @@
                              Padding="5"/>
                 </DockPanel>
 
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                    <CheckBox x:Name="chk_enable_counter"
-                              Content="Enable Counter ({count} / {param6})"
-                              VerticalAlignment="Center"/>
-                </StackPanel>
-
                 <DockPanel Margin="0,0,0,6">
-                    <TextBlock Text="Start Value:" Width="100" DockPanel.Dock="Left" VerticalAlignment="Center"/>
-                    <TextBox x:Name="txt_counter_start"
-                             Height="24"
-                             Width="160"
-                             FontSize="11" FontFamily="Courier New"
-                             VerticalAlignment="Center"
-                             VerticalContentAlignment="Center"
-                             Padding="3"/>
+                    <TextBlock Text="Counter:" Width="100" DockPanel.Dock="Left" VerticalAlignment="Center"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="18"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="Start" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox x:Name="txt_counter_start"
+                                 Grid.Column="1"
+                                 Height="24"
+                                 FontSize="11" FontFamily="Courier New"
+                                 VerticalAlignment="Center"
+                                 VerticalContentAlignment="Center"
+                                 Padding="3"/>
+
+                        <TextBlock Text="Increment" Grid.Column="3" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox x:Name="txt_counter_increment"
+                                 Grid.Column="4"
+                                 Height="24"
+                                 FontSize="11" FontFamily="Courier New"
+                                 VerticalAlignment="Center"
+                                 VerticalContentAlignment="Center"
+                                 Padding="3"/>
+                    </Grid>
                 </DockPanel>
 
                 <DockPanel Margin="0,0,0,10">
-                    <TextBlock Text="Increment:" Width="100" DockPanel.Dock="Left" VerticalAlignment="Center"/>
-                    <TextBox x:Name="txt_counter_increment"
-                             Height="24"
-                             Width="160"
-                             FontSize="11" FontFamily="Courier New"
-                             VerticalAlignment="Center"
-                             VerticalContentAlignment="Center"
-                             Padding="3"/>
+                    <TextBlock Text="Find/Replace:" Width="100" DockPanel.Dock="Left" VerticalAlignment="Center"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="18"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="Find" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox x:Name="txt_find"
+                                 Grid.Column="1"
+                                 Height="24"
+                                 FontSize="11" FontFamily="Courier New"
+                                 VerticalAlignment="Center"
+                                 VerticalContentAlignment="Center"
+                                 Padding="3"/>
+
+                        <TextBlock Text="Replace" Grid.Column="3" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox x:Name="txt_replace"
+                                 Grid.Column="4"
+                                 Height="24"
+                                 FontSize="11" FontFamily="Courier New"
+                                 VerticalAlignment="Center"
+                                 VerticalContentAlignment="Center"
+                                 Padding="3"/>
+                    </Grid>
                 </DockPanel>
 
                 <Button x:Name="btn_syntax_examples"

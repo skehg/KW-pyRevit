@@ -1,7 +1,7 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Create Plan Views"
-        Height="500" Width="600"
+    Height="560" Width="860"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize">
 
@@ -30,7 +30,8 @@
                 <ComboBox x:Name="phaseBox" Grid.Column="1" Height="26"/>
 
                 <TextBlock Text="Abbrev:" Grid.Column="2" VerticalAlignment="Center" Margin="10 0 0 0"/>
-                <TextBox x:Name="phaseAbbrevBox" Grid.Column="3" Height="26"
+                <ComboBox x:Name="phaseAbbrevBox" Grid.Column="3" Height="26"
+                             IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
                              ToolTip="Optional - alternate name for Phase"/>
             </Grid>
         </GroupBox>
@@ -41,20 +42,39 @@
         <!-- ========================= -->
         <GroupBox Header="Naming Settings" Grid.Row="1" Margin="0 0 0 12">
             <Grid Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="60"/>
+                    <ColumnDefinition Width="120"/>
+                    <ColumnDefinition Width="10"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="60"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="120"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Text="Prefix:" Grid.Column="0" VerticalAlignment="Center"/>
-                <TextBox x:Name="prefixBox" Grid.Column="1" Height="26"
+                <TextBlock Text="Prefix:" Grid.Row="0" Grid.Column="0"/>
+                <TextBlock Text="Name Pattern:" Grid.Row="0" Grid.Column="2"/>
+                <TextBlock Text="Suffix:" Grid.Row="0" Grid.Column="4"/>
+
+                <ComboBox x:Name="prefixBox" Grid.Row="1" Grid.Column="0" Height="26"
+                             IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
                              ToolTip="Optional Prefix. Include delimiter"/>
 
-                <TextBlock Text="Suffix:" Grid.Column="2" VerticalAlignment="Center" Margin="10 0 0 0"/>
-                <TextBox x:Name="suffixBox" Grid.Column="3" Height="26"
+                <TextBox x:Name="namePatternBox" Grid.Row="1" Grid.Column="2" Height="26"
+                             Text="{}{phase_abbrev~upper}-{level~upper}-{plan_type~upper}"
+                             ToolTip="Use tokens: {phase}, {phase_abbrev}, {plan_type}, {scopebox}, {level}. Optional per-token case: ~upper or ~title."/>
+
+                <ComboBox x:Name="suffixBox" Grid.Row="1" Grid.Column="4" Height="26"
+                             IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
                              ToolTip="Optional Suffix. Include delimiter"/>
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="5" Margin="0 8 0 0"
+                           TextWrapping="Wrap"
+                           Foreground="#666"
+                           Text="Example: {phase_abbrev~upper} {plan_type}-{level}. Prefix and Suffix are applied automatically around the pattern."/>
             </Grid>
         </GroupBox>
 
@@ -74,7 +94,8 @@
                     </Grid.ColumnDefinitions>
 
                     <CheckBox x:Name="floorPlanBox" Content="Floor Plan" Grid.Column="0" IsChecked="True"/>
-                    <TextBox x:Name="floorNameBox" Grid.Column="2" Height="24" Margin="10 0 0 0"
+                    <ComboBox x:Name="floorNameBox" Grid.Column="2" Height="24" Margin="10 0 0 0"
+                             IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
                              ToolTip="Optional custom name for Floor Plans"/>
                     <ComboBox x:Name="floorTemplateCombo" Grid.Column="1" Height="24" Margin="10 0 0 0"/>
 
@@ -89,7 +110,8 @@
                     </Grid.ColumnDefinitions>
 
                     <CheckBox x:Name="ceilingPlanBox" Content="Ceiling Plan" Grid.Column="0"/>
-                    <TextBox x:Name="ceilingNameBox" Grid.Column="2" Height="24" Margin="10 0 0 0"
+                    <ComboBox x:Name="ceilingNameBox" Grid.Column="2" Height="24" Margin="10 0 0 0"
+                             IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
                              ToolTip="Optional custom name for Ceiling Plans"/>
                     <ComboBox x:Name="ceilingTemplateCombo" Grid.Column="1" Height="24" Margin="10 0 0 0"/>
 
@@ -104,7 +126,8 @@
                     </Grid.ColumnDefinitions>
 
                     <CheckBox x:Name="structPlanBox" Content="Structural Plan" Grid.Column="0"/>
-                    <TextBox x:Name="structNameBox" Grid.Column="2" Height="24" Margin="10 0 0 0"
+                    <ComboBox x:Name="structNameBox" Grid.Column="2" Height="24" Margin="10 0 0 0"
+                             IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
                              ToolTip="Optional custom name for Structural Plans"/>
                     <ComboBox x:Name="structTemplateCombo" Grid.Column="1" Height="24" Margin="10 0 0 0"/>
 
