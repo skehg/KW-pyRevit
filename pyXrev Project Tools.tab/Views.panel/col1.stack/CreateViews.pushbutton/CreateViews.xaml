@@ -131,6 +131,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="130"/>
@@ -139,8 +140,8 @@
                             <ColumnDefinition Width="95"/>
                         </Grid.ColumnDefinitions>
 
-                        <TextBlock Text="Titleblock" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="titleblockCombo" Grid.Row="0" Grid.Column="1" Height="26" Margin="10 0 10 0"/>
+                        <TextBlock Text="Template Sheet" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="templateSheetCombo" Grid.Row="0" Grid.Column="1" Height="26" Margin="10 0 10 0"/>
                         <TextBlock Text="Start" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="0 0 5 0"/>
                         <TextBox x:Name="sheetStartBox" Grid.Row="0" Grid.Column="3" Height="26" Text="001"/>
 
@@ -149,6 +150,13 @@
                         <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0 8 0 0" Foreground="#666"
                                    TextWrapping="Wrap"
                                    Text="Select Include on Sheet rows in the grid and sequence will preview in order."/>
+
+                        <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="4" Orientation="Horizontal" Margin="0 10 0 0">
+                            <CheckBox x:Name="copyDetailingBox" Content="Copy detailing" IsChecked="True" Margin="0 0 16 0"/>
+                            <CheckBox x:Name="copyLegendsBox" Content="Copy legends" IsChecked="True" Margin="0 0 16 0"/>
+                            <CheckBox x:Name="copySchedulesBox" Content="Copy schedules" IsChecked="True" Margin="0 0 16 0"/>
+                            <CheckBox x:Name="removeRevisionsBox" Content="Remove revisions" IsChecked="True"/>
+                        </StackPanel>
                     </Grid>
                 </GroupBox>
             </StackPanel>
@@ -206,18 +214,12 @@
 
                 <Grid Grid.Row="1">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="8"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" VerticalAlignment="Top">
-                        <Button x:Name="moveUpButton" Content="Move Up" Width="90" Height="28" Margin="0 0 0 6"/>
-                        <Button x:Name="moveDownButton" Content="Move Down" Width="90" Height="28"/>
-                    </StackPanel>
-
                     <DataGrid x:Name="queueGrid"
-                              Grid.Column="2"
+                              Grid.Column="0"
+                              Grid.ColumnSpan="1"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               CanUserDeleteRows="False"
@@ -237,16 +239,17 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
+                            <DataGridTextColumn Binding="{Binding SheetNumberPreview}" Header="Sheet No." Width="100" IsReadOnly="True"/>
+                            <DataGridTextColumn Binding="{Binding ViewName}" Header="View Name" Width="220"/>
                             <DataGridTextColumn Binding="{Binding LevelName}" Header="Level" Width="140" IsReadOnly="True"/>
                             <DataGridTextColumn Binding="{Binding PlanType}" Header="Plan Type" Width="100" IsReadOnly="True"/>
-                            <DataGridTextColumn Binding="{Binding RowType}" Header="Type" Width="85" IsReadOnly="True"/>
-                            <DataGridTextColumn Binding="{Binding ParentName}" Header="Parent" Width="170" IsReadOnly="True"/>
-                            <DataGridTextColumn Binding="{Binding TemplateName}" Header="Template" Width="170"/>
                             <DataGridComboBoxColumn x:Name="gridScopeColumn" Header="Scope Box" Width="170"
                                                     SelectedItemBinding="{Binding ScopeName, UpdateSourceTrigger=PropertyChanged}"/>
-                            <DataGridTextColumn Binding="{Binding ViewName}" Header="View Name" Width="220"/>
-                            <DataGridTextColumn Binding="{Binding SheetNumberOverride, UpdateSourceTrigger=PropertyChanged}" Header="Sheet Override" Width="110"/>
-                            <DataGridTextColumn Binding="{Binding SheetNumberPreview}" Header="Sheet No." Width="100" IsReadOnly="True"/>
+                            <DataGridTextColumn Binding="{Binding ParentName}" Header="Parent" Width="170" IsReadOnly="True"/>
+                            <DataGridTextColumn Binding="{Binding TemplateName}" Header="View Template" Width="170"/>
+                            <DataGridTextColumn Binding="{Binding SheetTemplateName, UpdateSourceTrigger=PropertyChanged}" Header="Sheet Template" Width="180"/>
+                            <DataGridTextColumn Binding="{Binding SheetNumberOverride, UpdateSourceTrigger=PropertyChanged}" Header="Sheet No. Override" Width="120"/>
+                            <DataGridTextColumn Binding="{Binding SheetNameOverride, UpdateSourceTrigger=PropertyChanged}" Header="Sheet Name Override" Width="180"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>

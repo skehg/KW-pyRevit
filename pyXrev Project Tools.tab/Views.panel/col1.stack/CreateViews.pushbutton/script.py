@@ -9,7 +9,6 @@ import datetime
 import csv
 import codecs
 from System.Windows.Controls import CheckBox
-from System.Windows.Controls import DataGridRow
 from System.Windows.Controls import TextBox
 from System.Windows.Controls import ComboBox
 from System.Windows.Controls.Primitives import ButtonBase, ToggleButton
@@ -17,6 +16,7 @@ from System.Windows import RoutedEventHandler
 from System.Windows import Input
 from System.Windows.Media import VisualTreeHelper
 from System.Collections.ObjectModel import ObservableCollection
+from System.Collections.Generic import List
 from Autodesk.Revit.UI import TaskDialog, TaskDialogCommandLinkId
 from System.ComponentModel import INotifyPropertyChanged, PropertyChangedEventArgs
 
@@ -28,7 +28,11 @@ CFG_NAME_PATTERN_KEY = "createviews_name_pattern"
 CFG_SHEET_START_KEY = "createviews_sheet_start"
 CFG_SHEET_INCREMENT_KEY = "createviews_sheet_increment"
 CFG_DEPENDENT_COUNT_KEY = "createviews_dependent_count"
-CFG_TITLEBLOCK_NAME_KEY = "createviews_titleblock_name"
+CFG_TEMPLATE_SHEET_KEY = "createviews_template_sheet"
+CFG_COPY_DETAILING_KEY = "createviews_copy_detailing"
+CFG_COPY_LEGENDS_KEY = "createviews_copy_legends"
+CFG_COPY_SCHEDULES_KEY = "createviews_copy_schedules"
+CFG_REMOVE_REVISIONS_KEY = "createviews_remove_revisions"
 HISTORY_LIMIT = 25
 
 NUMERIC_REGEX = re.compile(r'^\d+$')
@@ -43,6 +47,13 @@ TEXT_HISTORY_FIELDS = [
     ("ceilingNameBox", "createviews_hist_ceiling_name", "Ceiling"),
     ("structNameBox", "createviews_hist_struct_name", "Structural")
 ]
+
+sheet_number_counter_state = {
+    "signature": None,
+    "generator": None,
+    "index": 0,
+    "error": None
+}
 
 
 class QueueRow(INotifyPropertyChanged):
@@ -73,6 +84,9 @@ class QueueRow(INotifyPropertyChanged):
         self.ParentName = parent_name
         self.IncludeOnSheet = False
         self.SheetNumberOverride = ""
+        self.SheetNameOverride = ""
+        self.SheetTemplateName = ""
+        self.SheetNumberAssigned = ""
         self.SheetNumberPreview = ""
 
     def add_PropertyChanged(self, handler):
@@ -94,7 +108,7 @@ class QueueRow(INotifyPropertyChanged):
         object.__setattr__(self, name, value)
         if name.startswith("_"):
             return
-        if name in ("RowId", "Level", "PlanKey", "LevelName", "PlanType", "TemplateName", "ScopeName", "ViewName", "RowType", "ParentRowId", "ParentName", "IncludeOnSheet", "SheetNumberOverride", "SheetNumberPreview"):
+        if name in ("RowId", "Level", "PlanKey", "LevelName", "PlanType", "TemplateName", "ScopeName", "ViewName", "RowType", "ParentRowId", "ParentName", "IncludeOnSheet", "SheetNumberOverride", "SheetNameOverride", "SheetTemplateName", "SheetNumberAssigned", "SheetNumberPreview"):
             try:
                 self._notify(name)
             except:
@@ -248,6 +262,27 @@ def as_text(value, default_value=""):
         return str(value)
     except:
         return default_value
+
+
+def as_bool(value, default_value=False):
+    if value is None:
+        return default_value
+
+    if isinstance(value, bool):
+        return value
+
+    try:
+        if isinstance(value, int):
+            return value != 0
+    except:
+        pass
+
+    text = as_text(value, "").strip().lower()
+    if text in ("1", "true", "yes", "y", "on"):
+        return True
+    if text in ("0", "false", "no", "n", "off"):
+        return False
+    return default_value
 
 
 def parse_history(raw_value):
@@ -434,6 +469,114 @@ def build_counter_generator(start_text, increment_text):
     return None, 'Unsupported start format. Use numeric, alphabetic, or prefix+numeric (e.g. SK-001).'
 
 
+def _sheet_number_counter_signature():
+    return (
+        as_text(window.sheetStartBox.Text, "001"),
+        as_text(window.sheetIncrementBox.Text, "1")
+    )
+
+
+def reset_sheet_number_counter_state():
+    generator, error = build_counter_generator(window.sheetStartBox.Text, window.sheetIncrementBox.Text)
+    sheet_number_counter_state["signature"] = _sheet_number_counter_signature()
+    sheet_number_counter_state["generator"] = generator
+    sheet_number_counter_state["index"] = 0
+    sheet_number_counter_state["error"] = error
+    return generator, error
+
+
+def ensure_sheet_number_counter_state():
+    signature = _sheet_number_counter_signature()
+    if sheet_number_counter_state.get("signature") != signature:
+        return reset_sheet_number_counter_state()
+    return sheet_number_counter_state.get("generator"), sheet_number_counter_state.get("error")
+
+
+def assign_next_sheet_number():
+    generator, error = ensure_sheet_number_counter_state()
+    if generator is None:
+        return None, error
+
+    try:
+        value = generator(sheet_number_counter_state["index"])
+    except Exception:
+        return None, "Failed to generate the next sheet number."
+
+    sheet_number_counter_state["index"] += 1
+    return value, None
+
+
+def get_row_sheet_number(row):
+    if row is None:
+        return ""
+
+    override_no = (row.SheetNumberOverride or "").strip()
+    if override_no:
+        return override_no
+
+    assigned_no = (row.SheetNumberAssigned or "").strip()
+    if assigned_no:
+        return assigned_no
+
+    return (row.SheetNumberPreview or "").strip()
+
+
+def set_row_sheet_number_preview(row):
+    if row is None:
+        return
+
+    if not bool(row.IncludeOnSheet):
+        row.SheetNumberPreview = ""
+        return
+
+    override_no = (row.SheetNumberOverride or "").strip()
+    if override_no:
+        row.SheetNumberPreview = override_no
+        return
+
+    assigned_no = (row.SheetNumberAssigned or "").strip()
+    if assigned_no:
+        row.SheetNumberPreview = assigned_no
+        return
+
+    assigned_no, error = assign_next_sheet_number()
+    if assigned_no:
+        row.SheetNumberAssigned = assigned_no
+        row.SheetNumberPreview = assigned_no
+    else:
+        row.SheetNumberPreview = ""
+
+
+def clear_row_sheet_number_assignment(row):
+    if row is None:
+        return
+
+    row.SheetNumberAssigned = ""
+    row.SheetNumberPreview = ""
+
+
+def get_existing_sheet_number_set():
+    numbers = set()
+    try:
+        sheets = DB.FilteredElementCollector(doc)\
+            .OfClass(DB.ViewSheet)\
+            .WhereElementIsNotElementType()\
+            .ToElements()
+    except:
+        sheets = []
+
+    for sheet in sheets:
+        try:
+            sheet_no = (sheet.SheetNumber or "").strip()
+        except:
+            sheet_no = ""
+
+        if sheet_no:
+            numbers.add(sheet_no.lower())
+
+    return numbers
+
+
 def plan_key_to_view_family(plan_key):
     if plan_key == "floor":
         return DB.ViewFamily.FloorPlan
@@ -523,6 +666,437 @@ def _safe_titleblock_display(tb):
     return "{} : {}".format(fam, name)
 
 
+def _safe_sheet_display(sheet):
+    number = as_text(getattr(sheet, 'SheetNumber', None), "")
+    name = as_text(getattr(sheet, 'Name', None), "")
+    if not number and not name:
+        return "<Unnamed Sheet>"
+    if not number:
+        return name
+    if not name:
+        return number
+    return "{} - {}".format(number, name)
+
+
+def _is_placeholder_sheet(sheet):
+    try:
+        return bool(getattr(sheet, 'IsPlaceholder', False))
+    except:
+        return False
+
+
+def get_sheet_titleblock_type_id(sheet):
+    if sheet is None:
+        return DB.ElementId.InvalidElementId
+
+    try:
+        title_blocks = DB.FilteredElementCollector(doc, sheet.Id)\
+            .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)\
+            .WhereElementIsNotElementType()\
+            .ToElements()
+    except:
+        title_blocks = []
+
+    for tb in title_blocks:
+        try:
+            return tb.GetTypeId()
+        except:
+            continue
+
+    return DB.ElementId.InvalidElementId
+
+
+def get_template_plan_reference(template_sheet):
+    if template_sheet is None:
+        return None, None
+
+    try:
+        viewport_ids = list(template_sheet.GetAllViewports())
+    except:
+        viewport_ids = []
+
+    for viewport_id in viewport_ids:
+        viewport = doc.GetElement(viewport_id)
+        if viewport is None:
+            continue
+
+        view_obj = doc.GetElement(viewport.ViewId)
+        if view_obj is None:
+            continue
+
+        try:
+            if isinstance(view_obj, DB.ViewPlan):
+                return viewport, view_obj
+        except:
+            continue
+
+    return None, None
+
+
+def get_template_legend_viewports(template_sheet):
+    results = []
+    if template_sheet is None:
+        return results
+
+    try:
+        viewport_ids = list(template_sheet.GetAllViewports())
+    except:
+        viewport_ids = []
+
+    for viewport_id in viewport_ids:
+        viewport = doc.GetElement(viewport_id)
+        if viewport is None:
+            continue
+
+        view_obj = doc.GetElement(viewport.ViewId)
+        if view_obj is None:
+            continue
+
+        try:
+            if view_obj.ViewType == DB.ViewType.Legend:
+                results.append((viewport, view_obj))
+        except:
+            continue
+
+    return results
+
+
+def get_template_schedule_instances(template_sheet):
+    schedules = []
+    if template_sheet is None:
+        return schedules
+
+    try:
+        all_instances = DB.FilteredElementCollector(doc, template_sheet.Id)\
+            .OfClass(DB.ScheduleSheetInstance)\
+            .ToElements()
+    except:
+        all_instances = []
+
+    for inst in all_instances:
+        try:
+            if inst.IsTitleblockRevisionSchedule:
+                continue
+        except:
+            pass
+
+        schedules.append(inst)
+
+    return schedules
+
+
+def copy_template_sheet_parameters(template_sheet, new_sheet, warnings_list=None):
+    if template_sheet is None or new_sheet is None:
+        return
+
+    def _warn(msg):
+        if warnings_list is not None:
+            warnings_list.append(msg)
+
+    # Revit 2025+ exposes Sheet Collection through ViewSheet.SheetCollectionId.
+    has_sheet_collection_property = False
+    try:
+        source_sheet_collection_id = getattr(template_sheet, 'SheetCollectionId', DB.ElementId.InvalidElementId)
+        has_sheet_collection_property = hasattr(template_sheet, 'SheetCollectionId')
+    except:
+        source_sheet_collection_id = DB.ElementId.InvalidElementId
+        has_sheet_collection_property = False
+
+    copied_sheet_collection = False
+    source_has_sheet_collection_value = False
+
+    try:
+        if source_sheet_collection_id and source_sheet_collection_id != DB.ElementId.InvalidElementId:
+            source_has_sheet_collection_value = True
+    except:
+        source_has_sheet_collection_value = False
+
+    try:
+        if source_sheet_collection_id and source_sheet_collection_id != DB.ElementId.InvalidElementId:
+            new_sheet.SheetCollectionId = source_sheet_collection_id
+            try:
+                current_id = getattr(new_sheet, 'SheetCollectionId', DB.ElementId.InvalidElementId)
+                copied_sheet_collection = (current_id == source_sheet_collection_id)
+            except:
+                copied_sheet_collection = False
+    except:
+        copied_sheet_collection = False
+
+    # Fallback: try parameter-by-name if property assignment is unavailable or did not persist.
+    if not copied_sheet_collection:
+        try:
+            source_param = template_sheet.LookupParameter("Sheet Collection")
+            target_param = new_sheet.LookupParameter("Sheet Collection")
+        except:
+            source_param = None
+            target_param = None
+
+        if source_param is not None and target_param is not None:
+            try:
+                if (not target_param.IsReadOnly) and source_param.HasValue:
+                    source_has_sheet_collection_value = True
+                    storage = source_param.StorageType
+                    if storage == DB.StorageType.String:
+                        target_param.Set(source_param.AsString())
+                    elif storage == DB.StorageType.Integer:
+                        target_param.Set(source_param.AsInteger())
+                    elif storage == DB.StorageType.Double:
+                        target_param.Set(source_param.AsDouble())
+                    elif storage == DB.StorageType.ElementId:
+                        target_param.Set(source_param.AsElementId())
+
+                    try:
+                        if storage == DB.StorageType.ElementId:
+                            copied_sheet_collection = (target_param.AsElementId() == source_param.AsElementId())
+                        elif storage == DB.StorageType.Integer:
+                            copied_sheet_collection = (target_param.AsInteger() == source_param.AsInteger())
+                        elif storage == DB.StorageType.Double:
+                            copied_sheet_collection = (target_param.AsDouble() == source_param.AsDouble())
+                        else:
+                            copied_sheet_collection = (as_text(target_param.AsString(), "") == as_text(source_param.AsString(), ""))
+                    except:
+                        copied_sheet_collection = False
+            except:
+                copied_sheet_collection = False
+
+    # If neither API property nor parameter lookup can resolve a source value, surface it.
+    if not source_has_sheet_collection_value:
+        try:
+            revit_major = int(as_text(doc.Application.VersionNumber, "0"))
+        except:
+            revit_major = 0
+
+        if revit_major >= 2025:
+            if not has_sheet_collection_property:
+                _warn("Sheet Collection could not be copied for template sheet '{}': this Revit API build does not expose ViewSheet.SheetCollectionId. Consider Revit 2025.3+ API/runtime alignment.".format(as_text(getattr(template_sheet, 'SheetNumber', None), "?")))
+            else:
+                _warn("Sheet Collection source value was not resolvable for template sheet '{}'. The sheet may have no collection assigned, or localized parameter name lookup ('Sheet Collection') did not match.".format(as_text(getattr(template_sheet, 'SheetNumber', None), "?")))
+
+    if source_has_sheet_collection_value and not copied_sheet_collection:
+        _warn("Could not copy Sheet Collection from template sheet '{}' to new sheet '{}'. Check whether the target sheet allows editing SheetCollectionId in this project state.".format(as_text(getattr(template_sheet, 'SheetNumber', None), "?"), as_text(getattr(new_sheet, 'SheetNumber', None), "?")))
+
+    excluded_names = set(["sheet number", "sheet name", "revisions on sheet"])
+    excluded_bips = set([
+        int(DB.BuiltInParameter.SHEET_NUMBER),
+        int(DB.BuiltInParameter.SHEET_NAME),
+        int(DB.BuiltInParameter.SHEET_CURRENT_REVISION)
+    ])
+
+    try:
+        source_params = list(template_sheet.Parameters)
+    except:
+        source_params = []
+
+    for source_param in source_params:
+        if source_param is None:
+            continue
+
+        try:
+            source_id_int = source_param.Id.IntegerValue
+        except:
+            source_id_int = None
+
+        if source_id_int in excluded_bips:
+            continue
+
+        try:
+            param_name = as_text(source_param.Definition.Name, "").strip()
+        except:
+            param_name = ""
+
+        if not param_name:
+            continue
+
+        if param_name.lower() in excluded_names:
+            continue
+
+        try:
+            if not source_param.HasValue:
+                continue
+        except:
+            pass
+
+        try:
+            target_param = new_sheet.LookupParameter(param_name)
+        except:
+            target_param = None
+
+        if target_param is None:
+            continue
+
+        try:
+            if target_param.IsReadOnly:
+                continue
+        except:
+            continue
+
+        try:
+            storage = source_param.StorageType
+            if storage == DB.StorageType.String:
+                target_param.Set(source_param.AsString())
+            elif storage == DB.StorageType.Integer:
+                target_param.Set(source_param.AsInteger())
+            elif storage == DB.StorageType.Double:
+                target_param.Set(source_param.AsDouble())
+            elif storage == DB.StorageType.ElementId:
+                target_param.Set(source_param.AsElementId())
+        except:
+            continue
+
+
+def _ensure_crop_enabled(view_obj):
+    if view_obj is None:
+        return
+
+    try:
+        crop_param = view_obj.get_Parameter(DB.BuiltInParameter.VIEWER_CROP_REGION)
+        if crop_param and not crop_param.AsInteger():
+            crop_param.Set(1)
+    except:
+        pass
+
+
+def _hide_view_elements_temp(view_obj):
+    if view_obj is None:
+        return
+
+    try:
+        element_ids = DB.FilteredElementCollector(doc, view_obj.Id).WhereElementIsNotElementType().ToElementIds()
+        if element_ids and element_ids.Count > 0:
+            view_obj.HideElementsTemporary(element_ids)
+    except:
+        pass
+
+
+def _clear_view_temp_hide(view_obj):
+    if view_obj is None:
+        return
+
+    try:
+        view_obj.DisableTemporaryViewMode(DB.TemporaryViewMode.TemporaryHideIsolate)
+    except:
+        pass
+
+
+def align_viewport_to_template_center(template_view, template_viewport, target_view, target_viewport):
+    if template_view is None or template_viewport is None or target_view is None or target_viewport is None:
+        return False
+
+    try:
+        _ensure_crop_enabled(template_view)
+        _ensure_crop_enabled(target_view)
+        _hide_view_elements_temp(template_view)
+        _hide_view_elements_temp(target_view)
+        target_viewport.SetBoxCenter(template_viewport.GetBoxCenter())
+        return True
+    except:
+        return False
+    finally:
+        _clear_view_temp_hide(target_view)
+        _clear_view_temp_hide(template_view)
+
+
+def apply_template_viewport_settings(template_viewport, target_viewport):
+    if template_viewport is None or target_viewport is None:
+        return
+
+    # Match viewport type first; this carries most title/graphics settings.
+    try:
+        template_type_id = template_viewport.GetTypeId()
+        if template_type_id and template_type_id != target_viewport.GetTypeId():
+            target_viewport.ChangeTypeId(template_type_id)
+    except:
+        pass
+
+    # Best-effort copy of writable instance parameters that are not identity fields.
+    excluded_ids = set([
+        int(DB.BuiltInParameter.VIEWPORT_SHEET_NUMBER),
+        int(DB.BuiltInParameter.VIEWPORT_SHEET_NAME),
+        int(DB.BuiltInParameter.VIEWPORT_VIEW_NAME),
+        int(DB.BuiltInParameter.VIEWPORT_DETAIL_NUMBER)
+    ])
+
+    try:
+        template_params = list(template_viewport.Parameters)
+    except:
+        template_params = []
+
+    for source_param in template_params:
+        if source_param is None:
+            continue
+
+        try:
+            source_id = source_param.Id
+            source_int = source_id.IntegerValue
+        except:
+            continue
+
+        if source_int in excluded_ids:
+            continue
+
+        try:
+            if not source_param.HasValue:
+                continue
+        except:
+            pass
+
+        try:
+            target_param = target_viewport.get_Parameter(source_id)
+        except:
+            target_param = None
+
+        if target_param is None:
+            continue
+
+        try:
+            if target_param.IsReadOnly:
+                continue
+        except:
+            continue
+
+        try:
+            storage = source_param.StorageType
+            if storage == DB.StorageType.String:
+                target_param.Set(source_param.AsString())
+            elif storage == DB.StorageType.Integer:
+                target_param.Set(source_param.AsInteger())
+            elif storage == DB.StorageType.Double:
+                target_param.Set(source_param.AsDouble())
+            elif storage == DB.StorageType.ElementId:
+                target_param.Set(source_param.AsElementId())
+        except:
+            continue
+
+
+def remove_template_inherited_revisions(sheet, template_revision_ints):
+    if sheet is None:
+        return
+
+    if not template_revision_ints:
+        return
+
+    try:
+        current_ids = sheet.GetAdditionalRevisionIds()
+    except:
+        current_ids = None
+
+    if not current_ids:
+        return
+
+    keep_ids = List[DB.ElementId]()
+    for rev_id in current_ids:
+        try:
+            if rev_id.IntegerValue not in template_revision_ints:
+                keep_ids.Add(rev_id)
+        except:
+            keep_ids.Add(rev_id)
+
+    try:
+        sheet.SetAdditionalRevisionIds(keep_ids)
+    except:
+        pass
+
+
 xaml_path = __file__.replace("script.py", "CreateViews.xaml")
 print("CreateViews: startup begin")
 try:
@@ -604,7 +1178,7 @@ try:
 
     floor_templates = [t for t in all_templates if t.ViewType == DB.ViewType.FloorPlan]
     ceiling_templates = [t for t in all_templates if t.ViewType == DB.ViewType.CeilingPlan]
-    struct_templates = [t for t in all_templates if t.ViewType == DB.ViewType.EngineeringPlan]
+    struct_templates = list(floor_templates)
 
     def populate_template_combo(combo, items):
         combo.Items.Clear()
@@ -621,29 +1195,42 @@ try:
     template_lists = {
         "floor": floor_templates,
         "ceiling": ceiling_templates,
-        "struct": struct_templates
+        "struct": floor_templates
     }
 
-    print("CreateViews: load titleblocks")
-    titleblock_types = DB.FilteredElementCollector(doc)\
-        .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)\
-        .WhereElementIsElementType()\
+    print("CreateViews: load template sheets")
+    template_sheets = DB.FilteredElementCollector(doc)\
+        .OfClass(DB.ViewSheet)\
+        .WhereElementIsNotElementType()\
         .ToElements()
-    titleblock_types = sorted(titleblock_types, key=lambda tb: natural_sort_key(_safe_titleblock_display(tb)))
+    template_sheets = [s for s in template_sheets if not _is_placeholder_sheet(s)]
+    template_sheets = sorted(template_sheets, key=lambda s: natural_sort_key(_safe_sheet_display(s)))
 
-    window.titleblockMap = {}
-    window.titleblockCombo.Items.Add("<None>")
-    window.titleblockMap["<None>"] = None
-    for tb in titleblock_types:
-        display = _safe_titleblock_display(tb)
-        window.titleblockCombo.Items.Add(display)
-        window.titleblockMap[display] = tb
+    window.templateSheetMap = {}
+    window.templateSheetCombo.Items.Add("<None>")
+    window.templateSheetMap["<None>"] = None
 
-    saved_tb = as_text(cfg_get(CFG_TITLEBLOCK_NAME_KEY, "<None>"), "<None>")
-    if saved_tb in window.titleblockMap:
-        window.titleblockCombo.SelectedItem = saved_tb
+    for sheet in template_sheets:
+        display = _safe_sheet_display(sheet)
+        unique_display = display
+        suffix = 2
+        while unique_display in window.templateSheetMap:
+            unique_display = "{} ({})".format(display, suffix)
+            suffix += 1
+
+        window.templateSheetCombo.Items.Add(unique_display)
+        window.templateSheetMap[unique_display] = sheet
+
+    saved_template_sheet = as_text(cfg_get(CFG_TEMPLATE_SHEET_KEY, "<None>"), "<None>")
+    if saved_template_sheet in window.templateSheetMap:
+        window.templateSheetCombo.SelectedItem = saved_template_sheet
     else:
-        window.titleblockCombo.SelectedIndex = 0
+        window.templateSheetCombo.SelectedIndex = 0
+
+    window.copyDetailingBox.IsChecked = as_bool(cfg_get(CFG_COPY_DETAILING_KEY, True), True)
+    window.copyLegendsBox.IsChecked = as_bool(cfg_get(CFG_COPY_LEGENDS_KEY, True), True)
+    window.copySchedulesBox.IsChecked = as_bool(cfg_get(CFG_COPY_SCHEDULES_KEY, True), True)
+    window.removeRevisionsBox.IsChecked = as_bool(cfg_get(CFG_REMOVE_REVISIONS_KEY, True), True)
 
     print("CreateViews: setup queue grid")
     queue_rows = ObservableCollection[object]()
@@ -861,28 +1448,13 @@ def rebuild_queue_preview():
     is_refreshing_preview[0] = True
     suppress_checkbox_events[0] = True
     try:
+        ensure_sheet_number_counter_state()
+
         for row in queue_rows:
             row.SheetNumberPreview = ""
 
-        ordered_rows = get_display_order_rows()
-        include_rows = [r for r in ordered_rows if bool(r.IncludeOnSheet)]
-        if not include_rows:
-            return
-
-        counter_gen, _error = build_counter_generator(window.sheetStartBox.Text, window.sheetIncrementBox.Text)
-        if counter_gen is None:
-            for row in include_rows:
-                row.SheetNumberPreview = (row.SheetNumberOverride or "").strip()
-            return
-
-        idx = 0
-        for row in include_rows:
-            override_no = (row.SheetNumberOverride or "").strip()
-            if override_no:
-                row.SheetNumberPreview = override_no
-            else:
-                row.SheetNumberPreview = counter_gen(idx)
-                idx += 1
+        for row in get_display_order_rows():
+            set_row_sheet_number_preview(row)
     finally:
         suppress_checkbox_events[0] = False
         is_refreshing_preview[0] = False
@@ -916,26 +1488,10 @@ def build_sheet_number_map(include_rows):
     duplicate_numbers = []
     seen = set()
 
-    has_auto = False
     for row in include_rows:
-        if not (row.SheetNumberOverride or "").strip():
-            has_auto = True
-            break
-
-    counter_gen = None
-    if has_auto:
-        counter_gen, counter_error = build_counter_generator(window.sheetStartBox.Text, window.sheetIncrementBox.Text)
-        if counter_gen is None:
-            return None, counter_error
-
-    idx = 0
-    for row in include_rows:
-        override_no = (row.SheetNumberOverride or "").strip()
-        if override_no:
-            sheet_no = override_no
-        else:
-            sheet_no = counter_gen(idx)
-            idx += 1
+        sheet_no = get_row_sheet_number(row)
+        if not sheet_no:
+            return None, "Missing sheet number for included row: {}".format(row.ViewName)
 
         key = sheet_no.lower()
         if key in seen:
@@ -946,6 +1502,17 @@ def build_sheet_number_map(include_rows):
     if duplicate_numbers:
         unique_duplicates = sorted(list(set(duplicate_numbers)), key=natural_sort_key)
         return None, "Duplicate sheet numbers in queue: {}".format(", ".join(unique_duplicates))
+
+    existing_sheet_numbers = get_existing_sheet_number_set()
+    clashes = []
+    for row in include_rows:
+        sheet_no = sheet_numbers.get(row.RowId, "")
+        if sheet_no and sheet_no.lower() in existing_sheet_numbers:
+            clashes.append(sheet_no)
+
+    if clashes:
+        unique_clashes = sorted(list(set(clashes)), key=natural_sort_key)
+        return None, "Sheet number clash with existing sheets: {}".format(", ".join(unique_clashes))
 
     return sheet_numbers, None
 
@@ -1175,6 +1742,7 @@ def duplicate_as_dependent(sender=None, args=None):
                     source.ViewName
                 )
                 row.IncludeOnSheet = bool(source.IncludeOnSheet)
+                row.SheetTemplateName = (source.SheetTemplateName or "").strip()
                 queue_rows.Add(row)
                 added += 1
     finally:
@@ -1188,10 +1756,12 @@ def duplicate_as_dependent(sender=None, args=None):
 
 def include_all(sender=None, args=None):
     commit_queue_grid_edits()
+    current_template_sheet = selected_text(window.templateSheetCombo, "<None>")
     batch_preview_update_active[0] = True
     try:
         for row in queue_rows:
             row.IncludeOnSheet = True
+            row.SheetTemplateName = current_template_sheet
     finally:
         batch_preview_update_active[0] = False
 
@@ -1204,15 +1774,17 @@ def include_none(sender=None, args=None):
     try:
         for row in queue_rows:
             row.IncludeOnSheet = False
+            clear_row_sheet_number_assignment(row)
+            row.SheetTemplateName = ""
     finally:
         batch_preview_update_active[0] = False
 
+    reset_sheet_number_counter_state()
     schedule_queue_preview_refresh()
 
 
 def _parse_bool(text):
-    value = (text or "").strip().lower()
-    return value in ("1", "true", "yes", "y", "on")
+    return as_bool(text, False)
 
 
 def _normalize_plan_key(raw_key, raw_label):
@@ -1254,7 +1826,7 @@ def export_queue_csv(sender=None, args=None):
 
     header = [
         "RowType", "Level", "PlanKey", "PlanType", "Template", "Scope Box",
-        "View Name", "Include On Sheet", "Sheet Override", "Parent View"
+        "View Name", "Include On Sheet", "Sheet No. Override", "Sheet Name Override", "Sheet Template", "Parent View"
     ]
 
     try:
@@ -1272,6 +1844,8 @@ def export_queue_csv(sender=None, args=None):
                     as_text(row.ViewName, ""),
                     "True" if bool(row.IncludeOnSheet) else "False",
                     as_text(row.SheetNumberOverride, ""),
+                    as_text(row.SheetNameOverride, ""),
+                    as_text(row.SheetTemplateName, ""),
                     as_text(row.ParentName, "")
                 ])
     except Exception as ex:
@@ -1289,7 +1863,7 @@ def import_queue_csv(sender=None, args=None):
 
     required = set([
         "RowType", "Level", "PlanKey", "PlanType", "Template", "Scope Box",
-        "View Name", "Include On Sheet", "Sheet Override", "Parent View"
+        "View Name", "Include On Sheet", "Parent View"
     ])
 
     rows_raw = []
@@ -1355,7 +1929,9 @@ def import_queue_csv(sender=None, args=None):
             parent_name
         )
         row.IncludeOnSheet = _parse_bool(csv_row.get("Include On Sheet"))
-        row.SheetNumberOverride = (csv_row.get("Sheet Override") or "").strip()
+        row.SheetNumberOverride = (csv_row.get("Sheet No. Override") or csv_row.get("Sheet Override") or "").strip()
+        row.SheetNameOverride = (csv_row.get("Sheet Name Override") or "").strip()
+        row.SheetTemplateName = (csv_row.get("Sheet Template") or "").strip()
         imported_rows.append(row)
 
     if not imported_rows:
@@ -1420,12 +1996,41 @@ def on_level_select_none(sender, args):
 
 
 def on_grid_changed(sender=None, args=None):
+    if sender in (window.sheetStartBox, window.sheetIncrementBox):
+        reset_sheet_number_counter_state()
     schedule_queue_preview_refresh()
+
+
+def _get_queue_row_from_toggle_event(args):
+    current = getattr(args, 'OriginalSource', None)
+    while current is not None:
+        row = getattr(current, 'DataContext', None)
+        if row is not None and getattr(row, 'RowId', None) is not None:
+            return row
+        try:
+            current = VisualTreeHelper.GetParent(current)
+        except:
+            current = None
+    return None
 
 
 def on_grid_checkbox_toggled(sender, args):
     if suppress_checkbox_events[0]:
         return
+
+    row = _get_queue_row_from_toggle_event(args)
+    if row is not None:
+        if bool(getattr(row, 'IncludeOnSheet', False)):
+            row.SheetTemplateName = selected_text(window.templateSheetCombo, "<None>")
+            if not (row.SheetNumberOverride or "").strip() and not (row.SheetNumberAssigned or "").strip():
+                assigned_no, _error = assign_next_sheet_number()
+                if assigned_no:
+                    row.SheetNumberAssigned = assigned_no
+                    row.SheetNumberPreview = assigned_no
+        else:
+            clear_row_sheet_number_assignment(row)
+            row.SheetTemplateName = ""
+
     schedule_queue_preview_refresh()
 
 
@@ -1478,65 +2083,6 @@ def get_selected_queue_rows():
     return rows
 
 
-def _find_parent_row(dep_obj):
-    current = dep_obj
-    while current is not None:
-        try:
-            if isinstance(current, DataGridRow):
-                return current
-        except:
-            pass
-        try:
-            current = VisualTreeHelper.GetParent(current)
-        except:
-            return None
-    return None
-
-
-def on_queuegrid_preview_click(sender, args):
-    try:
-        source = args.OriginalSource
-        current = source
-        while current is not None:
-            if isinstance(current, ToggleButton):
-                return
-            if isinstance(current, TextBox):
-                return
-            if isinstance(current, ComboBox):
-                return
-            if isinstance(current, ButtonBase):
-                return
-            try:
-                current = VisualTreeHelper.GetParent(current)
-            except:
-                current = None
-
-        if isinstance(source, ToggleButton):
-            return
-
-        row = _find_parent_row(args.OriginalSource)
-        if row is None:
-            return
-
-        mods = Input.Keyboard.Modifiers
-        ctrl = bool(mods & Input.ModifierKeys.Control)
-        shift = bool(mods & Input.ModifierKeys.Shift)
-
-        if not ctrl and not shift:
-            try:
-                window.queueGrid.SelectedItems.Clear()
-            except:
-                pass
-
-        try:
-            row.IsSelected = True
-            window.queueGrid.CurrentItem = row.Item
-        except:
-            pass
-    except:
-        pass
-
-
 def validate_before_create():
     if len(list(queue_rows)) == 0:
         return False, "Add at least one queue row before creating views."
@@ -1568,9 +2114,22 @@ def validate_before_create():
 
     includes = [r for r in queue_rows if bool(r.IncludeOnSheet)]
     if includes:
-        selected_tb_name = selected_text(window.titleblockCombo, "<None>")
-        if selected_tb_name == "<None>":
-            return False, "Select a titleblock when Include on Sheet is enabled."
+        for row in includes:
+            template_sheet_name = (row.SheetTemplateName or "").strip()
+            if not template_sheet_name:
+                return False, "Select a Sheet Template for included row: {}".format(row.ViewName)
+
+            template_sheet = window.templateSheetMap.get(template_sheet_name)
+            if template_sheet is None:
+                return False, "Sheet Template was not found for included row: {}".format(row.ViewName)
+
+            titleblock_id = get_sheet_titleblock_type_id(template_sheet)
+            if titleblock_id == DB.ElementId.InvalidElementId:
+                return False, "Sheet Template must contain a titleblock instance for row: {}".format(row.ViewName)
+
+            template_viewport, _template_view = get_template_plan_reference(template_sheet)
+            if template_viewport is None:
+                return False, "Sheet Template must contain at least one plan viewport for row: {}".format(row.ViewName)
 
         _sheet_map, sheet_error = build_sheet_number_map(get_included_rows_in_order())
         if sheet_error:
@@ -1586,7 +2145,11 @@ def save_ui_settings():
         cfg_set(CFG_SHEET_START_KEY, as_text(window.sheetStartBox.Text, "001"))
         cfg_set(CFG_SHEET_INCREMENT_KEY, as_text(window.sheetIncrementBox.Text, "1"))
         cfg_set(CFG_DEPENDENT_COUNT_KEY, as_text(window.dependentCountBox.Text, "1"))
-        cfg_set(CFG_TITLEBLOCK_NAME_KEY, selected_text(window.titleblockCombo, "<None>"))
+        cfg_set(CFG_TEMPLATE_SHEET_KEY, selected_text(window.templateSheetCombo, "<None>"))
+        cfg_set(CFG_COPY_DETAILING_KEY, bool(window.copyDetailingBox.IsChecked))
+        cfg_set(CFG_COPY_LEGENDS_KEY, bool(window.copyLegendsBox.IsChecked))
+        cfg_set(CFG_COPY_SCHEDULES_KEY, bool(window.copySchedulesBox.IsChecked))
+        cfg_set(CFG_REMOVE_REVISIONS_KEY, bool(window.removeRevisionsBox.IsChecked))
 
         for field_name, history_key, _default_value in TEXT_HISTORY_FIELDS:
             combo = getattr(window, field_name)
@@ -1629,15 +2192,12 @@ window.includeAllButton.Click += include_all
 window.includeNoneButton.Click += include_none
 window.exportCsvButton.Click += export_queue_csv
 window.importCsvButton.Click += import_queue_csv
-window.moveUpButton.Click += move_up
-window.moveDownButton.Click += move_down
 window.sheetStartBox.TextChanged += on_grid_changed
 window.sheetIncrementBox.TextChanged += on_grid_changed
 window.queueGrid.RowEditEnding += on_grid_changed
 window.queueGrid.Sorting += on_grid_sorted
 window.queueGrid.AddHandler(ToggleButton.CheckedEvent, RoutedEventHandler(on_grid_checkbox_toggled))
 window.queueGrid.AddHandler(ToggleButton.UncheckedEvent, RoutedEventHandler(on_grid_checkbox_toggled))
-window.queueGrid.PreviewMouseLeftButtonDown += on_queuegrid_preview_click
 window.okButton.Click += ok_click
 window.cancelButton.Click += cancel_click
 
@@ -1697,6 +2257,8 @@ for row in queue_rows:
 created_primary = []
 created_dependent = []
 created_sheets = []
+created_sheet_objs = []
+created_sheet_sources = []
 placed_views = []
 warnings = []
 
@@ -1809,16 +2371,52 @@ try:
 
     include_rows = get_included_rows_in_order()
     if include_rows:
-        selected_tb_name = selected_text(window.titleblockCombo, "<None>")
-        selected_tb = window.titleblockMap.get(selected_tb_name)
-        titleblock_id = selected_tb.Id if selected_tb else DB.ElementId.InvalidElementId
+        copy_detailing = bool(window.copyDetailingBox.IsChecked)
+        copy_legends = bool(window.copyLegendsBox.IsChecked)
+        copy_schedules = bool(window.copySchedulesBox.IsChecked)
+        remove_revisions = bool(window.removeRevisionsBox.IsChecked)
 
         sheet_number_map, counter_error = build_sheet_number_map(include_rows)
         if sheet_number_map is None:
             raise Exception(counter_error)
 
+        if copy_detailing:
+            warnings.append("Copy detailing is not implemented in this version; checkbox currently acts as a placeholder.")
+
         with revit.Transaction("Create Sheets and Place Views"):
             for row in include_rows:
+                template_sheet_name = (row.SheetTemplateName or "").strip()
+                template_sheet = window.templateSheetMap.get(template_sheet_name)
+                if template_sheet is None:
+                    warnings.append("Skipped sheet row with missing Sheet Template: {}".format(row.ViewName))
+                    continue
+
+                titleblock_id = get_sheet_titleblock_type_id(template_sheet)
+                if titleblock_id == DB.ElementId.InvalidElementId:
+                    warnings.append("Skipped sheet row with invalid Sheet Template titleblock: {}".format(row.ViewName))
+                    continue
+
+                template_ref_viewport, template_ref_view = get_template_plan_reference(template_sheet)
+                if template_ref_viewport is None or template_ref_view is None:
+                    warnings.append("Skipped sheet row with invalid Sheet Template viewport: {}".format(row.ViewName))
+                    continue
+
+                template_legends = get_template_legend_viewports(template_sheet)
+                template_schedules = get_template_schedule_instances(template_sheet)
+
+                template_sheet_collection_id = DB.ElementId.InvalidElementId
+                try:
+                    template_sheet_collection_id = getattr(template_sheet, 'SheetCollectionId', DB.ElementId.InvalidElementId)
+                except:
+                    template_sheet_collection_id = DB.ElementId.InvalidElementId
+
+                template_additional_revision_ids = set()
+                try:
+                    for rev_id in template_sheet.GetAdditionalRevisionIds():
+                        template_additional_revision_ids.add(rev_id.IntegerValue)
+                except:
+                    pass
+
                 view_obj = row_to_view.get(row.RowId)
                 if view_obj is None:
                     warnings.append("Skipped sheet row without created view: {}".format(row.ViewName))
@@ -1831,18 +2429,97 @@ try:
 
                 sheet = DB.ViewSheet.Create(doc, titleblock_id)
                 sheet.SheetNumber = sheet_no
+
+                desired_sheet_name = (row.SheetNameOverride or "").strip() or row.ViewName
                 try:
-                    sheet.Name = row.ViewName
+                    sheet.Name = desired_sheet_name
                 except:
                     pass
 
-                created_sheets.append("{} - {}".format(sheet_no, row.ViewName))
+                copy_template_sheet_parameters(template_sheet, sheet, warnings)
+
+                created_sheets.append("{} - {}".format(sheet_no, desired_sheet_name))
+                created_sheet_objs.append(sheet)
+                created_sheet_sources.append((sheet, template_sheet_collection_id))
 
                 if DB.Viewport.CanAddViewToSheet(doc, sheet.Id, view_obj.Id):
-                    DB.Viewport.Create(doc, sheet.Id, view_obj.Id, DB.XYZ(0, 0, 0))
+                    new_viewport = DB.Viewport.Create(doc, sheet.Id, view_obj.Id, DB.XYZ(0, 0, 0))
+
+                    apply_template_viewport_settings(template_ref_viewport, new_viewport)
+
+                    aligned = align_viewport_to_template_center(
+                        template_ref_view,
+                        template_ref_viewport,
+                        view_obj,
+                        new_viewport
+                    )
+
+                    if not aligned:
+                        try:
+                            new_viewport.SetBoxCenter(template_ref_viewport.GetBoxCenter())
+                            warnings.append("Used viewport-box fallback alignment for '{}' on sheet {}.".format(view_obj.Name, sheet_no))
+                        except:
+                            warnings.append("Could not align '{}' to template center on sheet {}.".format(view_obj.Name, sheet_no))
+
+                    if copy_legends:
+                        for template_legend_viewport, legend_view in template_legends:
+                            try:
+                                if not DB.Viewport.CanAddViewToSheet(doc, sheet.Id, legend_view.Id):
+                                    continue
+
+                                legend_origin = template_legend_viewport.GetBoxCenter()
+                                new_legend_viewport = DB.Viewport.Create(doc, sheet.Id, legend_view.Id, legend_origin)
+
+                                try:
+                                    template_legend_type_id = template_legend_viewport.GetTypeId()
+                                    if template_legend_type_id != new_legend_viewport.GetTypeId():
+                                        new_legend_viewport.ChangeTypeId(template_legend_type_id)
+                                except:
+                                    pass
+                            except:
+                                warnings.append("Could not copy a legend to sheet {}.".format(sheet_no))
+
+                    if copy_schedules:
+                        for template_schedule in template_schedules:
+                            try:
+                                schedule_view_id = template_schedule.ScheduleId
+                                schedule_point = template_schedule.Point
+                                DB.ScheduleSheetInstance.Create(doc, sheet.Id, schedule_view_id, schedule_point)
+                            except:
+                                warnings.append("Could not copy a schedule to sheet {}.".format(sheet_no))
+
+                    if remove_revisions:
+                        remove_template_inherited_revisions(sheet, template_additional_revision_ids)
+
                     placed_views.append("{} -> {}".format(view_obj.Name, sheet_no))
                 else:
                     warnings.append("Could not place '{}' on sheet {}.".format(view_obj.Name, sheet_no))
+
+        # Some project states appear to require a post-creation commit before SheetCollection assignment persists.
+        if created_sheet_sources:
+            with revit.Transaction("Finalize Sheet Collection Assignment"):
+                for sheet, source_collection_id in created_sheet_sources:
+                    try:
+                        if source_collection_id and source_collection_id != DB.ElementId.InvalidElementId:
+                            sheet.SheetCollectionId = source_collection_id
+                    except:
+                        try:
+                            warnings.append("Could not finalize Sheet Collection for sheet {}.".format(sheet.SheetNumber))
+                        except:
+                            warnings.append("Could not finalize Sheet Collection for a created sheet.")
+
+                try:
+                    doc.Regenerate()
+                except:
+                    pass
+
+                for sheet, source_collection_id in created_sheet_sources:
+                    try:
+                        current_id = getattr(sheet, 'SheetCollectionId', DB.ElementId.InvalidElementId)
+                        if source_collection_id and source_collection_id != DB.ElementId.InvalidElementId and current_id != source_collection_id:
+                            warnings.append("Sheet Collection did not persist after finalize transaction for sheet {}.".format(sheet.SheetNumber))
+                    except:
+                        warnings.append("Could not verify finalized Sheet Collection for a created sheet.")
 
 except Exception as ex:
     detail = _exception_details(ex)
