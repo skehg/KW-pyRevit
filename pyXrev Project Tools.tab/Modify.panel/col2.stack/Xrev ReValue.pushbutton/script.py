@@ -618,8 +618,27 @@ def _get_element_type(element):
     return None
 
 
+def _elementid_param_to_text(param):
+    """Convert an ElementId parameter value into readable text."""
+    try:
+        val = param.AsValueString()
+        if val:
+            return str(val)
+    except Exception:
+        pass
+
+    try:
+        elem_id = param.AsElementId()
+        if elem_id and elem_id.IntegerValue >= 0:
+            return str(elem_id.IntegerValue)
+    except Exception:
+        pass
+
+    return ''
+
+
 def collect_all_parameters(elements, is_instance_mode):
-    """Collect all unique string and numeric parameters from elements"""
+    """Collect all unique string/numeric/ElementId parameters from elements."""
     param_set = set()
     param_values_map = {}
     
@@ -648,13 +667,21 @@ def collect_all_parameters(elements, is_instance_mode):
                         param_name = param.Definition.Name
                         param_storage = param.StorageType
                         
-                        if param_storage in [StorageType.String, StorageType.Double, StorageType.Integer]:
+                        is_scope_box_param = (param_name or '').strip().lower() == 'scope box'
+                        include_param = (
+                            param_storage in [StorageType.String, StorageType.Double, StorageType.Integer]
+                            or (param_storage == StorageType.ElementId and is_scope_box_param)
+                        )
+
+                        if include_param:
                             param_set.add(param_name)
                             
                             if param.HasValue:
                                 try:
                                     if param_storage == StorageType.String:
                                         val = param.AsString()
+                                    elif param_storage == StorageType.ElementId:
+                                        val = _elementid_param_to_text(param)
                                     else:
                                         val = param.AsValueString()
                                     if val and param_name not in param_values_map:
@@ -1050,6 +1077,9 @@ class ReValueDialog(object):
                     elif param_storage == StorageType.Integer:
                         value = param.AsInteger()
                         return str(value) if value is not None else ""
+                    elif param_storage == StorageType.ElementId:
+                        value = _elementid_param_to_text(param)
+                        return str(value) if value else ""
                     else:
                         try:
                             value = param.AsString()

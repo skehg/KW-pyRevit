@@ -1,157 +1,267 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Create Plan Views"
-    Height="560" Width="860"
+        Height="820" Width="1220"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize">
+        ResizeMode="CanResize">
 
     <Grid Margin="12">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>   <!-- Phase + Abbrev -->
-            <RowDefinition Height="Auto"/>   <!-- Prefix + Suffix -->
-            <RowDefinition Height="Auto"/>   <!-- Plan Types -->
-            <RowDefinition Height="Auto"/>   <!-- Buttons -->
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <Grid Grid.Row="0" Margin="0 0 0 10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="330"/>
+            </Grid.ColumnDefinitions>
 
-        <!-- ========================= -->
-        <!--   PHASE + ABBREV FRAME   -->
-        <!-- ========================= -->
-        <GroupBox Header="Phase Settings" Grid.Row="0" Margin="0 0 0 12">
-            <Grid Margin="10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="60"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="60"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Margin="0 0 10 0">
+                <GroupBox Header="Phase Settings" Margin="0 0 0 10">
+                    <Grid Margin="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                <TextBlock Text="Phase:" Grid.Column="0" VerticalAlignment="Center"/>
-                <ComboBox x:Name="phaseBox" Grid.Column="1" Height="26"/>
+                        <TextBlock Text="Phase:" Grid.Column="0" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="phaseBox" Grid.Column="1" Height="26"/>
 
-                <TextBlock Text="Abbrev:" Grid.Column="2" VerticalAlignment="Center" Margin="10 0 0 0"/>
-                <ComboBox x:Name="phaseAbbrevBox" Grid.Column="3" Height="26"
-                             IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
-                             ToolTip="Optional - alternate name for Phase"/>
-            </Grid>
-        </GroupBox>
+                        <TextBlock Text="Abbrev:" Grid.Column="2" VerticalAlignment="Center" Margin="10 0 0 0"/>
+                        <ComboBox x:Name="phaseAbbrevBox" Grid.Column="3" Height="26"
+                                  IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
+                                  ToolTip="Optional alternate label for phase token"/>
+                    </Grid>
+                </GroupBox>
 
+                <GroupBox Header="Naming Settings" Margin="0 0 0 10">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
 
-        <!-- ========================= -->
-        <!--   PREFIX + SUFFIX FRAME  -->
-        <!-- ========================= -->
-        <GroupBox Header="Naming Settings" Grid.Row="1" Margin="0 0 0 12">
+                        <TextBlock Text="Prefix" Grid.Row="0" Grid.Column="0"/>
+                        <TextBlock Text="Name Pattern" Grid.Row="0" Grid.Column="2"/>
+                        <TextBlock Text="Suffix" Grid.Row="0" Grid.Column="4"/>
+
+                        <ComboBox x:Name="prefixBox" Grid.Row="1" Grid.Column="0" Height="26"
+                                  IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"/>
+
+                        <TextBox x:Name="namePatternBox" Grid.Row="1" Grid.Column="2" Height="26"
+                                 Text="{}{phase_abbrev~upper}-{level~upper}-{plan_type~upper}"
+                                 ToolTip="Tokens: {phase}, {phase_abbrev}, {plan_type}, {scopebox}, {level}. Case modifiers: ~upper, ~title"/>
+
+                        <ComboBox x:Name="suffixBox" Grid.Row="1" Grid.Column="4" Height="26"
+                                  IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="5" Margin="0 8 0 0"
+                                   TextWrapping="Wrap"
+                                   Foreground="#666"
+                                   Text="Preview names are generated when rows are added. You can edit names and scope per row in the grid."/>
+                    </Grid>
+                </GroupBox>
+
+                <GroupBox Header="Plan Types + Defaults" Margin="0 0 0 10">
+                    <StackPanel Margin="10">
+                        <Grid Margin="0 0 0 8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <CheckBox x:Name="floorPlanBox" Content="Floor Plan" Grid.Column="0" IsChecked="True"/>
+                            <ComboBox x:Name="floorTemplateCombo" Grid.Column="1" Height="24" Margin="10 0 0 0"/>
+                            <ComboBox x:Name="floorNameBox" Grid.Column="2" Height="24" Margin="10 0 0 0"
+                                      IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"/>
+                        </Grid>
+
+                        <Grid Margin="0 0 0 8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <CheckBox x:Name="ceilingPlanBox" Content="Ceiling Plan" Grid.Column="0"/>
+                            <ComboBox x:Name="ceilingTemplateCombo" Grid.Column="1" Height="24" Margin="10 0 0 0"/>
+                            <ComboBox x:Name="ceilingNameBox" Grid.Column="2" Height="24" Margin="10 0 0 0"
+                                      IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"/>
+                        </Grid>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <CheckBox x:Name="structPlanBox" Content="Structural Plan" Grid.Column="0"/>
+                            <ComboBox x:Name="structTemplateCombo" Grid.Column="1" Height="24" Margin="10 0 0 0"/>
+                            <ComboBox x:Name="structNameBox" Grid.Column="2" Height="24" Margin="10 0 0 0"
+                                      IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"/>
+                        </Grid>
+
+                        <Grid Margin="0 10 0 0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Scope Box" Grid.Column="0" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="scopeBoxCombo" Grid.Column="1" Height="26" Margin="10 0 0 0"/>
+                        </Grid>
+                    </StackPanel>
+                </GroupBox>
+
+                <GroupBox Header="Sheet Placement (Optional)">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="95"/>
+                            <ColumnDefinition Width="95"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="Titleblock" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="titleblockCombo" Grid.Row="0" Grid.Column="1" Height="26" Margin="10 0 10 0"/>
+                        <TextBlock Text="Start" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="0 0 5 0"/>
+                        <TextBox x:Name="sheetStartBox" Grid.Row="0" Grid.Column="3" Height="26" Text="001"/>
+
+                        <TextBlock Text="Increment" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="0 8 5 0"/>
+                        <TextBox x:Name="sheetIncrementBox" Grid.Row="1" Grid.Column="3" Height="26" Margin="0 8 0 0" Text="1"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0 8 0 0" Foreground="#666"
+                                   TextWrapping="Wrap"
+                                   Text="Select Include on Sheet rows in the grid and sequence will preview in order."/>
+                    </Grid>
+                </GroupBox>
+            </StackPanel>
+
+            <GroupBox Header="Levels" Grid.Column="1">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ComboBox x:Name="sortCombo" Grid.Row="0" Grid.Column="0" Height="24" Margin="0 0 6 8"/>
+                    <TextBox x:Name="filterBox" Grid.Row="0" Grid.Column="1" Height="24" Width="120" Margin="0 0 0 8"
+                             VerticalContentAlignment="Center"
+                             ToolTip="Filter levels by name"/>
+
+                    <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0 0 0 8">
+                        <Button x:Name="selectAllLevelsButton" Content="Select All" Width="90" Height="24" Margin="0 0 6 0"/>
+                        <Button x:Name="selectNoneLevelsButton" Content="Select None" Width="90" Height="24"/>
+                    </StackPanel>
+
+                    <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" BorderBrush="#DDD" BorderThickness="1" CornerRadius="2">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Height="360">
+                            <StackPanel x:Name="levelsPanel" Margin="6"/>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+            </GroupBox>
+        </Grid>
+
+        <GroupBox Header="View Queue" Grid.Row="1">
             <Grid Margin="10">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="120"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="120"/>
-                </Grid.ColumnDefinitions>
 
-                <TextBlock Text="Prefix:" Grid.Row="0" Grid.Column="0"/>
-                <TextBlock Text="Name Pattern:" Grid.Row="0" Grid.Column="2"/>
-                <TextBlock Text="Suffix:" Grid.Row="0" Grid.Column="4"/>
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0 0 0 8">
+                    <Button x:Name="addRowsButton" Content="Add" Width="90" Height="28" Margin="0 0 8 0"/>
+                    <Button x:Name="removeSelectedButton" Content="Remove Selected" Width="120" Height="28" Margin="0 0 8 0"/>
+                    <Button x:Name="duplicateDependentButton" Content="Duplicate as Dependent" Width="170" Height="28" Margin="0 0 8 0"/>
+                    <TextBlock Text="Dependents / source" VerticalAlignment="Center" Margin="0 0 8 0"/>
+                    <TextBox x:Name="dependentCountBox" Width="50" Height="24" Text="1" VerticalContentAlignment="Center"/>
+                    <Button x:Name="includeAllButton" Content="Include All" Width="90" Height="28" Margin="20 0 8 0"/>
+                    <Button x:Name="includeNoneButton" Content="Include None" Width="90" Height="28"/>
+                    <Button x:Name="exportCsvButton" Content="Export CSV" Width="95" Height="28" Margin="12 0 8 0"/>
+                    <Button x:Name="importCsvButton" Content="Import CSV" Width="95" Height="28"/>
+                </StackPanel>
 
-                <ComboBox x:Name="prefixBox" Grid.Row="1" Grid.Column="0" Height="26"
-                             IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
-                             ToolTip="Optional Prefix. Include delimiter"/>
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                <TextBox x:Name="namePatternBox" Grid.Row="1" Grid.Column="2" Height="26"
-                             Text="{}{phase_abbrev~upper}-{level~upper}-{plan_type~upper}"
-                             ToolTip="Use tokens: {phase}, {phase_abbrev}, {plan_type}, {scopebox}, {level}. Optional per-token case: ~upper or ~title."/>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Top">
+                        <Button x:Name="moveUpButton" Content="Move Up" Width="90" Height="28" Margin="0 0 0 6"/>
+                        <Button x:Name="moveDownButton" Content="Move Down" Width="90" Height="28"/>
+                    </StackPanel>
 
-                <ComboBox x:Name="suffixBox" Grid.Row="1" Grid.Column="4" Height="26"
-                             IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
-                             ToolTip="Optional Suffix. Include delimiter"/>
+                    <DataGrid x:Name="queueGrid"
+                              Grid.Column="2"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              SelectionMode="Extended"
+                              SelectionUnit="FullRow"
+                              HeadersVisibility="Column"
+                              IsReadOnly="False"
+                              RowHeaderWidth="0"
+                              AlternatingRowBackground="#F7F7F7">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="On Sheet" Width="70">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IncludeOnSheet, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Binding="{Binding LevelName}" Header="Level" Width="140" IsReadOnly="True"/>
+                            <DataGridTextColumn Binding="{Binding PlanType}" Header="Plan Type" Width="100" IsReadOnly="True"/>
+                            <DataGridTextColumn Binding="{Binding RowType}" Header="Type" Width="85" IsReadOnly="True"/>
+                            <DataGridTextColumn Binding="{Binding ParentName}" Header="Parent" Width="170" IsReadOnly="True"/>
+                            <DataGridTextColumn Binding="{Binding TemplateName}" Header="Template" Width="170"/>
+                            <DataGridComboBoxColumn x:Name="gridScopeColumn" Header="Scope Box" Width="170"
+                                                    SelectedItemBinding="{Binding ScopeName, UpdateSourceTrigger=PropertyChanged}"/>
+                            <DataGridTextColumn Binding="{Binding ViewName}" Header="View Name" Width="220"/>
+                            <DataGridTextColumn Binding="{Binding SheetNumberOverride, UpdateSourceTrigger=PropertyChanged}" Header="Sheet Override" Width="110"/>
+                            <DataGridTextColumn Binding="{Binding SheetNumberPreview}" Header="Sheet No." Width="100" IsReadOnly="True"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
 
-                <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="5" Margin="0 8 0 0"
-                           TextWrapping="Wrap"
-                           Foreground="#666"
-                           Text="Example: {phase_abbrev~upper} {plan_type}-{level}. Prefix and Suffix are applied automatically around the pattern."/>
+                <TextBlock Grid.Row="2" Margin="0 8 0 0" Foreground="#666" TextWrapping="Wrap"
+                           Text="Use Remove Selected to remove rows. For dependent rows, edit View Name and Scope Box directly in the grid before Create."/>
             </Grid>
         </GroupBox>
 
-
-        <!-- ========================= -->
-        <!--   PLAN TYPES FRAME       -->
-        <!-- ========================= -->
-        <GroupBox Header="Plan Types" Grid.Row="2" Margin="0 0 0 12">
-            <StackPanel Margin="10">
-
-                <!-- FLOOR -->
-                <Grid Margin="0 0 0 8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="100"/>
-                        <ColumnDefinition Width="220"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <CheckBox x:Name="floorPlanBox" Content="Floor Plan" Grid.Column="0" IsChecked="True"/>
-                    <ComboBox x:Name="floorNameBox" Grid.Column="2" Height="24" Margin="10 0 0 0"
-                             IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
-                             ToolTip="Optional custom name for Floor Plans"/>
-                    <ComboBox x:Name="floorTemplateCombo" Grid.Column="1" Height="24" Margin="10 0 0 0"/>
-
-                </Grid>
-
-                <!-- CEILING -->
-                <Grid Margin="0 0 0 8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="100"/>
-                        <ColumnDefinition Width="220"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <CheckBox x:Name="ceilingPlanBox" Content="Ceiling Plan" Grid.Column="0"/>
-                    <ComboBox x:Name="ceilingNameBox" Grid.Column="2" Height="24" Margin="10 0 0 0"
-                             IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
-                             ToolTip="Optional custom name for Ceiling Plans"/>
-                    <ComboBox x:Name="ceilingTemplateCombo" Grid.Column="1" Height="24" Margin="10 0 0 0"/>
-
-                </Grid>
-
-                <!-- STRUCTURAL -->
-                <Grid Margin="0 0 0 0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="100"/>
-                        <ColumnDefinition Width="220"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <CheckBox x:Name="structPlanBox" Content="Structural Plan" Grid.Column="0"/>
-                    <ComboBox x:Name="structNameBox" Grid.Column="2" Height="24" Margin="10 0 0 0"
-                             IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
-                             ToolTip="Optional custom name for Structural Plans"/>
-                    <ComboBox x:Name="structTemplateCombo" Grid.Column="1" Height="24" Margin="10 0 0 0"/>
-
-                </Grid>
-				<GroupBox Header="Scope Box" Margin="0 0 0 12">
-					<StackPanel Margin="10">
-						<ComboBox x:Name="scopeBoxCombo" Height="26"/>
-					</StackPanel>
-				</GroupBox>
-
-            </StackPanel>
-        </GroupBox>
-
-
-        <!-- ========================= -->
-        <!--        BUTTONS           -->
-        <!-- ========================= -->
-        <StackPanel Grid.Row="3"
+        <StackPanel Grid.Row="2"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
-                    Margin="0,10,0,0">
-            <Button x:Name="okButton" Content="OK" Width="80" Height="30" Margin="0 0 10 0"/>
-            <Button x:Name="cancelButton" Content="Cancel" Width="80" Height="30"/>
+                    Margin="0 10 0 0">
+            <Button x:Name="okButton" Content="Create" Width="100" Height="30" Margin="0 0 10 0"/>
+            <Button x:Name="cancelButton" Content="Cancel" Width="100" Height="30"/>
         </StackPanel>
-
     </Grid>
 </Window>
