@@ -1,0 +1,74 @@
+<Window
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Shape Offset"
+    Height="300"
+    Width="430"
+    WindowStartupLocation="CenterScreen"
+    ResizeMode="NoResize"
+    ShowInTaskbar="False"
+    Background="#FFF5F5F5">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="Shape Offset Settings"
+                   FontSize="16"
+                   FontWeight="SemiBold"
+                   Foreground="#222"/>
+
+        <TextBlock Grid.Row="2"
+                   Text="Point region"
+                   Margin="0,0,0,4"
+                   Foreground="#333"/>
+        <ComboBox x:Name="cmbRegion"
+                  Grid.Row="2"
+                  Margin="0,20,0,0"
+                  Height="28"/>
+
+        <TextBlock Grid.Row="4"
+                   Text="Offset mode"
+                   Margin="0,0,0,4"
+                   Foreground="#333"/>
+        <ComboBox x:Name="cmbMode"
+                  Grid.Row="4"
+                  Margin="0,20,0,0"
+                  Height="28"/>
+
+        <TextBlock x:Name="txtOffsetLabel"
+                   Grid.Row="6"
+                   Text="Offset value"
+                   Margin="0,0,0,4"
+                   Foreground="#333"/>
+        <TextBox x:Name="txtOffset"
+                 Grid.Row="6"
+                 Margin="0,20,0,0"
+                 Height="28"
+                 VerticalContentAlignment="Center"/>
+
+        <StackPanel Grid.Row="8"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="Cancel"
+                    Width="90"
+                    Height="30"
+                    Margin="0,0,8,0"
+                    Click="on_cancel"/>
+            <Button Content="Run"
+                    Width="90"
+                    Height="30"
+                    Click="on_run"/>
+        </StackPanel>
+    </Grid>
+</Window>

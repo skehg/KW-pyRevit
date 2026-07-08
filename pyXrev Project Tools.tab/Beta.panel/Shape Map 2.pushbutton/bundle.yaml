@@ -1,0 +1,8 @@
+title: Shape Map 2
+tooltip: >
+  Map shape-edit elevations from a source Floor/Roof/Ceiling/Toposolid
+  onto a destination host using vertical ray sampling on source geometry.
+  Supports source point inclusion, optional boundary/internal grids,
+  and optional Level+Offset alignment with additional Z offset.
+author: Xrev Team
+highlight: new

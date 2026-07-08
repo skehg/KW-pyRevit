@@ -1,0 +1,9 @@
+title:
+  en_us: Change Level FCR
+  fr_fr: french title
+  es_es: spanish title
+tooltip: 
+  en_us: Change Level/Base Level for Floors, Ceilings, Toposolids (2024+) and Roofs while preserving world elevation by recalculating offsets
+  fr_fr: french tooltip
+  es_es: spanish tooltip
+# highlight: new

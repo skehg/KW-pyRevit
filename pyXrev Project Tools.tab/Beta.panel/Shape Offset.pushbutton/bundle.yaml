@@ -1,0 +1,6 @@
+title: Shape Offset
+tooltip: >
+  Offset existing shape-edited points on a Floor/Roof/Toposolid.
+  Supports boundary/internal/both filtering and additive or equalized offset modes.
+author: Xrev Team
+highlight: new

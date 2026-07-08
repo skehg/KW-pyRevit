@@ -725,6 +725,7 @@
             <DockPanel>
                 <TextBlock x:Name="txtStatus" Foreground="#2A2A2A" Text="Ready." TextWrapping="Wrap" DockPanel.Dock="Left"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
+                    <Button Content="Help" Width="88" Height="28" Margin="10 0 0 0" Click="on_help"/>
                     <Button Content="Close" Width="88" Height="28" Margin="10 0 0 0" Click="on_close"/>
                 </StackPanel>
             </DockPanel>

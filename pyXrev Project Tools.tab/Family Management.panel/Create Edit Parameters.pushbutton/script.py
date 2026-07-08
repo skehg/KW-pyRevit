@@ -8,6 +8,7 @@ Formula autocomplete suggests existing family parameter names while typing.
 
 import re
 import sys
+import os
 import clr
 import System
 
@@ -61,6 +62,7 @@ from System.Windows.Input import Key
 doc = revit.doc
 uiapp = __revit__  # noqa: F821
 app = uiapp.Application
+SCRIPT_DIR = os.path.dirname(__file__)
 
 
 class OptionItem(object):
@@ -2897,6 +2899,14 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
             pass
         _pyscript.save_config()
         self.Close()
+
+    def on_help(self, sender, args):
+        """Lazy-load markdown help only when the Help button is clicked."""
+        try:
+            from help_viewer import show_help
+            show_help(SCRIPT_DIR, "Parameter Editor")
+        except Exception as ex:
+            forms.alert("Could not open Help window: {}".format(str(ex)))
 
 
 def _is_token_char(ch):

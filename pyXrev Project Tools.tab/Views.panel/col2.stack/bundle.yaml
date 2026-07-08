@@ -1,5 +1,5 @@
 layout:
-  - ToggleReferencePlanes
-  - ScopeboxReport
-  - ObjectOverrides
+  - duplicate_sheets
+  - ViewTemplates
+  - ViewTransfer
   

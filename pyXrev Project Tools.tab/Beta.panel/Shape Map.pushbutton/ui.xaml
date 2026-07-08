@@ -1,0 +1,82 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Shape Map"
+        Height="560" Width="700"
+        MinHeight="520" MinWidth="620"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="Review source and destination before running Shape Map."
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,8"/>
+
+        <GroupBox Grid.Row="1" Header="Source" Margin="0,0,0,8" Padding="8">
+            <TextBlock x:Name="txtSource" TextWrapping="Wrap"/>
+        </GroupBox>
+
+        <GroupBox Grid.Row="2" Header="Destination" Margin="0,0,0,8" Padding="8">
+            <TextBlock x:Name="txtDestination" TextWrapping="Wrap"/>
+        </GroupBox>
+
+        <CheckBox Grid.Row="3"
+                  x:Name="chkAlignLevelOffset"
+                  IsChecked="True"
+                  Content="Align destination Level and Height Offset From Level with source before mapping"
+                  Margin="0,0,0,8"/>
+
+        <Expander Grid.Row="4" Header="Advanced" IsExpanded="True" Margin="0,0,0,10">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="320">
+            <StackPanel Margin="8">
+                <TextBlock Text="Sampling mode" Margin="0,0,0,4"/>
+                <ComboBox x:Name="cmbSamplingMode" Width="360" SelectedIndex="0">
+                    <ComboBoxItem Content="Hybrid: edge points + optional interior grid + source vertices" Tag="hybrid"/>
+                    <ComboBoxItem Content="Edge points only" Tag="edge_only"/>
+                    <ComboBoxItem Content="Match source points XYZ only + destination boundary projection" Tag="source_vertices_only"/>
+                    <ComboBoxItem Content="Destination vertices only (recommended for copied host in Z)" Tag="destination_vertices_only"/>
+                </ComboBox>
+                <CheckBox x:Name="chkUseInteriorGrid"
+                          IsChecked="True"
+                          Content="Use interior grid sampling"
+                          Margin="0,8,0,0"/>
+                <TextBlock x:Name="txtGridLabel" Text="Internal grid spacing" Margin="0,0,0,4"/>
+                <TextBox x:Name="txtGridSpacing" Width="140"/>
+                <TextBlock Text="Smaller values increase fidelity and point count." Foreground="#666" Margin="0,4,0,0"/>
+                <TextBlock x:Name="txtEdgeLabel" Text="Edge point spacing" Margin="0,8,0,4"/>
+                <TextBox x:Name="txtEdgeSpacing" Width="140"/>
+                <TextBlock x:Name="txtEdgeHelp" Text="Set boundary point spacing along destination edges." Foreground="#666" Margin="0,4,0,0"/>
+                <TextBlock x:Name="txtPointOffsetLabel" Text="Global Z offset applied to all mapped points" Margin="0,8,0,4"/>
+                <TextBox x:Name="txtPointOffset" Width="140" Text="0"/>
+                <TextBlock x:Name="txtPointOffsetHelp" Text="Positive raises all points, negative lowers all points." Foreground="#666" Margin="0,4,0,0"/>
+                <TextBlock Text="Destination Z write mode" Margin="0,8,0,4"/>
+                <ComboBox x:Name="cmbZMode" Width="360" SelectedIndex="0">
+                    <ComboBoxItem Content="Relative to destination Level + Offset (recommended)" Tag="relative_level_offset"/>
+                    <ComboBoxItem Content="Absolute project elevation" Tag="absolute"/>
+                </ComboBox>
+                <CheckBox x:Name="chkSkipZeroOffsets"
+                          IsChecked="False"
+                          Content="Skip near-zero destination offsets"
+                          Margin="0,8,0,0"/>
+                <CheckBox x:Name="chkDebugFallback"
+                          IsChecked="False"
+                          Content="Print detailed fallback/interpolation rows to output"
+                          Margin="0,8,0,0"/>
+            </StackPanel>
+            </ScrollViewer>
+        </Expander>
+
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="btnRun" Content="Run" Width="90" Height="28" Margin="0,0,8,0" IsDefault="True" Click="on_run"/>
+            <Button x:Name="btnCancel" Content="Cancel" Width="90" Height="28" IsCancel="True" Click="on_cancel"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,8 @@
+title: Family Clean Manager
+tooltip: >
+  Analyse and manually clean family documents by category.
+  Phase 1 supports materials, fill patterns, subcategories,
+  DWG imports, and nested family deep scan summaries.
+author: Xrev Team
+context: doc-family
+highlight: false

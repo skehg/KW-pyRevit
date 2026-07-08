@@ -8,6 +8,7 @@ import os
 import datetime
 import csv
 import codecs
+import uuid
 from System.Windows.Controls import CheckBox
 from System.Windows.Controls import TextBox
 from System.Windows.Controls import ComboBox
@@ -24,7 +25,11 @@ from System.ComponentModel import INotifyPropertyChanged, PropertyChangedEventAr
 doc = revit.doc
 
 DEFAULT_NAME_PATTERN = "{phase_abbrev~upper}-{level~upper}-{plan_type~upper}"
+DEFAULT_SHEET_NAME_PATTERN = "{view_name}"
+DEFAULT_TOKEN_DELIMITERS = " \\t\\r\\n!\"#$%&'()*+,-./:;<=>?@[\\\\]^_`{|}~"
 CFG_NAME_PATTERN_KEY = "createviews_name_pattern"
+CFG_SHEET_NAME_PATTERN_KEY = "createviews_sheet_name_pattern"
+CFG_TOKEN_DELIMITERS_KEY = "createviews_token_delimiters"
 CFG_SHEET_START_KEY = "createviews_sheet_start"
 CFG_SHEET_INCREMENT_KEY = "createviews_sheet_increment"
 CFG_DEPENDENT_COUNT_KEY = "createviews_dependent_count"
@@ -34,25 +39,57 @@ CFG_COPY_LEGENDS_KEY = "createviews_copy_legends"
 CFG_COPY_SCHEDULES_KEY = "createviews_copy_schedules"
 CFG_REMOVE_REVISIONS_KEY = "createviews_remove_revisions"
 HISTORY_LIMIT = 25
+CFG_NAME_PATTERN_HISTORY_KEY = "createviews_hist_name_pattern"
+CFG_NAME_PATTERN_CURRENT_KEY = "createviews_curr_name_pattern"
+CFG_SHEET_NAME_PATTERN_HISTORY_KEY = "createviews_hist_sheet_name_pattern"
+CFG_SHEET_NAME_PATTERN_CURRENT_KEY = "createviews_curr_sheet_name_pattern"
 
 NUMERIC_REGEX = re.compile(r'^\d+$')
 ALPHA_REGEX = re.compile(r'^[A-Za-z]+$')
 MIXED_SUFFIX_NUM_REGEX = re.compile(r'^(.*?)(\d+)$')
 
 TEXT_HISTORY_FIELDS = [
-    ("phaseAbbrevBox", "createviews_hist_phase_abbrev", ""),
-    ("prefixBox", "createviews_hist_prefix", ""),
-    ("suffixBox", "createviews_hist_suffix", ""),
-    ("floorNameBox", "createviews_hist_floor_name", "Floor"),
-    ("ceilingNameBox", "createviews_hist_ceiling_name", "Ceiling"),
-    ("structNameBox", "createviews_hist_struct_name", "Structural")
+    ("namePatternBox", CFG_NAME_PATTERN_HISTORY_KEY, DEFAULT_NAME_PATTERN, CFG_NAME_PATTERN_CURRENT_KEY),
+    ("sheetNamePatternBox", CFG_SHEET_NAME_PATTERN_HISTORY_KEY, DEFAULT_SHEET_NAME_PATTERN, CFG_SHEET_NAME_PATTERN_CURRENT_KEY),
+    ("phaseAbbrevBox", "createviews_hist_phase_abbrev", "", "createviews_curr_phase_abbrev"),
+    ("prefixBox", "createviews_hist_prefix", "", "createviews_curr_prefix"),
+    ("suffixBox", "createviews_hist_suffix", "", "createviews_curr_suffix"),
+    ("floorNameBox", "createviews_hist_floor_name", "Floor", "createviews_curr_floor_name"),
+    ("ceilingNameBox", "createviews_hist_ceiling_name", "Ceiling", "createviews_curr_ceiling_name"),
+    ("structNameBox", "createviews_hist_struct_name", "Structural", "createviews_curr_struct_name")
 ]
+
+RESETTABLE_CFG_KEYS = [
+    CFG_NAME_PATTERN_KEY,
+    CFG_SHEET_NAME_PATTERN_KEY,
+    CFG_TOKEN_DELIMITERS_KEY,
+    CFG_SHEET_START_KEY,
+    CFG_SHEET_INCREMENT_KEY,
+    CFG_DEPENDENT_COUNT_KEY,
+    CFG_TEMPLATE_SHEET_KEY,
+    CFG_COPY_DETAILING_KEY,
+    CFG_COPY_LEGENDS_KEY,
+    CFG_COPY_SCHEDULES_KEY,
+    CFG_REMOVE_REVISIONS_KEY
+]
+
+for _field_name, _history_key, _default_value, _current_key in TEXT_HISTORY_FIELDS:
+    RESETTABLE_CFG_KEYS.append(_history_key)
+    RESETTABLE_CFG_KEYS.append(_current_key)
 
 sheet_number_counter_state = {
     "signature": None,
     "generator": None,
     "index": 0,
     "error": None
+}
+
+token_delimiter_state = {
+    "value": DEFAULT_TOKEN_DELIMITERS
+}
+
+sheet_number_clash_mode_state = {
+    "detail": "Sheet number clash mode: Not evaluated."
 }
 
 
@@ -68,10 +105,13 @@ class QueueRow(INotifyPropertyChanged):
         view_name,
         row_type,
         parent_row_id,
-        parent_name
+        parent_name,
+        row_key=None,
+        parent_row_key=None
     ):
         self._changed_handlers = []
         self.RowId = row_id
+        self.RowKey = row_key or make_row_key()
         self.Level = level
         self.PlanKey = plan_key
         self.LevelName = level.Name if level else ""
@@ -81,10 +121,12 @@ class QueueRow(INotifyPropertyChanged):
         self.ViewName = view_name
         self.RowType = row_type
         self.ParentRowId = parent_row_id
+        self.ParentRowKey = parent_row_key or ""
         self.ParentName = parent_name
         self.IncludeOnSheet = False
         self.SheetNumberOverride = ""
         self.SheetNameOverride = ""
+        self.SheetNamePatternApplied = ""
         self.SheetTemplateName = ""
         self.SheetNumberAssigned = ""
         self.SheetNumberPreview = ""
@@ -108,7 +150,7 @@ class QueueRow(INotifyPropertyChanged):
         object.__setattr__(self, name, value)
         if name.startswith("_"):
             return
-        if name in ("RowId", "Level", "PlanKey", "LevelName", "PlanType", "TemplateName", "ScopeName", "ViewName", "RowType", "ParentRowId", "ParentName", "IncludeOnSheet", "SheetNumberOverride", "SheetNameOverride", "SheetTemplateName", "SheetNumberAssigned", "SheetNumberPreview"):
+        if name in ("RowId", "RowKey", "Level", "PlanKey", "LevelName", "PlanType", "TemplateName", "ScopeName", "ViewName", "RowType", "ParentRowId", "ParentRowKey", "ParentName", "IncludeOnSheet", "SheetNumberOverride", "SheetNameOverride", "SheetTemplateName", "SheetNumberAssigned", "SheetNumberPreview"):
             try:
                 self._notify(name)
             except:
@@ -138,6 +180,13 @@ def _capture_traceback_text():
         pass
 
     return "No active exception was captured."
+
+
+def make_row_key():
+    try:
+        return "cv-{}".format(uuid.uuid4().hex)
+    except:
+        return "cv-{}".format(str(next_row_id()))
 
 
 def _exception_details(ex):
@@ -255,6 +304,28 @@ def cfg_set(name, value):
     setattr(cfg, name, value)
 
 
+def cfg_delete(name):
+    cfg = script.get_config()
+    try:
+        delattr(cfg, name)
+        return
+    except:
+        pass
+
+    try:
+        setattr(cfg, name, None)
+    except:
+        pass
+
+
+def cfg_try_get(name):
+    cfg = script.get_config()
+    try:
+        return True, getattr(cfg, name)
+    except:
+        return False, None
+
+
 def as_text(value, default_value=""):
     if value is None:
         return default_value
@@ -312,13 +383,16 @@ def write_history(key, items):
     cfg_set(key, "\n".join(items[:HISTORY_LIMIT]))
 
 
-def setup_history_combo(combo, history_key, default_value):
+def setup_history_combo(combo, history_key, default_value, current_key):
     items = read_history(history_key)
     combo.Items.Clear()
     for item in items:
         combo.Items.Add(item)
 
-    if items:
+    has_current, current_value = cfg_try_get(current_key)
+    if has_current:
+        combo.Text = as_text(current_value, "")
+    elif items:
         combo.Text = items[0]
     else:
         combo.Text = default_value or ""
@@ -336,6 +410,14 @@ def update_history(key, value):
         items.append(existing)
 
     write_history(key, items)
+
+
+def save_combo_current_text(combo, current_key):
+    try:
+        cfg_set(current_key, as_text(getattr(combo, "Text", None), ""))
+        script.save_config()
+    except:
+        pass
 
 
 def selected_text(combo, default_value=""):
@@ -362,12 +444,213 @@ def apply_token_case(text, case_name):
     case_key = case_name.strip().lower()
     if case_key == "upper":
         return value.upper()
+    if case_key == "lower":
+        return value.lower()
     if case_key == "title":
         return value.title()
     return value
 
 
-def render_name_pattern(pattern, token_values):
+def _decode_delimiter_text(encoded_text):
+    text = as_text(encoded_text, "")
+    if not text:
+        return ""
+
+    out = []
+    idx = 0
+    length = len(text)
+    while idx < length:
+        ch = text[idx]
+        if ch != "\\":
+            out.append(ch)
+            idx += 1
+            continue
+
+        idx += 1
+        if idx >= length:
+            out.append("\\")
+            break
+
+        esc = text[idx]
+        idx += 1
+        if esc == "t":
+            out.append("\t")
+        elif esc == "r":
+            out.append("\r")
+        elif esc == "n":
+            out.append("\n")
+        elif esc == "s":
+            out.append(" ")
+        elif esc == "\\":
+            out.append("\\")
+        else:
+            out.append(esc)
+
+    return "".join(out)
+
+
+def _encode_delimiter_text(raw_text):
+    out = []
+    for ch in as_text(raw_text, ""):
+        if ch == "\\":
+            out.append("\\\\")
+        elif ch == "\t":
+            out.append("\\t")
+        elif ch == "\r":
+            out.append("\\r")
+        elif ch == "\n":
+            out.append("\\n")
+        elif ch == " ":
+            out.append("\\s")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def _normalize_delimiters(raw_text):
+    raw = as_text(raw_text, "")
+    if not raw:
+        raw = DEFAULT_TOKEN_DELIMITERS
+
+    unique = []
+    seen = set()
+    for ch in raw:
+        if ch in seen:
+            continue
+        seen.add(ch)
+        unique.append(ch)
+
+    if not unique:
+        return DEFAULT_TOKEN_DELIMITERS
+
+    return "".join(unique)
+
+
+def _load_token_delimiters_from_config():
+    persisted = as_text(cfg_get(CFG_TOKEN_DELIMITERS_KEY, DEFAULT_TOKEN_DELIMITERS), DEFAULT_TOKEN_DELIMITERS)
+    normalized = _normalize_delimiters(persisted)
+    token_delimiter_state["value"] = normalized
+    return normalized
+
+
+def _set_token_delimiters(value, persist=False):
+    normalized = _normalize_delimiters(value)
+    token_delimiter_state["value"] = normalized
+    if persist:
+        cfg_set(CFG_TOKEN_DELIMITERS_KEY, normalized)
+        try:
+            script.save_config()
+        except:
+            pass
+    return normalized
+
+
+def _tokenize_by_delimiters(text, delimiters):
+    value = as_text(text, "")
+    if not value:
+        return []
+
+    delimiter_set = set(delimiters or "")
+    parts = []
+    current = []
+    for ch in value:
+        if ch in delimiter_set:
+            if current:
+                parts.append("".join(current))
+                current = []
+            continue
+        current.append(ch)
+
+    if current:
+        parts.append("".join(current))
+
+    return parts
+
+
+def _resolve_token_index(index_text, count):
+    if count <= 0:
+        return None
+
+    text = as_text(index_text, "").strip().lower()
+    if not text:
+        return None
+
+    if text.isdigit():
+        value = int(text)
+        if value < 1 or value > count:
+            return None
+        return value
+
+    if text == "end":
+        return count
+
+    match = re.match(r'^end\s*([+-])\s*(\d+)$', text)
+    if not match:
+        return None
+
+    sign = match.group(1)
+    offset = int(match.group(2))
+    if sign == "+":
+        value = count + offset
+    else:
+        value = count - offset
+
+    if value < 1 or value > count:
+        return None
+    return value
+
+
+def _resolve_tokenized_value(base_value, selector_text, delimiters):
+    value = as_text(base_value, "")
+    selector = as_text(selector_text, "").strip()
+    if not selector:
+        return value
+
+    parts = _tokenize_by_delimiters(value, delimiters)
+    if not parts:
+        return ""
+
+    if ":" in selector:
+        start_text, end_text = selector.split(":", 1)
+        start_idx = _resolve_token_index(start_text, len(parts))
+        end_idx = _resolve_token_index(end_text, len(parts))
+        if start_idx is None or end_idx is None:
+            return ""
+        if start_idx > end_idx:
+            return ""
+        return " ".join(parts[start_idx - 1:end_idx])
+
+    idx = _resolve_token_index(selector, len(parts))
+    if idx is None:
+        return ""
+    return parts[idx - 1]
+
+
+def _resolve_token_value(token_expr, token_values, delimiters):
+    expr = as_text(token_expr, "").strip()
+    if not expr:
+        return None, False
+
+    token_key = expr.lower()
+    selector = ""
+    if "." in expr:
+        token_key, selector = expr.split(".", 1)
+        token_key = token_key.strip().lower()
+        selector = selector.strip()
+
+    token_value = token_values.get(token_key)
+    if token_value is None:
+        return None, False
+
+    if selector and token_key in ("scopebox", "level"):
+        return _resolve_tokenized_value(token_value, selector, delimiters), True
+
+    return as_text(token_value, ""), True
+
+
+def render_name_pattern(pattern, token_values, delimiters=None):
+    delimiter_text = _normalize_delimiters(delimiters if delimiters is not None else token_delimiter_state.get("value", DEFAULT_TOKEN_DELIMITERS))
+
     def _replace(match):
         expr = (match.group(1) or "").strip()
         if not expr:
@@ -378,9 +661,8 @@ def render_name_pattern(pattern, token_values):
         if "~" in expr:
             token_part, case_part = expr.split("~", 1)
 
-        token_key = token_part.strip().lower()
-        token_value = token_values.get(token_key)
-        if token_value is None:
+        token_value, found = _resolve_token_value(token_part, token_values, delimiter_text)
+        if not found:
             return match.group(0)
 
         return apply_token_case(token_value, case_part)
@@ -389,7 +671,7 @@ def render_name_pattern(pattern, token_values):
 
 
 def build_view_name(pattern, token_values, prefix_text, suffix_text):
-    base_name = render_name_pattern(pattern, token_values)
+    base_name = render_name_pattern(pattern, token_values, token_delimiter_state.get("value", DEFAULT_TOKEN_DELIMITERS))
     return safe_name("{}{}{}".format(prefix_text or "", base_name, suffix_text or ""))
 
 
@@ -575,6 +857,157 @@ def get_existing_sheet_number_set():
             numbers.add(sheet_no.lower())
 
     return numbers
+
+
+def get_revit_major_version():
+    try:
+        return int(as_text(doc.Application.VersionNumber, "0"))
+    except:
+        return 0
+
+
+def _is_valid_element_id(element_id):
+    try:
+        if element_id is None:
+            return False
+        if element_id == DB.ElementId.InvalidElementId:
+            return False
+        return element_id.IntegerValue > 0
+    except:
+        return False
+
+
+def _sheet_collection_display_from_id(collection_id):
+    try:
+        if not _is_valid_element_id(collection_id):
+            return "<No Collection>"
+        collection_obj = doc.GetElement(collection_id)
+        if collection_obj is None:
+            return "Collection Id {}".format(collection_id.IntegerValue)
+        try:
+            return as_text(getattr(collection_obj, 'Name', None), "") or "Collection Id {}".format(collection_id.IntegerValue)
+        except:
+            return "Collection Id {}".format(collection_id.IntegerValue)
+    except:
+        return "<Unknown Collection>"
+
+
+def get_sheet_collection_identity(sheet):
+    if sheet is None:
+        return None, "<Unknown Collection>", False, "Sheet is missing."
+
+    # Revit 2025+ API path.
+    try:
+        has_prop = hasattr(sheet, 'SheetCollectionId')
+    except:
+        has_prop = False
+
+    if has_prop:
+        try:
+            collection_id = getattr(sheet, 'SheetCollectionId', DB.ElementId.InvalidElementId)
+            if _is_valid_element_id(collection_id):
+                return "id:{}".format(collection_id.IntegerValue), _sheet_collection_display_from_id(collection_id), True, None
+            return "none", "<No Collection>", True, None
+        except:
+            return None, "<Unknown Collection>", False, "Could not read ViewSheet.SheetCollectionId."
+
+    # Fallback path for API/runtime mismatches where the property is unavailable.
+    try:
+        source_param = sheet.LookupParameter("Sheet Collection")
+    except:
+        source_param = None
+
+    if source_param is None:
+        return None, "<Unknown Collection>", False, "ViewSheet.SheetCollectionId is unavailable and 'Sheet Collection' parameter lookup failed."
+
+    try:
+        if not source_param.HasValue:
+            return "none", "<No Collection>", True, None
+    except:
+        return "none", "<No Collection>", True, None
+
+    try:
+        storage = source_param.StorageType
+        if storage == DB.StorageType.ElementId:
+            value_id = source_param.AsElementId()
+            if _is_valid_element_id(value_id):
+                return "id:{}".format(value_id.IntegerValue), _sheet_collection_display_from_id(value_id), True, None
+            return "none", "<No Collection>", True, None
+        if storage == DB.StorageType.String:
+            value = as_text(source_param.AsString(), "").strip()
+            if value:
+                return "name:{}".format(value.lower()), value, True, None
+            return "none", "<No Collection>", True, None
+        if storage == DB.StorageType.Integer:
+            value = source_param.AsInteger()
+            return "int:{}".format(value), "Collection Value {}".format(value), True, None
+        if storage == DB.StorageType.Double:
+            value = source_param.AsDouble()
+            return "dbl:{}".format(value), "Collection Value {}".format(value), True, None
+    except:
+        pass
+
+    return None, "<Unknown Collection>", False, "Could not resolve sheet collection identity."
+
+
+def get_existing_sheet_number_collection_pair_set():
+    pairs = set()
+    unresolved_count = 0
+
+    try:
+        sheets = DB.FilteredElementCollector(doc)\
+            .OfClass(DB.ViewSheet)\
+            .WhereElementIsNotElementType()\
+            .ToElements()
+    except:
+        sheets = []
+
+    for sheet in sheets:
+        try:
+            sheet_no = (sheet.SheetNumber or "").strip()
+        except:
+            sheet_no = ""
+
+        if not sheet_no:
+            continue
+
+        collection_key, _collection_display, resolved, _reason = get_sheet_collection_identity(sheet)
+        if not resolved or not collection_key:
+            unresolved_count += 1
+            continue
+
+        pairs.add((sheet_no.lower(), collection_key))
+
+    return pairs, unresolved_count
+
+
+def _validate_sheet_numbers_global(include_rows, sheet_numbers):
+    duplicate_numbers = []
+    seen = set()
+
+    for row in include_rows:
+        sheet_no = sheet_numbers.get(row.RowId, "")
+        key = sheet_no.lower()
+        if key in seen:
+            duplicate_numbers.append(sheet_no)
+        seen.add(key)
+
+    if duplicate_numbers:
+        unique_duplicates = sorted(list(set(duplicate_numbers)), key=natural_sort_key)
+        return "Duplicate sheet numbers in queue: {}".format(", ".join(unique_duplicates))
+
+    existing_sheet_numbers = get_existing_sheet_number_set()
+    clashes = []
+    for row in include_rows:
+        sheet_no = sheet_numbers.get(row.RowId, "")
+        if sheet_no and sheet_no.lower() in existing_sheet_numbers:
+            clashes.append(sheet_no)
+
+    if clashes:
+        unique_clashes = sorted(list(set(clashes)), key=natural_sort_key)
+        return "Sheet number clash with existing sheets: {}".format(", ".join(unique_clashes))
+
+    return None
 
 
 def plan_key_to_view_family(plan_key):
@@ -1115,15 +1548,25 @@ except Exception as ex:
 
 try:
     print("CreateViews: apply defaults")
-    persisted_pattern = cfg_get(CFG_NAME_PATTERN_KEY, DEFAULT_NAME_PATTERN)
-    try:
-        window.namePatternBox.Text = persisted_pattern or DEFAULT_NAME_PATTERN
-    except:
-        window.namePatternBox.Text = DEFAULT_NAME_PATTERN
+    _load_token_delimiters_from_config()
+    persisted_pattern = as_text(cfg_get(CFG_NAME_PATTERN_KEY, DEFAULT_NAME_PATTERN), DEFAULT_NAME_PATTERN).strip() or DEFAULT_NAME_PATTERN
+    persisted_sheet_name_pattern = as_text(cfg_get(CFG_SHEET_NAME_PATTERN_KEY, DEFAULT_SHEET_NAME_PATTERN), DEFAULT_SHEET_NAME_PATTERN).strip() or DEFAULT_SHEET_NAME_PATTERN
+    if not read_history(CFG_NAME_PATTERN_HISTORY_KEY):
+        write_history(CFG_NAME_PATTERN_HISTORY_KEY, [persisted_pattern])
+    if not read_history(CFG_SHEET_NAME_PATTERN_HISTORY_KEY):
+        write_history(CFG_SHEET_NAME_PATTERN_HISTORY_KEY, [persisted_sheet_name_pattern])
 
-    for field_name, history_key, default_value in TEXT_HISTORY_FIELDS:
+    has_pattern_current, _pattern_current = cfg_try_get(CFG_NAME_PATTERN_CURRENT_KEY)
+    if not has_pattern_current:
+        cfg_set(CFG_NAME_PATTERN_CURRENT_KEY, persisted_pattern)
+
+    has_sheet_pattern_current, _sheet_pattern_current = cfg_try_get(CFG_SHEET_NAME_PATTERN_CURRENT_KEY)
+    if not has_sheet_pattern_current:
+        cfg_set(CFG_SHEET_NAME_PATTERN_CURRENT_KEY, persisted_sheet_name_pattern)
+
+    for field_name, history_key, default_value, current_key in TEXT_HISTORY_FIELDS:
         try:
-            setup_history_combo(getattr(window, field_name), history_key, default_value)
+            setup_history_combo(getattr(window, field_name), history_key, default_value, current_key)
         except:
             pass
 
@@ -1147,7 +1590,17 @@ try:
         label = p.Name
         phase_map[label] = p
         window.phaseBox.Items.Add(label)
-    window.phaseBox.SelectedIndex = len(phases) - 1
+
+    default_phase_index = len(phases) - 1
+    for idx, phase_obj in enumerate(phases):
+        try:
+            if (phase_obj.Name or "").strip().lower() == "new construction":
+                default_phase_index = idx
+                break
+        except:
+            continue
+
+    window.phaseBox.SelectedIndex = default_phase_index
 
     print("CreateViews: load scope boxes")
     scope_boxes = DB.FilteredElementCollector(doc)\
@@ -1358,6 +1811,26 @@ def resolve_template(plan_key, template_name):
     return None
 
 
+def get_row_by_id(row_id):
+    if row_id is None:
+        return None
+    for row in queue_rows:
+        if row.RowId == row_id:
+            return row
+    return None
+
+
+def get_parent_display_name(row):
+    if row is None:
+        return ""
+
+    parent_row = get_row_by_id(getattr(row, 'ParentRowId', None))
+    if parent_row is not None:
+        return as_text(getattr(parent_row, 'ViewName', None), "")
+
+    return as_text(getattr(row, 'ParentName', None), "")
+
+
 def queue_name_exists(name, exclude_row_id=None):
     target = (name or "").strip().lower()
     if not target:
@@ -1441,6 +1914,45 @@ def build_row_name(level_obj, plan_label, scope_name):
     return generated
 
 
+def build_sheet_name_for_row(row):
+    if row is None:
+        return ""
+
+    pattern = (window.sheetNamePatternBox.Text or "").strip() or DEFAULT_SHEET_NAME_PATTERN
+    phase_obj = get_selected_phase()
+    raw_phase = selected_text(window.phaseAbbrevBox, "")
+    phase_abbrev = raw_phase or ""
+    scope_name = row.ScopeName if row.ScopeName and row.ScopeName != "<None>" else ""
+
+    token_values = {
+        "phase": phase_obj.Name if phase_obj else "",
+        "phase_abbrev": phase_abbrev,
+        "plan_type": row.PlanType or "",
+        "scopebox": scope_name,
+        "level": row.LevelName or "",
+        "view_name": row.ViewName or "",
+        "sheet_number": get_row_sheet_number(row)
+    }
+
+    return safe_name(render_name_pattern(pattern, token_values, token_delimiter_state.get("value", DEFAULT_TOKEN_DELIMITERS))).strip()
+
+
+def apply_sheet_name_pattern_to_queue():
+    for row in get_display_order_rows():
+        generated = build_sheet_name_for_row(row)
+        if not generated:
+            continue
+
+        current_name = (row.SheetNameOverride or "").strip()
+        last_applied = (row.SheetNamePatternApplied or "").strip()
+
+        if current_name and current_name != last_applied:
+            continue
+
+        row.SheetNameOverride = generated
+        row.SheetNamePatternApplied = generated
+
+
 def rebuild_queue_preview():
     if is_refreshing_preview[0]:
         return
@@ -1455,6 +1967,8 @@ def rebuild_queue_preview():
 
         for row in get_display_order_rows():
             set_row_sheet_number_preview(row)
+
+        apply_sheet_name_pattern_to_queue()
     finally:
         suppress_checkbox_events[0] = False
         is_refreshing_preview[0] = False
@@ -1483,36 +1997,88 @@ def get_included_rows_in_order():
     return [r for r in get_display_order_rows() if bool(r.IncludeOnSheet)]
 
 
-def build_sheet_number_map(include_rows):
+def build_sheet_number_map(include_rows, warnings_list=None):
     sheet_numbers = {}
-    duplicate_numbers = []
-    seen = set()
 
     for row in include_rows:
         sheet_no = get_row_sheet_number(row)
         if not sheet_no:
             return None, "Missing sheet number for included row: {}".format(row.ViewName)
-
-        key = sheet_no.lower()
-        if key in seen:
-            duplicate_numbers.append(sheet_no)
-        seen.add(key)
         sheet_numbers[row.RowId] = sheet_no
 
-    if duplicate_numbers:
-        unique_duplicates = sorted(list(set(duplicate_numbers)), key=natural_sort_key)
-        return None, "Duplicate sheet numbers in queue: {}".format(", ".join(unique_duplicates))
+    revit_major = get_revit_major_version()
+    if revit_major < 2025:
+        sheet_number_clash_mode_state["detail"] = "Sheet number clash mode: Global (Revit < 2025)."
+        error = _validate_sheet_numbers_global(include_rows, sheet_numbers)
+        if error:
+            return None, error
+        return sheet_numbers, None
 
-    existing_sheet_numbers = get_existing_sheet_number_set()
-    clashes = []
+    row_collection_map = {}
+    unresolved_rows = []
+
+    for row in include_rows:
+        template_sheet_name = (row.SheetTemplateName or "").strip()
+        template_sheet = None
+        try:
+            template_sheet = window.templateSheetMap.get(template_sheet_name)
+        except:
+            template_sheet = None
+
+        collection_key, collection_display, resolved, reason = get_sheet_collection_identity(template_sheet)
+        if not resolved or not collection_key:
+            unresolved_rows.append((row, reason or "Unknown collection resolution error."))
+            continue
+
+        row_collection_map[row.RowId] = (collection_key, collection_display)
+
+    existing_pairs, unresolved_existing_count = get_existing_sheet_number_collection_pair_set()
+
+    if unresolved_rows or unresolved_existing_count > 0:
+        sheet_number_clash_mode_state["detail"] = "Sheet number clash mode: Global fallback (Revit 2025+, unresolved Sheet Collection identity)."
+        if warnings_list is not None:
+            if unresolved_rows:
+                warnings_list.append(
+                    "Sheet Collection identity could not be resolved for {} queued row(s); using global sheet-number clash checks."
+                    .format(len(unresolved_rows))
+                )
+            if unresolved_existing_count > 0:
+                warnings_list.append(
+                    "Sheet Collection identity could not be resolved for {} existing sheet(s); using global sheet-number clash checks."
+                    .format(unresolved_existing_count)
+                )
+
+        error = _validate_sheet_numbers_global(include_rows, sheet_numbers)
+        if error:
+            return None, error
+        return sheet_numbers, None
+
+    sheet_number_clash_mode_state["detail"] = "Sheet number clash mode: Collection-aware (Revit 2025+, by Sheet Collection)."
+
+    duplicate_pairs = []
+    seen_pairs = set()
     for row in include_rows:
         sheet_no = sheet_numbers.get(row.RowId, "")
-        if sheet_no and sheet_no.lower() in existing_sheet_numbers:
-            clashes.append(sheet_no)
+        collection_key, collection_display = row_collection_map.get(row.RowId, ("none", "<No Collection>"))
+        pair = (sheet_no.lower(), collection_key)
+        if pair in seen_pairs:
+            duplicate_pairs.append("{} [{}]".format(sheet_no, collection_display))
+        seen_pairs.add(pair)
 
-    if clashes:
-        unique_clashes = sorted(list(set(clashes)), key=natural_sort_key)
-        return None, "Sheet number clash with existing sheets: {}".format(", ".join(unique_clashes))
+    if duplicate_pairs:
+        unique_duplicates = sorted(list(set(duplicate_pairs)), key=natural_sort_key)
+        return None, "Duplicate sheet numbers in queue within the same sheet collection: {}".format(", ".join(unique_duplicates))
+
+    collection_clashes = []
+    for row in include_rows:
+        sheet_no = sheet_numbers.get(row.RowId, "")
+        collection_key, collection_display = row_collection_map.get(row.RowId, ("none", "<No Collection>"))
+        if (sheet_no.lower(), collection_key) in existing_pairs:
+            collection_clashes.append("{} [{}]".format(sheet_no, collection_display))
+
+    if collection_clashes:
+        unique_clashes = sorted(list(set(collection_clashes)), key=natural_sort_key)
+        return None, "Sheet number clash with existing sheets in the same sheet collection: {}".format(", ".join(unique_clashes))
 
     return sheet_numbers, None
 
@@ -1642,19 +2208,6 @@ def add_rows(sender=None, args=None):
     try:
         for lvl in selected_levels:
             for spec in specs:
-                duplicate_primary = False
-                for existing in queue_rows:
-                    if existing.RowType != "Primary":
-                        continue
-                    if existing.PlanKey != spec.Key:
-                        continue
-                    if existing.Level and existing.Level.Id.IntegerValue == lvl.Id.IntegerValue:
-                        duplicate_primary = True
-                        break
-
-                if duplicate_primary:
-                    continue
-
                 proposed_name = build_row_name(lvl, spec.Label, default_scope_name)
                 proposed_name = unique_queue_name(proposed_name)
 
@@ -1739,7 +2292,8 @@ def duplicate_as_dependent(sender=None, args=None):
                     dep_name,
                     "Dependent",
                     source.RowId,
-                    source.ViewName
+                    source.ViewName,
+                    parent_row_key=source.RowKey
                 )
                 row.IncludeOnSheet = bool(source.IncludeOnSheet)
                 row.SheetTemplateName = (source.SheetTemplateName or "").strip()
@@ -1825,7 +2379,7 @@ def export_queue_csv(sender=None, args=None):
         return
 
     header = [
-        "RowType", "Level", "PlanKey", "PlanType", "Template", "Scope Box",
+        "Row Key", "Parent Row Key", "RowType", "Level", "PlanKey", "PlanType", "Template", "Scope Box",
         "View Name", "Include On Sheet", "Sheet No. Override", "Sheet Name Override", "Sheet Template", "Parent View"
     ]
 
@@ -1835,6 +2389,8 @@ def export_queue_csv(sender=None, args=None):
             writer.writerow(header)
             for row in rows:
                 writer.writerow([
+                    as_text(getattr(row, 'RowKey', None), ""),
+                    as_text(getattr(row, 'ParentRowKey', None), ""),
                     as_text(row.RowType, ""),
                     as_text(row.LevelName, ""),
                     as_text(row.PlanKey, ""),
@@ -1846,7 +2402,7 @@ def export_queue_csv(sender=None, args=None):
                     as_text(row.SheetNumberOverride, ""),
                     as_text(row.SheetNameOverride, ""),
                     as_text(row.SheetTemplateName, ""),
-                    as_text(row.ParentName, "")
+                    get_parent_display_name(row)
                 ])
     except Exception as ex:
         show_error("Failed to export queue CSV.", _exception_details(ex), "Create Views - CSV Export")
@@ -1891,6 +2447,7 @@ def import_queue_csv(sender=None, args=None):
 
     imported_rows = []
     warnings = []
+    rowkey_to_imported = {}
 
     for csv_row in rows_raw:
         level_name = (csv_row.get("Level") or "").strip()
@@ -1915,6 +2472,12 @@ def import_queue_csv(sender=None, args=None):
         if not view_name:
             view_name = build_row_name(level_obj, plan_label, scope_name)
 
+        row_key = (csv_row.get("Row Key") or "").strip() or make_row_key()
+        while row_key.lower() in rowkey_to_imported:
+            warnings.append("Duplicate Row Key found in CSV; generated a new key for row: {}".format(view_name))
+            row_key = make_row_key()
+
+        parent_row_key = (csv_row.get("Parent Row Key") or "").strip()
         parent_name = (csv_row.get("Parent View") or "").strip()
         row = QueueRow(
             next_row_id(),
@@ -1926,13 +2489,16 @@ def import_queue_csv(sender=None, args=None):
             view_name,
             row_type,
             None,
-            parent_name
+            parent_name,
+            row_key=row_key,
+            parent_row_key=parent_row_key
         )
         row.IncludeOnSheet = _parse_bool(csv_row.get("Include On Sheet"))
         row.SheetNumberOverride = (csv_row.get("Sheet No. Override") or csv_row.get("Sheet Override") or "").strip()
         row.SheetNameOverride = (csv_row.get("Sheet Name Override") or "").strip()
         row.SheetTemplateName = (csv_row.get("Sheet Template") or "").strip()
         imported_rows.append(row)
+        rowkey_to_imported[row_key.lower()] = row
 
     if not imported_rows:
         forms.alert("No valid queue rows were found in CSV.")
@@ -1944,17 +2510,27 @@ def import_queue_csv(sender=None, args=None):
             continue
         key = (row.ViewName or "").strip().lower()
         if key and key not in primary_by_name:
-            primary_by_name[key] = row.RowId
+            primary_by_name[key] = row
 
     for row in imported_rows:
         if row.RowType != "Dependent":
             continue
-        key = (row.ParentName or "").strip().lower()
-        parent_id = primary_by_name.get(key)
-        if parent_id is None:
+        parent_row = None
+
+        key = (row.ParentRowKey or "").strip().lower()
+        if key:
+            parent_row = rowkey_to_imported.get(key)
+
+        if parent_row is None:
+            key = (row.ParentName or "").strip().lower()
+            parent_row = primary_by_name.get(key)
+
+        if parent_row is None:
             warnings.append("Dependent row missing parent in CSV queue: {}".format(row.ViewName))
             continue
-        row.ParentRowId = parent_id
+        row.ParentRowId = parent_row.RowId
+        row.ParentRowKey = parent_row.RowKey
+        row.ParentName = parent_row.ViewName
 
     batch_preview_update_active[0] = True
     try:
@@ -1962,6 +2538,13 @@ def import_queue_csv(sender=None, args=None):
         for row in imported_rows:
             row.ViewName = unique_queue_name(row.ViewName, row.RowId)
             queue_rows.Add(row)
+
+        for row in imported_rows:
+            if row.RowType != "Dependent":
+                continue
+            parent_row = get_row_by_id(row.ParentRowId)
+            if parent_row is not None:
+                row.ParentName = parent_row.ViewName
     finally:
         batch_preview_update_active[0] = False
 
@@ -1996,6 +2579,11 @@ def on_level_select_none(sender, args):
 
 
 def on_grid_changed(sender=None, args=None):
+    for row in queue_rows:
+        current_name = (row.SheetNameOverride or "").strip()
+        if current_name and current_name != (row.SheetNamePatternApplied or "").strip():
+            row.SheetNamePatternApplied = ""
+
     if sender in (window.sheetStartBox, window.sheetIncrementBox):
         reset_sheet_number_counter_state()
     schedule_queue_preview_refresh()
@@ -2037,6 +2625,149 @@ def on_grid_checkbox_toggled(sender, args):
 def on_grid_sorted(sender, args):
     # Keep numbering synced when user sorts by a column.
     schedule_queue_preview_refresh()
+
+
+def on_combo_text_changed(sender, args):
+    combo = None
+    for field_name, history_key, _default_value, current_key in TEXT_HISTORY_FIELDS:
+        field_combo = getattr(window, field_name)
+        if sender == field_combo:
+            combo = field_combo
+            break
+        try:
+            if sender == field_combo.EditableTextBox:
+                combo = field_combo
+                break
+        except:
+            pass
+
+    if combo is None:
+        return
+
+    for field_name, history_key, _default_value, current_key in TEXT_HISTORY_FIELDS:
+        if combo == getattr(window, field_name):
+            save_combo_current_text(combo, current_key)
+            if field_name == "namePatternBox":
+                cfg_set(CFG_NAME_PATTERN_KEY, as_text(getattr(combo, "Text", None), "").strip() or DEFAULT_NAME_PATTERN)
+                try:
+                    script.save_config()
+                except:
+                    pass
+                schedule_queue_preview_refresh()
+            elif field_name == "sheetNamePatternBox":
+                cfg_set(CFG_SHEET_NAME_PATTERN_KEY, as_text(getattr(combo, "Text", None), "").strip() or DEFAULT_SHEET_NAME_PATTERN)
+                try:
+                    script.save_config()
+                except:
+                    pass
+                schedule_queue_preview_refresh()
+            elif field_name == "phaseAbbrevBox":
+                schedule_queue_preview_refresh()
+            break
+
+
+def on_settings_expander_toggled(sender=None, args=None):
+    update_dynamic_layout()
+    try:
+        window.Dispatcher.BeginInvoke(System.Action(update_dynamic_layout))
+    except:
+        pass
+
+
+def _is_finite_positive(value):
+    try:
+        if value is None:
+            return False
+        numeric = float(value)
+    except:
+        return False
+
+    if numeric <= 0.0:
+        return False
+
+    try:
+        if numeric == float("inf") or numeric == float("-inf"):
+            return False
+    except:
+        pass
+
+    return True
+
+
+def update_dynamic_layout(sender=None, args=None):
+    try:
+        window.UpdateLayout()
+    except:
+        pass
+
+    try:
+        levels_top = window.levelsGroupBox.TranslatePoint(System.Windows.Point(0, 0), window)
+        naming_bottom = window.namingSettingsBox.TranslatePoint(
+            System.Windows.Point(0, window.namingSettingsBox.ActualHeight),
+            window
+        )
+    except:
+        return
+
+    target_height = naming_bottom.Y - levels_top.Y
+    if not _is_finite_positive(target_height):
+        return
+
+    if target_height < 140.0:
+        target_height = 140.0
+
+    # Hard cap prevents accidental runaway sizes during transient layout states.
+    if target_height > 1200.0:
+        target_height = 1200.0
+
+    try:
+        window.levelsGroupBox.Height = target_height
+    except:
+        pass
+
+
+def reset_saved_settings(sender=None, args=None):
+    for key in RESETTABLE_CFG_KEYS:
+        cfg_delete(key)
+
+    try:
+        script.save_config()
+    except:
+        pass
+
+    window.namePatternBox.Text = DEFAULT_NAME_PATTERN
+    window.sheetNamePatternBox.Text = DEFAULT_SHEET_NAME_PATTERN
+    window.sheetStartBox.Text = "001"
+    window.sheetIncrementBox.Text = "1"
+    window.dependentCountBox.Text = "1"
+    window.templateSheetCombo.SelectedIndex = 0
+    window.copyDetailingBox.IsChecked = True
+    window.copyLegendsBox.IsChecked = True
+    window.copySchedulesBox.IsChecked = True
+    window.removeRevisionsBox.IsChecked = True
+    _set_token_delimiters(DEFAULT_TOKEN_DELIMITERS, persist=False)
+
+    cfg_set(CFG_NAME_PATTERN_KEY, DEFAULT_NAME_PATTERN)
+    cfg_set(CFG_NAME_PATTERN_CURRENT_KEY, DEFAULT_NAME_PATTERN)
+    write_history(CFG_NAME_PATTERN_HISTORY_KEY, [DEFAULT_NAME_PATTERN])
+    cfg_set(CFG_SHEET_NAME_PATTERN_KEY, DEFAULT_SHEET_NAME_PATTERN)
+    cfg_set(CFG_SHEET_NAME_PATTERN_CURRENT_KEY, DEFAULT_SHEET_NAME_PATTERN)
+    write_history(CFG_SHEET_NAME_PATTERN_HISTORY_KEY, [DEFAULT_SHEET_NAME_PATTERN])
+    cfg_set(CFG_TOKEN_DELIMITERS_KEY, DEFAULT_TOKEN_DELIMITERS)
+    try:
+        script.save_config()
+    except:
+        pass
+
+    for field_name, history_key, default_value, current_key in TEXT_HISTORY_FIELDS:
+        try:
+            setup_history_combo(getattr(window, field_name), history_key, default_value, current_key)
+        except:
+            pass
+
+    reset_sheet_number_counter_state()
+    schedule_queue_preview_refresh()
+    forms.alert("Saved settings have been reset.")
 
 
 def get_selected_queue_rows():
@@ -2141,7 +2872,9 @@ def validate_before_create():
 def save_ui_settings():
     try:
         entered_pattern = (window.namePatternBox.Text or "").strip() or DEFAULT_NAME_PATTERN
+        entered_sheet_name_pattern = (window.sheetNamePatternBox.Text or "").strip() or DEFAULT_SHEET_NAME_PATTERN
         cfg_set(CFG_NAME_PATTERN_KEY, entered_pattern)
+        cfg_set(CFG_SHEET_NAME_PATTERN_KEY, entered_sheet_name_pattern)
         cfg_set(CFG_SHEET_START_KEY, as_text(window.sheetStartBox.Text, "001"))
         cfg_set(CFG_SHEET_INCREMENT_KEY, as_text(window.sheetIncrementBox.Text, "1"))
         cfg_set(CFG_DEPENDENT_COUNT_KEY, as_text(window.dependentCountBox.Text, "1"))
@@ -2151,9 +2884,11 @@ def save_ui_settings():
         cfg_set(CFG_COPY_SCHEDULES_KEY, bool(window.copySchedulesBox.IsChecked))
         cfg_set(CFG_REMOVE_REVISIONS_KEY, bool(window.removeRevisionsBox.IsChecked))
 
-        for field_name, history_key, _default_value in TEXT_HISTORY_FIELDS:
+        for field_name, history_key, _default_value, current_key in TEXT_HISTORY_FIELDS:
             combo = getattr(window, field_name)
-            update_history(history_key, as_text(getattr(combo, "Text", None), ""))
+            combo_text = as_text(getattr(combo, "Text", None), "")
+            cfg_set(current_key, combo_text)
+            update_history(history_key, combo_text)
 
         script.save_config()
     except:
@@ -2176,6 +2911,35 @@ def cancel_click(sender, args):
     window.Close()
 
 
+def on_help_click(sender=None, args=None):
+    """Lazy-load help subsystem only when user requests Help."""
+    try:
+        from help_viewer import show_help
+        show_help(os.path.dirname(__file__), "Create Views")
+    except Exception as ex:
+        show_error(
+            "Could not open help.",
+            _exception_details(ex),
+            "Create Views - Help"
+        )
+
+
+def on_edit_delimiters_click(sender=None, args=None):
+    encoded_current = _encode_delimiter_text(token_delimiter_state.get("value", DEFAULT_TOKEN_DELIMITERS))
+    user_input = forms.ask_for_string(
+        default=encoded_current,
+        prompt="Enter token delimiters. Use escapes: \\s (space), \\t, \\n, \\r, \\\\.",
+        title="Create Views - Token Delimiters"
+    )
+    if user_input is None:
+        return
+
+    decoded = _decode_delimiter_text(user_input)
+    normalized = _set_token_delimiters(decoded, persist=True)
+    forms.alert("Token delimiters updated to: {}".format(_encode_delimiter_text(normalized)))
+    schedule_queue_preview_refresh()
+
+
 window.sortCombo.Items.Clear()
 window.sortCombo.Items.Add("Height (Level)")
 window.sortCombo.Items.Add("Name")
@@ -2183,6 +2947,7 @@ window.sortCombo.SelectedIndex = 0
 
 window.sortCombo.SelectionChanged += on_sort_changed
 window.filterBox.TextChanged += on_filter_changed
+window.phaseBox.SelectionChanged += on_grid_changed
 window.selectAllLevelsButton.Click += on_level_select_all
 window.selectNoneLevelsButton.Click += on_level_select_none
 window.addRowsButton.Click += add_rows
@@ -2192,18 +2957,39 @@ window.includeAllButton.Click += include_all
 window.includeNoneButton.Click += include_none
 window.exportCsvButton.Click += export_queue_csv
 window.importCsvButton.Click += import_queue_csv
+window.templateSheetCombo.SelectionChanged += on_grid_changed
 window.sheetStartBox.TextChanged += on_grid_changed
 window.sheetIncrementBox.TextChanged += on_grid_changed
 window.queueGrid.RowEditEnding += on_grid_changed
 window.queueGrid.Sorting += on_grid_sorted
+
+for expander_name in ("phaseSettingsExpander", "planTypesExpander", "sheetPlacementExpander"):
+    try:
+        expander = getattr(window, expander_name)
+        expander.Expanded += on_settings_expander_toggled
+        expander.Collapsed += on_settings_expander_toggled
+    except:
+        pass
+
+window.SizeChanged += update_dynamic_layout
+window.ContentRendered += update_dynamic_layout
+
+for field_name, history_key, _default_value, _current_key in TEXT_HISTORY_FIELDS:
+    combo = getattr(window, field_name)
+    combo.AddHandler(TextBox.TextChangedEvent, RoutedEventHandler(on_combo_text_changed))
+
 window.queueGrid.AddHandler(ToggleButton.CheckedEvent, RoutedEventHandler(on_grid_checkbox_toggled))
 window.queueGrid.AddHandler(ToggleButton.UncheckedEvent, RoutedEventHandler(on_grid_checkbox_toggled))
+window.helpButton.Click += on_help_click
+window.delimitersButton.Click += on_edit_delimiters_click
+window.resetSettingsButton.Click += reset_saved_settings
 window.okButton.Click += ok_click
 window.cancelButton.Click += cancel_click
 
 
 rebuild_level_checkboxes()
 schedule_queue_preview_refresh()
+update_dynamic_layout()
 
 
 try:
@@ -2261,6 +3047,7 @@ created_sheet_objs = []
 created_sheet_sources = []
 placed_views = []
 warnings = []
+sheet_clash_mode_line = ""
 
 row_to_view = {}
 name_clash_policy = {"action": None, "repeat_all": False}
@@ -2376,9 +3163,11 @@ try:
         copy_schedules = bool(window.copySchedulesBox.IsChecked)
         remove_revisions = bool(window.removeRevisionsBox.IsChecked)
 
-        sheet_number_map, counter_error = build_sheet_number_map(include_rows)
+        sheet_number_map, counter_error = build_sheet_number_map(include_rows, warnings)
         if sheet_number_map is None:
             raise Exception(counter_error)
+
+        sheet_clash_mode_line = as_text(sheet_number_clash_mode_state.get("detail"), "")
 
         if copy_detailing:
             warnings.append("Copy detailing is not implemented in this version; checkbox currently acts as a placeholder.")
@@ -2540,6 +3329,8 @@ if created_sheets:
     msg.append("Sheets created ({})".format(len(created_sheets)))
 if placed_views:
     msg.append("Views placed on sheets ({})".format(len(placed_views)))
+if sheet_clash_mode_line:
+    msg.append(sheet_clash_mode_line)
 
 if warnings:
     msg.append("\nWarnings")

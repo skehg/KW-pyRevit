@@ -255,24 +255,19 @@ def main():
     sel_filter = CategorySelectionFilter(allowed_cat_ids)
     selected_ids = set()
 
-    forms.toast(
-        "Select elements in any view — press ESC to finish",
-        title="Split Elements",
-        appid="split-elements"
-    )
-
-    while True:
-        prompt = "Selected {} elements — press ESC to finish.".format(len(selected_ids))
-        try:
-            ref = uidoc.Selection.PickObject(
-                ObjectType.Element,
-                sel_filter,
-                prompt
-            )
-            if ref:
-                selected_ids.add(ref.ElementId)
-        except:
-            break
+    with forms.WarningBar(title="Click elements to split — ESC to finish", handle_esc=True):
+        while True:
+            prompt = "Selected {} elements — press ESC to finish.".format(len(selected_ids))
+            try:
+                ref = uidoc.Selection.PickObject(
+                    ObjectType.Element,
+                    sel_filter,
+                    prompt
+                )
+                if ref:
+                    selected_ids.add(ref.ElementId)
+            except:
+                break
 
     if not selected_ids:
         forms.alert("No elements selected. Operation cancelled.")
@@ -309,8 +304,6 @@ def main():
                 continue
 
             split_vertical_element_by_levels(el, levels, offset_ft)
-
-    forms.alert("Splitting complete.")
 
 
 if __name__ == "__main__":

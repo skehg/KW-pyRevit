@@ -1,0 +1,109 @@
+<Window
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Family Clean Manager"
+    Height="740"
+    Width="980"
+    MinHeight="620"
+    MinWidth="860"
+    WindowStartupLocation="CenterScreen"
+    ResizeMode="CanResize">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock
+            Grid.Row="0"
+            x:Name="txtFamilyName"
+            FontSize="18"
+            FontWeight="SemiBold"
+            Margin="0,0,0,8"
+            Text="Family: -"/>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button x:Name="btnAnalyze" Content="Analyse Family" Width="150" Margin="0,0,8,0" Click="on_analyze_click"/>
+            <Button x:Name="btnDeepScan" Content="Deep Scan Nested Families" Width="200" Margin="0,0,8,0" Click="on_deep_scan_click"/>
+            <Button x:Name="btnClose" Content="Close" Width="90" Click="on_close_click"/>
+        </StackPanel>
+
+        <TabControl Grid.Row="2" x:Name="tabsMain">
+            <TabItem Header="Materials">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button x:Name="btnDeleteMaterials" Content="Delete Selected" Width="130" Margin="0,0,8,0" Click="on_delete_materials_click"/>
+                        <Button x:Name="btnRefreshMaterials" Content="Refresh" Width="100" Click="on_analyze_click"/>
+                    </StackPanel>
+                    <ListBox Grid.Row="1" x:Name="lstMaterials" SelectionMode="Extended" DisplayMemberPath="DisplayLabel"/>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Fill Patterns">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button x:Name="btnDeleteFillPatterns" Content="Delete Selected" Width="130" Margin="0,0,8,0" Click="on_delete_fill_patterns_click"/>
+                        <ComboBox x:Name="cmbFillPatternReplacement" Width="320" Margin="0,0,8,0" DisplayMemberPath="DisplayName"/>
+                        <Button x:Name="btnReplaceFillPatterns" Content="Replace Selected" Width="130" Margin="0,0,8,0" Click="on_replace_fill_patterns_click"/>
+                        <Button x:Name="btnRefreshFillPatterns" Content="Refresh" Width="100" Click="on_analyze_click"/>
+                    </StackPanel>
+                    <ListBox Grid.Row="1" x:Name="lstFillPatterns" SelectionMode="Extended" DisplayMemberPath="DisplayLabel"/>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Subcategories">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button x:Name="btnDeleteSubcategories" Content="Delete Selected" Width="130" Margin="0,0,8,0" Click="on_delete_subcategories_click"/>
+                        <Button x:Name="btnRefreshSubcategories" Content="Refresh" Width="100" Click="on_analyze_click"/>
+                    </StackPanel>
+                    <ListBox Grid.Row="1" x:Name="lstSubcategories" SelectionMode="Extended" DisplayMemberPath="DisplayLabel"/>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="DWG Imports">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button x:Name="btnDeleteDwgs" Content="Delete Selected" Width="130" Margin="0,0,8,0" Click="on_delete_dwgs_click"/>
+                        <Button x:Name="btnRefreshDwgs" Content="Refresh" Width="100" Click="on_analyze_click"/>
+                    </StackPanel>
+                    <ListBox Grid.Row="1" x:Name="lstDwgs" SelectionMode="Extended" DisplayMemberPath="DisplayLabel"/>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Nested Families">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button x:Name="btnOpenNested" Content="Open Selected" Width="130" Margin="0,0,8,0" Click="on_open_nested_click"/>
+                        <Button x:Name="btnRefreshNested" Content="Refresh" Width="100" Click="on_analyze_click"/>
+                    </StackPanel>
+                    <ListBox Grid.Row="1" x:Name="lstNestedFamilies" SelectionMode="Extended" DisplayMemberPath="DisplayLabel"/>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <TextBlock Grid.Row="3" x:Name="txtStatus" Margin="0,10,0,0" TextWrapping="Wrap" Text="Ready."/>
+    </Grid>
+</Window>
