@@ -18,6 +18,8 @@ Import pattern (pyRevit adds <extension>/lib/ to sys.path automatically):
     )
 """
 
+import json
+import os
 import re
 
 from Autodesk.Revit.DB import (
@@ -30,6 +32,73 @@ from Autodesk.Revit.DB import (
 
 # Maximum number of BFS depth levels ever rendered (mirrors PurgeParameters cap).
 MAX_DEPTH_CAP = 10
+
+
+# Known label cleanup for historic typo variants in source lists.
+GROUP_LABEL_NORMALIZATION_MAP = {
+    "anal sis results": "analysis results",
+    "constuction": "construction",
+    "electrical - lighång": "electrical - lighting",
+    "electrical - lightng": "electrical - lighting",
+    "fire protecton": "fire protection",
+    "green budding properties": "green building properties",
+    "materials and finishes": "materials and finishes",
+    "seaments and fittings": "segments and fittings",
+    "stuctural": "structural",
+    "stuctural analysis": "structural analysis",
+    "stuctural section dimensions": "structural section dimensions",
+    "visibiliy": "visibility",
+}
+
+
+# Fallback list mirrors the visible groups shown by Revit family parameter UI.
+DEFAULT_VISIBLE_GROUP_LABELS = (
+    "analysis results",
+    "analytical alignment",
+    "analytical model",
+    "constraints",
+    "construction",
+    "data",
+    "dimensions",
+    "division geometry",
+    "electrical",
+    "electrical - circuiting",
+    "electrical - lighting",
+    "electrical - loads",
+    "electrical engineering",
+    "energy analysis",
+    "fire protection",
+    "forces",
+    "general",
+    "graphics",
+    "green building properties",
+    "identity data",
+    "ifc parameters",
+    "layers",
+    "materials and finishes",
+    "mechanical",
+    "mechanical - flow",
+    "mechanical - loads",
+    "model properties",
+    "moments",
+    "other",
+    "overall legend",
+    "phasing",
+    "photometrics",
+    "plumbing",
+    "primary end",
+    "rebar set",
+    "releases / member forces",
+    "secondary end",
+    "segments and fittings",
+    "set",
+    "slab shape edit",
+    "structural",
+    "structural analysis",
+    "text",
+    "title text",
+    "visibility",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -48,6 +117,155 @@ def get_family_parameters(fm):
         return list(fm.Parameters)
     except Exception:
         return []
+
+
+def normalize_group_label(label):
+    """Normalize a parameter-group label for robust matching."""
+    normalized = " ".join((label or "").strip().lower().split())
+    return GROUP_LABEL_NORMALIZATION_MAP.get(normalized, normalized)
+
+
+def get_revit_major_version(doc):
+    """Return major Revit version as int, or None on failure."""
+    try:
+        return int(doc.Application.VersionNumber)
+    except Exception:
+        return None
+
+
+def _default_groupmap_search_dirs(extra_dirs=None):
+    """Return candidate directories that may contain groupmap-<year>.yaml."""
+    dirs = []
+
+    # Preferred shared location: extension lib folder (this file's directory).
+    try:
+        dirs.append(os.path.dirname(__file__))
+    except Exception:
+        pass
+
+    if extra_dirs:
+        for d in extra_dirs:
+            if d:
+                dirs.append(d)
+
+    unique = []
+    seen = set()
+    for d in dirs:
+        try:
+            key = os.path.normcase(os.path.normpath(d))
+        except Exception:
+            key = d
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(d)
+    return unique
+
+
+def load_groupmap_payload(version, search_dirs=None):
+    """Load group map payload for *version* from YAML frontmatter + JSON body.
+
+    Returns a dict with keys: payload, path.
+    Returns None when no valid file is found.
+    """
+    if not version:
+        return None
+
+    filename = "groupmap-{}.yaml".format(version)
+    for base_dir in _default_groupmap_search_dirs(search_dirs):
+        candidate = os.path.join(base_dir, filename)
+        if not os.path.exists(candidate):
+            continue
+
+        try:
+            with open(candidate, "r") as handle:
+                raw = handle.read()
+        except Exception:
+            continue
+
+        body = raw
+        if raw.startswith("---"):
+            # Frontmatter delimiter parsing must handle both LF and CRLF files.
+            lines = raw.splitlines(True)
+            if lines:
+                for idx in range(1, len(lines)):
+                    if lines[idx].strip() == "---":
+                        body = "".join(lines[idx + 1:])
+                        break
+
+        try:
+            payload = json.loads(body.lstrip(u"\ufeff"))
+            return {"payload": payload, "path": candidate}
+        except Exception:
+            continue
+
+    return None
+
+
+def get_group_label_filter(doc, fallback_labels=None, search_dirs=None):
+    """Return map-driven group label metadata for the running Revit version.
+
+    Output dict keys:
+      - labels: ordered display labels
+      - normalized_set: normalized labels set for membership tests
+      - order: normalized label -> zero-based order index
+      - source: "groupmap" or "fallback"
+      - path: source file path when map-driven
+      - version: Revit major version (or None)
+    """
+    version = get_revit_major_version(doc)
+    loaded = load_groupmap_payload(version, search_dirs=search_dirs)
+
+    labels = []
+    allowed_type_ids = set()
+    source = "fallback"
+    source_path = None
+
+    if loaded:
+        payload = loaded.get("payload") or {}
+        groups = payload.get("groups") or {}
+        actual = groups.get("actual_group_labels") or []
+        actual_groups = groups.get("actual_groups") or []
+
+        if isinstance(actual_groups, list):
+            for item in actual_groups:
+                if not isinstance(item, dict):
+                    continue
+                type_id = item.get("type_id")
+                if isinstance(type_id, str) and type_id.strip():
+                    allowed_type_ids.add(type_id.strip())
+
+        if isinstance(actual, list):
+            labels = [x for x in actual if isinstance(x, str) and x.strip()]
+            if labels:
+                source = "groupmap"
+                source_path = loaded.get("path")
+
+    if not labels:
+        base = fallback_labels or DEFAULT_VISIBLE_GROUP_LABELS
+        labels = [x for x in base if isinstance(x, str) and x.strip()]
+
+    normalized_set = set()
+    order = {}
+    ordered_labels = []
+
+    for label in labels:
+        normalized = normalize_group_label(label)
+        if normalized in normalized_set:
+            continue
+        normalized_set.add(normalized)
+        order[normalized] = len(order)
+        ordered_labels.append(label)
+
+    return {
+        "labels": ordered_labels,
+        "normalized_set": normalized_set,
+        "allowed_type_ids": allowed_type_ids,
+        "order": order,
+        "source": source,
+        "path": source_path,
+        "version": version,
+    }
 
 
 def safe_formula(fp):
@@ -96,15 +314,78 @@ def data_type_label(fp):
     return ""
 
 
-def formula_references_parameter(formula_text, parameter_name):
-    """Return True if *formula_text* contains a whole-word reference to *parameter_name*."""
+def _find_longest_param_matches(formula_text, known_param_names):
+    """Return non-overlapping longest parameter-name matches in *formula_text*.
+
+    Matching uses the same token-boundary rule as formula parsing, and resolves
+    collisions by preferring the longest name at each position.
+    """
+    if not formula_text or not known_param_names:
+        return []
+
+    candidates = []
+    seen_names = set()
+
+    for raw_name in known_param_names:
+        name = (raw_name or "").strip()
+        if not name:
+            continue
+
+        name_lower = name.lower()
+        if name_lower in seen_names:
+            continue
+        seen_names.add(name_lower)
+
+        try:
+            pattern = r"(?<![A-Za-z0-9_]){}(?![A-Za-z0-9_])".format(re.escape(name))
+            for m in re.finditer(pattern, formula_text, flags=re.IGNORECASE):
+                candidates.append((m.start(), m.end(), name_lower))
+        except Exception:
+            continue
+
+    if not candidates:
+        return []
+
+    # Keep the longest match when multiple names start at the same position.
+    best_by_start = {}
+    for start, end, name_lower in candidates:
+        current = best_by_start.get(start)
+        if current is None or (end - start) > (current[1] - current[0]):
+            best_by_start[start] = (start, end, name_lower)
+
+    # Suppress nested overlaps (e.g. "handle" inside "handle Offset").
+    accepted = []
+    for start in sorted(best_by_start.keys()):
+        start_i, end_i, name_i = best_by_start[start]
+        if accepted and start_i < accepted[-1][1]:
+            continue
+        accepted.append((start_i, end_i, name_i))
+
+    return accepted
+
+
+def formula_references_parameter(formula_text, parameter_name, known_param_names=None):
+    """Return True when *parameter_name* is truly referenced in *formula_text*.
+
+    When *known_param_names* is provided, matching is resolved against that full
+    parameter-name set and prefers the longest valid name at each position.
+    """
     if not formula_text or not parameter_name:
         return False
+
+    target_name = (parameter_name or "").strip().lower()
+    if not target_name:
+        return False
+
     try:
+        if known_param_names:
+            matches = _find_longest_param_matches(formula_text, known_param_names)
+            return any(name == target_name for _, _, name in matches)
+
         pattern = r"(?<![A-Za-z0-9_]){}(?![A-Za-z0-9_])".format(re.escape(parameter_name))
         return re.search(pattern, formula_text, flags=re.IGNORECASE) is not None
     except Exception:
-        return parameter_name.lower() in formula_text.lower()
+        return False
 
 
 def is_family_type_parameter(fp):
@@ -242,10 +523,13 @@ def find_formula_referencing_params(fm, target_param_name):
     Used by the Delete button to warn the user which other parameters will
     have broken formulas if *target_param_name* is deleted.
     """
+    all_params = get_family_parameters(fm)
+    known_names = [param_name(fp) for fp in all_params if param_name(fp)]
+
     referencing = []
-    for fp in get_family_parameters(fm):
+    for fp in all_params:
         f = safe_formula(fp)
-        if f and formula_references_parameter(f, target_param_name):
+        if f and formula_references_parameter(f, target_param_name, known_param_names=known_names):
             referencing.append(param_name(fp))
     return referencing
 
@@ -264,6 +548,7 @@ def build_depth_analysis(fm, directly_used, max_depth):
     Returns (safe_list, unsafe_name_set).
     """
     all_params = get_family_parameters(fm)
+    known_names = [param_name(fp) for fp in all_params if param_name(fp)]
     name_to_formula = {param_name(fp): safe_formula(fp) for fp in all_params}
 
     unsafe_names = set(param_name(fp) for fp in directly_used)
@@ -277,7 +562,7 @@ def build_depth_analysis(fm, directly_used, max_depth):
                 continue
             for f_name in frontier:
                 formula = name_to_formula.get(f_name, "")
-                if formula and formula_references_parameter(formula, name):
+                if formula and formula_references_parameter(formula, name, known_param_names=known_names):
                     next_frontier.add(name)
                     break
         if not next_frontier:
@@ -303,6 +588,7 @@ def compute_reverse_deps(safe_params, max_depth):
     Depth 2 = safe params whose formula references a D1 intermediate, etc.
     """
     safe_names = set(param_name(fp) for fp in safe_params)
+    known_names = [param_name(fp) for fp in safe_params if param_name(fp)]
     name_to_formula = {param_name(fp): safe_formula(fp) for fp in safe_params}
 
     # direct_refs[a] = set of safe param names that appear in formula of 'a'
@@ -313,7 +599,7 @@ def compute_reverse_deps(safe_params, max_depth):
         direct_refs[name] = set()
         if formula:
             for other in safe_names:
-                if other != name and formula_references_parameter(formula, other):
+                if other != name and formula_references_parameter(formula, other, known_param_names=known_names):
                     direct_refs[name].add(other)
 
     # reverse_refs[b] = set of safe param names whose formula references 'b'

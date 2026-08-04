@@ -1,15 +1,14 @@
 Analysis Results
 Analytical Alignment
-Analytical Alignment
 Analytical Model
 Constraints
-Constuction
+Construction
 Data
 Dimensions
 Division Geometry
 Electrical
 Electrical - Circuiting
-Electrical - Lightng
+Electrical - Lighting
 Electrical - Loads
 Electrical Analysis
 Electrical Engineering
@@ -18,12 +17,11 @@ Fire Protecton
 Forces
 General
 Graphics
-Green Budding Properties
+Green Building Properties
 Identity Data
 IFC Parameters
 Layers
-Life Safety
-Materials and finishes
+Materials and Finishes
 Mechanical
 Mechanical - Flow
 Mechanical - Loads
@@ -37,17 +35,12 @@ Plumbing
 Primary End
 Rebar Set
 Releases / Member Forces
-Rotation about
 Secondary End
 Segments and Fittings
 Set
 Slab Shape Edit
 Stuctural
 Stuctural Analysis
-Stuctural Section Dimensions
-Sub-Division
 Text
 Title Text
-View to Sheet Positioning
 Visibility
-Visualization

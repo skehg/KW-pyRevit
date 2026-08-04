@@ -1,0 +1,9 @@
+title:
+  en_us: Text Count
+  fr_fr: french title
+  es_es: spanish title
+tooltip: 
+  en_us: places text with an auto incrementing number
+  fr_fr: french tooltip
+  es_es: spanish tooltip
+# highlight: new

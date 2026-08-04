@@ -1,0 +1,46 @@
+Analysis Results
+Analytical Alignment
+Analytical Model
+Constraints
+Construction
+Data
+Dimensions
+Division Geometry
+Electrical
+Electrical - Circuiting
+Electrical - Lighting
+Electrical - Loads
+Electrical Analysis
+Electrical Engineering
+Energy Analysis
+Fire Protecton
+Forces
+General
+Graphics
+Green Building Properties
+Identity Data
+IFC Parameters
+Layers
+Materials and Finishes
+Mechanical
+Mechanical - Flow
+Mechanical - Loads
+Model Properties
+Moments
+Other
+Overall Legend
+Phasing
+Photometrics
+Plumbing
+Primary End
+Rebar Set
+Releases / Member Forces
+Secondary End
+Segments and Fittings
+Set
+Slab Shape Edit
+Stuctural
+Stuctural Analysis
+Text
+Title Text
+Visibility

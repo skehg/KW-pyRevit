@@ -1,0 +1,3605 @@
+---
+mapping_type: parameter_group_displaynames
+version_block: 2025-2027
+forge_namespace: Autodesk.Revit.DB.GroupTypeId
+group_api_type: Autodesk.Revit.DB.GroupTypeId
+last_verified: 2026-08-04
+schema_version: 1
+source: api-reflection
+generated_by: GroupMapBuilder 1.0
+revit_version: 2025
+---
+{
+    "mapping": {
+        "autodesk.parameter.group:materials-1.0.0": "Materials and Finishes", 
+        "autodesk.revit.group:routeAnalysis-1.0.0": "Route Analysis", 
+        "autodesk.parameter.group:electricalAnalysis-1.0.0": "Electrical Analysis", 
+        "autodesk.revit.group:trussFamilyTopChord-1.0.0": "Top Chords", 
+        "autodesk.parameter.group:energyAnalysis-1.0.0": "Energy Analysis", 
+        "autodesk.revit.group:curtainGrid-1.0.0": "Grid", 
+        "autodesk.revit.group:insulation-1.0.0": "Insulation", 
+        "autodesk.revit.group:curtainMullionn2-1.0.0": "Grid 2 Mullions", 
+        "autodesk.revit.group:railingSystemSegmentPatternRemainder-1.0.0": "Pattern Remainder", 
+        "autodesk.revit.group:curtainGridn1-1.0.0": "Grid 1", 
+        "autodesk.parameter.group:data-1.0.0": "Data", 
+        "autodesk.parameter.group:slabShapeEdit-1.0.0": "Slab Shape Edit", 
+        "autodesk.revit.group:alternateUnits-1.0.0": "Alternate Units", 
+        "autodesk.revit.group:stairsSupports-1.0.0": "Supports", 
+        "autodesk.parameter.group:other-1.0.0": "Other", 
+        "autodesk.revit.group:patternApplication-1.0.0": "Pattern Application", 
+        "autodesk.revit.group:rotationAbout-1.0.0": "Rotation about", 
+        "autodesk.revit.group:railingSystemSecondaryFamilyHandrails-1.0.0": "Handrail 2", 
+        "autodesk.parameter.group:divisionGeometry-1.0.0": "Division Geometry", 
+        "autodesk.parameter.group:electricalCircuiting-1.0.0": "Electrical - Circuiting", 
+        "autodesk.revit.group:energyAnalysisDetailedModel-1.0.0": "Detailed Model", 
+        "autodesk.parameter.group:toposolidSubdivision-1.0.1": "Sub-Division", 
+        "autodesk.parameter.group:analyticalAlignment-1.0.0": "Analytical Alignment", 
+        "autodesk.parameter.group:lifeSafety-1.0.0": "Life Safety", 
+        "autodesk.revit.group:conceptualEnergyData-1.0.0": "Conceptual Energy Data", 
+        "autodesk.revit.group:stairsTreadsRisers-1.0.0": "Threads/Risers", 
+        "autodesk.parameter.group:lightPhotometrics-1.0.0": "Photometrics", 
+        "autodesk.revit.group:profilen2-1.0.0": "Profile 2", 
+        "autodesk.revit.group:fabricationProductData-1.0.0": "Fabrication Product Data", 
+        "autodesk.parameter.group:electrical-1.0.0": "Electrical", 
+        "autodesk.revit.group:stairRisers-1.0.0": "Risers", 
+        "autodesk.parameter.group:construction-1.0.0": "Construction", 
+        "autodesk.revit.group:railingSystemFamilyHandrails-1.0.0": "Handrail 1", 
+        "autodesk.revit.group:termination-1.0.0": "Terminations", 
+        "autodesk.revit.group:display-1.0.0": "Display", 
+        "autodesk.parameter.group:couplerArray-1.0.0": "Set", 
+        "autodesk.parameter.group:fireProtection-1.0.0": "Fire Protection", 
+        "autodesk.revit.group:energyAnalysisAdvanced-1.0.0": "Advanced", 
+        "autodesk.parameter.group:identityData-1.0.0": "Identity Data", 
+        "autodesk.parameter.group:ifc-1.0.0": "IFC Parameters", 
+        "autodesk.revit.group:profile-1.0.0": "Profile", 
+        "autodesk.parameter.group:adskModelProperties-1.0.0": "Model Properties", 
+        "autodesk.revit.group:trussFamilyBottomChord-1.0.0": "Bottom Chords", 
+        "autodesk.parameter.group:structuralSectionDimensions-1.0.0": "Structural Section Dimensions", 
+        "autodesk.parameter.group:electricalLighting-1.0.0": "Electrical - Lighting", 
+        "autodesk.parameter.group:greenBuilding-1.0.0": "Green Building Properties", 
+        "autodesk.revit.group:flexible-1.0.0": "Adaptive Component", 
+        "autodesk.revit.group:railingSystemFamilyTopRail-1.0.0": "Top Rail", 
+        "autodesk.revit.group:viewExtents-1.0.0": "Extents", 
+        "autodesk.parameter.group:general-1.0.0": "General", 
+        "autodesk.revit.group:continuousrailEndTopExtension-1.0.0": "Extension (End/Top)", 
+        "autodesk.parameter.group:structuralAnalysis-1.0.0": "Structural Analysis", 
+        "autodesk.revit.group:railingSystemSegmentPatternRepeat-1.0.0": "Pattern Repeat", 
+        "autodesk.revit.group:railingSystemSegmentVGrid-1.0.0": "V Grid", 
+        "autodesk.parameter.group:constraints-1.0.0": "Constraints", 
+        "autodesk.revit.group:reference-1.0.0": "Reference", 
+        "autodesk.parameter.group:visualization-1.0.0": "Visualization", 
+        "autodesk.parameter.group:analyticalModel-1.0.0": "Analytical Model", 
+        "autodesk.parameter.group:segmentsFittings-1.0.0": "Segments and Fittings", 
+        "autodesk.parameter.group:releasesMemberForces-1.0.0": "Releases / Member Forces", 
+        "autodesk.parameter.group:primaryEnd-1.0.0": "Primary End", 
+        "autodesk.revit.group:nodes-1.0.0": "Nodes", 
+        "autodesk.parameter.group:electricalEngineering-1.0.0": "Electrical Engineering", 
+        "autodesk.parameter.group:mechanical-1.0.0": "Mechanical", 
+        "autodesk.revit.group:curtainGridVert-1.0.0": "Vertical Grid", 
+        "autodesk.parameter.group:viewToSheetPositioning-1.0.0": "View to Sheet Positioning", 
+        "autodesk.parameter.group:phasing-1.0.0": "Phasing", 
+        "autodesk.revit.group:stairTreads-1.0.0": "Treads", 
+        "autodesk.parameter.group:secondaryEnd-1.0.0": "Secondary End", 
+        "autodesk.revit.group:geoLocation-1.0.0": "Geolocation", 
+        "autodesk.revit.group:length-1.0.0": "Length", 
+        "autodesk.revit.group:stairStringers-1.0.0": "Stringers", 
+        "autodesk.revit.group:systemtypeRisedrop-1.0.0": "Rise / Drop", 
+        "autodesk.parameter.group:moments-1.0.0": "Moments", 
+        "autodesk.revit.group:structuralSectionGeometry-1.0.0": "Structural Section Geometry", 
+        "autodesk.revit.group:energyAnalysisBuildingData-1.0.0": "Building Data", 
+        "autodesk.revit.group:wallCrossSectionDefinition-1.0.0": "Cross-Section Definition", 
+        "autodesk.revit.group:support-1.0.0": "Supports", 
+        "autodesk.parameter.group:visibility-1.0.0": "Visibility", 
+        "autodesk.revit.group:primaryUnits-1.0.0": "Primary Units", 
+        "autodesk.revit.group:energyAnalysisDetailedAndConceptualModels-1.0.0": "Essential", 
+        "autodesk.revit.group:energyAnalysisRoomSpaceData-1.0.0": "Room/Space Data", 
+        "autodesk.parameter.group:rebarSystemLayers-1.0.0": "Layers", 
+        "autodesk.revit.group:profilen1-1.0.0": "Profile 1", 
+        "autodesk.parameter.group:graphics-1.0.0": "Graphics", 
+        "autodesk.revit.group:energyAnalysisBldgConsMtlThermalProps-1.0.0": "Material Thermal Properties", 
+        "autodesk.parameter.group:mechanicalLoads-1.0.0": "Mechanical - Loads", 
+        "autodesk.revit.group:lining-1.0.0": "Lining", 
+        "autodesk.revit.group:fitting-1.0.0": "Fittings", 
+        "autodesk.revit.group:curtainGridn2-1.0.0": "Grid 2", 
+        "autodesk.parameter.group:overallLegend-1.0.0": "Overall Legend", 
+        "autodesk.parameter.group:mechanicalAirflow-1.0.0": "Mechanical - Flow", 
+        "autodesk.revit.group:railingSystemSegmentPosts-1.0.0": "Posts", 
+        "autodesk.revit.group:analyticalProperties-1.0.0": "Analytical Properties", 
+        "autodesk.parameter.group:dimensions-1.0.0": "Dimensions", 
+        "autodesk.revit.group:conceptualEnergyDataBuildingServices-1.0.0": "Energy Model - Building Services", 
+        "autodesk.parameter.group:forces-1.0.0": "Forces", 
+        "autodesk.revit.group:underlay-1.0.0": "Underlay", 
+        "autodesk.parameter.group:rebarArray-1.0.0": "Rebar Set", 
+        "autodesk.revit.group:curtainMullionVert-1.0.0": "Vertical Mullions", 
+        "autodesk.parameter.group:structural-1.0.0": "Structural", 
+        "autodesk.revit.group:railingSystemSegmentUGrid-1.0.0": "U Grid", 
+        "autodesk.parameter.group:text-1.0.0": "Text", 
+        "autodesk.parameter.group:electricalLoads-1.0.0": "Electrical - Loads", 
+        "autodesk.revit.group:curtainMullionn1-1.0.0": "Grid 1 Mullions", 
+        "autodesk.revit.group:continuousrailBeginBottomExtension-1.0.0": "Extension (Beginning/Bottom)", 
+        "autodesk.parameter.group:plumbing-1.0.0": "Plumbing", 
+        "autodesk.revit.group:trussFamilyDiagWeb-1.0.0": "Diagonal Webs", 
+        "autodesk.revit.group:trussFamilyVertWeb-1.0.0": "Vertical Webs", 
+        "autodesk.revit.group:curtainGridHoriz-1.0.0": "Horizontal Grid", 
+        "autodesk.revit.group:pattern-1.0.0": "Pattern", 
+        "autodesk.revit.group:railingSystemFamilySegmentPattern-1.0.0": "Segment Pattern (default)", 
+        "autodesk.parameter.group:analysisResults-1.0.0": "Analysis Results", 
+        "autodesk.revit.group:stairsOpenEndConnection-1.0.0": "End Connection", 
+        "autodesk.revit.group:splitProfileDimensions-1.0.0": "Dimensions     (linear units or % of thickness)", 
+        "autodesk.revit.group:stairsCalculatorRules-1.0.0": "Calculation Rules", 
+        "autodesk.revit.group:geometryPositioning-1.0.0": "Geometric Position", 
+        "autodesk.revit.group:curtainGridU-1.0.0": "U Grid", 
+        "autodesk.revit.group:stairsWinders-1.0.0": "Winders", 
+        "autodesk.revit.group:curtainGridV-1.0.0": "V Grid", 
+        "autodesk.revit.group:area-1.0.0": "Area", 
+        "autodesk.revit.group:curtainMullionHoriz-1.0.0": "Horizontal Mullions", 
+        "autodesk.revit.group:viewCamera-1.0.0": "Camera", 
+        "autodesk.revit.group:translationIn-1.0.0": "Translation in", 
+        "autodesk.revit.group:energyAnalysisConceptualModel-1.0.0": "Energy Analytical Model", 
+        "autodesk.parameter.group:title-1.0.0": "Title Text"
+    }, 
+    "version": 2025, 
+    "group_api_type": "Autodesk.Revit.DB.GroupTypeId", 
+    "groups": {
+        "actual_groups": [
+            {
+                "normalized_label": "analysis results", 
+                "type_id": "autodesk.parameter.group:analysisResults-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Analysis Results"
+            }, 
+            {
+                "normalized_label": "analytical alignment", 
+                "type_id": "autodesk.parameter.group:analyticalAlignment-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Analytical Alignment"
+            }, 
+            {
+                "normalized_label": "analytical model", 
+                "type_id": "autodesk.parameter.group:analyticalModel-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Analytical Model"
+            }, 
+            {
+                "normalized_label": "constraints", 
+                "type_id": "autodesk.parameter.group:constraints-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Constraints"
+            }, 
+            {
+                "normalized_label": "construction", 
+                "type_id": "autodesk.parameter.group:construction-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Construction"
+            }, 
+            {
+                "normalized_label": "data", 
+                "type_id": "autodesk.parameter.group:data-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Data"
+            }, 
+            {
+                "normalized_label": "dimensions", 
+                "type_id": "autodesk.parameter.group:dimensions-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Dimensions"
+            }, 
+            {
+                "normalized_label": "division geometry", 
+                "type_id": "autodesk.parameter.group:divisionGeometry-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Division Geometry"
+            }, 
+            {
+                "normalized_label": "electrical", 
+                "type_id": "autodesk.parameter.group:electrical-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Electrical"
+            }, 
+            {
+                "normalized_label": "electrical - circuiting", 
+                "type_id": "autodesk.parameter.group:electricalCircuiting-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Electrical - Circuiting"
+            }, 
+            {
+                "normalized_label": "electrical - lighting", 
+                "type_id": "autodesk.parameter.group:electricalLighting-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Electrical - Lighting"
+            }, 
+            {
+                "normalized_label": "electrical - loads", 
+                "type_id": "autodesk.parameter.group:electricalLoads-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Electrical - Loads"
+            }, 
+            {
+                "normalized_label": "electrical analysis", 
+                "type_id": "autodesk.parameter.group:electricalAnalysis-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Electrical Analysis"
+            }, 
+            {
+                "normalized_label": "electrical engineering", 
+                "type_id": "autodesk.parameter.group:electricalEngineering-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Electrical Engineering"
+            }, 
+            {
+                "normalized_label": "energy analysis", 
+                "type_id": "autodesk.parameter.group:energyAnalysis-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Energy Analysis"
+            }, 
+            {
+                "normalized_label": "fire protection", 
+                "type_id": "autodesk.parameter.group:fireProtection-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Fire Protection"
+            }, 
+            {
+                "normalized_label": "forces", 
+                "type_id": "autodesk.parameter.group:forces-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Forces"
+            }, 
+            {
+                "normalized_label": "general", 
+                "type_id": "autodesk.parameter.group:general-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "General"
+            }, 
+            {
+                "normalized_label": "graphics", 
+                "type_id": "autodesk.parameter.group:graphics-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Graphics"
+            }, 
+            {
+                "normalized_label": "green building properties", 
+                "type_id": "autodesk.parameter.group:greenBuilding-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Green Building Properties"
+            }, 
+            {
+                "normalized_label": "identity data", 
+                "type_id": "autodesk.parameter.group:identityData-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Identity Data"
+            }, 
+            {
+                "normalized_label": "ifc parameters", 
+                "type_id": "autodesk.parameter.group:ifc-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "IFC Parameters"
+            }, 
+            {
+                "normalized_label": "layers", 
+                "type_id": "autodesk.parameter.group:rebarSystemLayers-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Layers"
+            }, 
+            {
+                "normalized_label": "life safety", 
+                "type_id": "autodesk.parameter.group:lifeSafety-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Life Safety"
+            }, 
+            {
+                "normalized_label": "materials and finishes", 
+                "type_id": "autodesk.parameter.group:materials-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Materials and Finishes"
+            }, 
+            {
+                "normalized_label": "mechanical", 
+                "type_id": "autodesk.parameter.group:mechanical-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Mechanical"
+            }, 
+            {
+                "normalized_label": "mechanical - flow", 
+                "type_id": "autodesk.parameter.group:mechanicalAirflow-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Mechanical - Flow"
+            }, 
+            {
+                "normalized_label": "mechanical - loads", 
+                "type_id": "autodesk.parameter.group:mechanicalLoads-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Mechanical - Loads"
+            }, 
+            {
+                "normalized_label": "model properties", 
+                "type_id": "autodesk.parameter.group:adskModelProperties-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Model Properties"
+            }, 
+            {
+                "normalized_label": "moments", 
+                "type_id": "autodesk.parameter.group:moments-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Moments"
+            }, 
+            {
+                "normalized_label": "other", 
+                "type_id": "autodesk.parameter.group:other-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Other"
+            }, 
+            {
+                "normalized_label": "overall legend", 
+                "type_id": "autodesk.parameter.group:overallLegend-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Overall Legend"
+            }, 
+            {
+                "normalized_label": "phasing", 
+                "type_id": "autodesk.parameter.group:phasing-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Phasing"
+            }, 
+            {
+                "normalized_label": "photometrics", 
+                "type_id": "autodesk.parameter.group:lightPhotometrics-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Photometrics"
+            }, 
+            {
+                "normalized_label": "plumbing", 
+                "type_id": "autodesk.parameter.group:plumbing-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Plumbing"
+            }, 
+            {
+                "normalized_label": "primary end", 
+                "type_id": "autodesk.parameter.group:primaryEnd-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Primary End"
+            }, 
+            {
+                "normalized_label": "rebar set", 
+                "type_id": "autodesk.parameter.group:rebarArray-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Rebar Set"
+            }, 
+            {
+                "normalized_label": "releases / member forces", 
+                "type_id": "autodesk.parameter.group:releasesMemberForces-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Releases / Member Forces"
+            }, 
+            {
+                "normalized_label": "rotation about", 
+                "type_id": "autodesk.revit.group:rotationAbout-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Rotation about"
+            }, 
+            {
+                "normalized_label": "secondary end", 
+                "type_id": "autodesk.parameter.group:secondaryEnd-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Secondary End"
+            }, 
+            {
+                "normalized_label": "segments and fittings", 
+                "type_id": "autodesk.parameter.group:segmentsFittings-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Segments and Fittings"
+            }, 
+            {
+                "normalized_label": "set", 
+                "type_id": "autodesk.parameter.group:couplerArray-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Set"
+            }, 
+            {
+                "normalized_label": "slab shape edit", 
+                "type_id": "autodesk.parameter.group:slabShapeEdit-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Slab Shape Edit"
+            }, 
+            {
+                "normalized_label": "structural", 
+                "type_id": "autodesk.parameter.group:structural-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Structural"
+            }, 
+            {
+                "normalized_label": "structural analysis", 
+                "type_id": "autodesk.parameter.group:structuralAnalysis-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Structural Analysis"
+            }, 
+            {
+                "normalized_label": "structural section dimensions", 
+                "type_id": "autodesk.parameter.group:structuralSectionDimensions-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Structural Section Dimensions"
+            }, 
+            {
+                "normalized_label": "sub-division", 
+                "type_id": "autodesk.parameter.group:toposolidSubdivision-1.0.1", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Sub-Division"
+            }, 
+            {
+                "normalized_label": "text", 
+                "type_id": "autodesk.parameter.group:text-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Text"
+            }, 
+            {
+                "normalized_label": "title text", 
+                "type_id": "autodesk.parameter.group:title-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Title Text"
+            }, 
+            {
+                "normalized_label": "view to sheet positioning", 
+                "type_id": "autodesk.parameter.group:viewToSheetPositioning-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "View to Sheet Positioning"
+            }, 
+            {
+                "normalized_label": "visibility", 
+                "type_id": "autodesk.parameter.group:visibility-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Visibility"
+            }, 
+            {
+                "normalized_label": "visualization", 
+                "type_id": "autodesk.parameter.group:visualization-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": true, 
+                "source": "expected_list", 
+                "bucket": "actual", 
+                "label": "Visualization"
+            }
+        ], 
+        "missing_expected_labels": [], 
+        "actual_group_labels": [
+            "Analysis Results", 
+            "Analytical Alignment", 
+            "Analytical Model", 
+            "Constraints", 
+            "Construction", 
+            "Data", 
+            "Dimensions", 
+            "Division Geometry", 
+            "Electrical", 
+            "Electrical - Circuiting", 
+            "Electrical - Lighting", 
+            "Electrical - Loads", 
+            "Electrical Analysis", 
+            "Electrical Engineering", 
+            "Energy Analysis", 
+            "Fire Protection", 
+            "Forces", 
+            "General", 
+            "Graphics", 
+            "Green Building Properties", 
+            "Identity Data", 
+            "IFC Parameters", 
+            "Layers", 
+            "Life Safety", 
+            "Materials and Finishes", 
+            "Mechanical", 
+            "Mechanical - Flow", 
+            "Mechanical - Loads", 
+            "Model Properties", 
+            "Moments", 
+            "Other", 
+            "Overall Legend", 
+            "Phasing", 
+            "Photometrics", 
+            "Plumbing", 
+            "Primary End", 
+            "Rebar Set", 
+            "Releases / Member Forces", 
+            "Rotation about", 
+            "Secondary End", 
+            "Segments and Fittings", 
+            "Set", 
+            "Slab Shape Edit", 
+            "Structural", 
+            "Structural Analysis", 
+            "Structural Section Dimensions", 
+            "Sub-Division", 
+            "Text", 
+            "Title Text", 
+            "View to Sheet Positioning", 
+            "Visibility", 
+            "Visualization"
+        ], 
+        "lookup": {
+            "by_type_id": {
+                "autodesk.parameter.group:materials-1.0.0": {
+                    "normalized_label": "materials and finishes", 
+                    "type_id": "autodesk.parameter.group:materials-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Materials and Finishes"
+                }, 
+                "autodesk.revit.group:routeAnalysis-1.0.0": {
+                    "normalized_label": "route analysis", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:routeAnalysis-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Route Analysis"
+                }, 
+                "autodesk.parameter.group:electricalAnalysis-1.0.0": {
+                    "normalized_label": "electrical analysis", 
+                    "type_id": "autodesk.parameter.group:electricalAnalysis-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Electrical Analysis"
+                }, 
+                "autodesk.revit.group:trussFamilyTopChord-1.0.0": {
+                    "normalized_label": "top chords", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:trussFamilyTopChord-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Top Chords"
+                }, 
+                "autodesk.parameter.group:energyAnalysis-1.0.0": {
+                    "normalized_label": "energy analysis", 
+                    "type_id": "autodesk.parameter.group:energyAnalysis-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Energy Analysis"
+                }, 
+                "autodesk.revit.group:curtainGrid-1.0.0": {
+                    "normalized_label": "grid", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainGrid-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Grid"
+                }, 
+                "autodesk.revit.group:insulation-1.0.0": {
+                    "normalized_label": "insulation", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:insulation-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Insulation"
+                }, 
+                "autodesk.revit.group:curtainMullionn2-1.0.0": {
+                    "normalized_label": "grid 2 mullions", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainMullionn2-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Grid 2 Mullions"
+                }, 
+                "autodesk.revit.group:railingSystemSegmentPatternRemainder-1.0.0": {
+                    "normalized_label": "pattern remainder", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:railingSystemSegmentPatternRemainder-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Pattern Remainder"
+                }, 
+                "autodesk.revit.group:curtainGridn1-1.0.0": {
+                    "normalized_label": "grid 1", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainGridn1-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Grid 1"
+                }, 
+                "autodesk.parameter.group:data-1.0.0": {
+                    "normalized_label": "data", 
+                    "type_id": "autodesk.parameter.group:data-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Data"
+                }, 
+                "autodesk.revit.group:alternateUnits-1.0.0": {
+                    "normalized_label": "alternate units", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:alternateUnits-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Alternate Units"
+                }, 
+                "autodesk.parameter.group:slabShapeEdit-1.0.0": {
+                    "normalized_label": "slab shape edit", 
+                    "type_id": "autodesk.parameter.group:slabShapeEdit-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Slab Shape Edit"
+                }, 
+                "autodesk.revit.group:stairsSupports-1.0.0": {
+                    "normalized_label": "supports", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairsSupports-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Supports"
+                }, 
+                "autodesk.parameter.group:other-1.0.0": {
+                    "normalized_label": "other", 
+                    "type_id": "autodesk.parameter.group:other-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Other"
+                }, 
+                "autodesk.revit.group:patternApplication-1.0.0": {
+                    "normalized_label": "pattern application", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:patternApplication-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Pattern Application"
+                }, 
+                "autodesk.revit.group:rotationAbout-1.0.0": {
+                    "normalized_label": "rotation about", 
+                    "type_id": "autodesk.revit.group:rotationAbout-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": false, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Rotation about"
+                }, 
+                "autodesk.revit.group:railingSystemSecondaryFamilyHandrails-1.0.0": {
+                    "normalized_label": "handrail 2", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:railingSystemSecondaryFamilyHandrails-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Handrail 2"
+                }, 
+                "autodesk.parameter.group:divisionGeometry-1.0.0": {
+                    "normalized_label": "division geometry", 
+                    "type_id": "autodesk.parameter.group:divisionGeometry-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Division Geometry"
+                }, 
+                "autodesk.parameter.group:electricalCircuiting-1.0.0": {
+                    "normalized_label": "electrical - circuiting", 
+                    "type_id": "autodesk.parameter.group:electricalCircuiting-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Electrical - Circuiting"
+                }, 
+                "autodesk.revit.group:energyAnalysisDetailedModel-1.0.0": {
+                    "normalized_label": "detailed model", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:energyAnalysisDetailedModel-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Detailed Model"
+                }, 
+                "autodesk.parameter.group:toposolidSubdivision-1.0.1": {
+                    "normalized_label": "sub-division", 
+                    "type_id": "autodesk.parameter.group:toposolidSubdivision-1.0.1", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Sub-Division"
+                }, 
+                "autodesk.parameter.group:analyticalAlignment-1.0.0": {
+                    "normalized_label": "analytical alignment", 
+                    "type_id": "autodesk.parameter.group:analyticalAlignment-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Analytical Alignment"
+                }, 
+                "autodesk.parameter.group:lifeSafety-1.0.0": {
+                    "normalized_label": "life safety", 
+                    "type_id": "autodesk.parameter.group:lifeSafety-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Life Safety"
+                }, 
+                "autodesk.revit.group:conceptualEnergyData-1.0.0": {
+                    "normalized_label": "conceptual energy data", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:conceptualEnergyData-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Conceptual Energy Data"
+                }, 
+                "autodesk.revit.group:stairsTreadsRisers-1.0.0": {
+                    "normalized_label": "threads/risers", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairsTreadsRisers-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Threads/Risers"
+                }, 
+                "autodesk.parameter.group:lightPhotometrics-1.0.0": {
+                    "normalized_label": "photometrics", 
+                    "type_id": "autodesk.parameter.group:lightPhotometrics-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Photometrics"
+                }, 
+                "autodesk.revit.group:profilen2-1.0.0": {
+                    "normalized_label": "profile 2", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:profilen2-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Profile 2"
+                }, 
+                "autodesk.revit.group:fabricationProductData-1.0.0": {
+                    "normalized_label": "fabrication product data", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:fabricationProductData-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Fabrication Product Data"
+                }, 
+                "autodesk.parameter.group:electrical-1.0.0": {
+                    "normalized_label": "electrical", 
+                    "type_id": "autodesk.parameter.group:electrical-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Electrical"
+                }, 
+                "autodesk.revit.group:stairRisers-1.0.0": {
+                    "normalized_label": "risers", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairRisers-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Risers"
+                }, 
+                "autodesk.parameter.group:construction-1.0.0": {
+                    "normalized_label": "construction", 
+                    "type_id": "autodesk.parameter.group:construction-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Construction"
+                }, 
+                "autodesk.revit.group:railingSystemFamilyHandrails-1.0.0": {
+                    "normalized_label": "handrail 1", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:railingSystemFamilyHandrails-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Handrail 1"
+                }, 
+                "autodesk.revit.group:termination-1.0.0": {
+                    "normalized_label": "terminations", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:termination-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Terminations"
+                }, 
+                "autodesk.revit.group:display-1.0.0": {
+                    "normalized_label": "display", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:display-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Display"
+                }, 
+                "autodesk.parameter.group:couplerArray-1.0.0": {
+                    "normalized_label": "set", 
+                    "type_id": "autodesk.parameter.group:couplerArray-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Set"
+                }, 
+                "autodesk.parameter.group:fireProtection-1.0.0": {
+                    "normalized_label": "fire protection", 
+                    "type_id": "autodesk.parameter.group:fireProtection-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Fire Protection"
+                }, 
+                "autodesk.revit.group:energyAnalysisAdvanced-1.0.0": {
+                    "normalized_label": "advanced", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:energyAnalysisAdvanced-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Advanced"
+                }, 
+                "autodesk.parameter.group:identityData-1.0.0": {
+                    "normalized_label": "identity data", 
+                    "type_id": "autodesk.parameter.group:identityData-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Identity Data"
+                }, 
+                "autodesk.parameter.group:ifc-1.0.0": {
+                    "normalized_label": "ifc parameters", 
+                    "type_id": "autodesk.parameter.group:ifc-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "IFC Parameters"
+                }, 
+                "autodesk.revit.group:profile-1.0.0": {
+                    "normalized_label": "profile", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:profile-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Profile"
+                }, 
+                "autodesk.parameter.group:adskModelProperties-1.0.0": {
+                    "normalized_label": "model properties", 
+                    "type_id": "autodesk.parameter.group:adskModelProperties-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Model Properties"
+                }, 
+                "autodesk.revit.group:trussFamilyBottomChord-1.0.0": {
+                    "normalized_label": "bottom chords", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:trussFamilyBottomChord-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Bottom Chords"
+                }, 
+                "autodesk.parameter.group:structuralSectionDimensions-1.0.0": {
+                    "normalized_label": "structural section dimensions", 
+                    "type_id": "autodesk.parameter.group:structuralSectionDimensions-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Structural Section Dimensions"
+                }, 
+                "autodesk.parameter.group:electricalLighting-1.0.0": {
+                    "normalized_label": "electrical - lighting", 
+                    "type_id": "autodesk.parameter.group:electricalLighting-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Electrical - Lighting"
+                }, 
+                "autodesk.parameter.group:greenBuilding-1.0.0": {
+                    "normalized_label": "green building properties", 
+                    "type_id": "autodesk.parameter.group:greenBuilding-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Green Building Properties"
+                }, 
+                "autodesk.revit.group:flexible-1.0.0": {
+                    "normalized_label": "adaptive component", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:flexible-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Adaptive Component"
+                }, 
+                "autodesk.revit.group:railingSystemFamilyTopRail-1.0.0": {
+                    "normalized_label": "top rail", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:railingSystemFamilyTopRail-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Top Rail"
+                }, 
+                "autodesk.revit.group:viewExtents-1.0.0": {
+                    "normalized_label": "extents", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:viewExtents-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Extents"
+                }, 
+                "autodesk.parameter.group:general-1.0.0": {
+                    "normalized_label": "general", 
+                    "type_id": "autodesk.parameter.group:general-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "General"
+                }, 
+                "autodesk.revit.group:continuousrailEndTopExtension-1.0.0": {
+                    "normalized_label": "extension (end/top)", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:continuousrailEndTopExtension-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Extension (End/Top)"
+                }, 
+                "autodesk.parameter.group:structuralAnalysis-1.0.0": {
+                    "normalized_label": "structural analysis", 
+                    "type_id": "autodesk.parameter.group:structuralAnalysis-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Structural Analysis"
+                }, 
+                "autodesk.revit.group:railingSystemSegmentPatternRepeat-1.0.0": {
+                    "normalized_label": "pattern repeat", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:railingSystemSegmentPatternRepeat-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Pattern Repeat"
+                }, 
+                "autodesk.parameter.group:constraints-1.0.0": {
+                    "normalized_label": "constraints", 
+                    "type_id": "autodesk.parameter.group:constraints-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Constraints"
+                }, 
+                "autodesk.revit.group:reference-1.0.0": {
+                    "normalized_label": "reference", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:reference-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Reference"
+                }, 
+                "autodesk.parameter.group:visualization-1.0.0": {
+                    "normalized_label": "visualization", 
+                    "type_id": "autodesk.parameter.group:visualization-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Visualization"
+                }, 
+                "autodesk.parameter.group:analyticalModel-1.0.0": {
+                    "normalized_label": "analytical model", 
+                    "type_id": "autodesk.parameter.group:analyticalModel-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Analytical Model"
+                }, 
+                "autodesk.parameter.group:segmentsFittings-1.0.0": {
+                    "normalized_label": "segments and fittings", 
+                    "type_id": "autodesk.parameter.group:segmentsFittings-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Segments and Fittings"
+                }, 
+                "autodesk.parameter.group:releasesMemberForces-1.0.0": {
+                    "normalized_label": "releases / member forces", 
+                    "type_id": "autodesk.parameter.group:releasesMemberForces-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Releases / Member Forces"
+                }, 
+                "autodesk.parameter.group:primaryEnd-1.0.0": {
+                    "normalized_label": "primary end", 
+                    "type_id": "autodesk.parameter.group:primaryEnd-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Primary End"
+                }, 
+                "autodesk.revit.group:nodes-1.0.0": {
+                    "normalized_label": "nodes", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:nodes-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Nodes"
+                }, 
+                "autodesk.parameter.group:electricalEngineering-1.0.0": {
+                    "normalized_label": "electrical engineering", 
+                    "type_id": "autodesk.parameter.group:electricalEngineering-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Electrical Engineering"
+                }, 
+                "autodesk.parameter.group:mechanical-1.0.0": {
+                    "normalized_label": "mechanical", 
+                    "type_id": "autodesk.parameter.group:mechanical-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Mechanical"
+                }, 
+                "autodesk.revit.group:curtainGridVert-1.0.0": {
+                    "normalized_label": "vertical grid", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainGridVert-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Vertical Grid"
+                }, 
+                "autodesk.parameter.group:viewToSheetPositioning-1.0.0": {
+                    "normalized_label": "view to sheet positioning", 
+                    "type_id": "autodesk.parameter.group:viewToSheetPositioning-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": false, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "View to Sheet Positioning"
+                }, 
+                "autodesk.parameter.group:phasing-1.0.0": {
+                    "normalized_label": "phasing", 
+                    "type_id": "autodesk.parameter.group:phasing-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Phasing"
+                }, 
+                "autodesk.revit.group:stairTreads-1.0.0": {
+                    "normalized_label": "treads", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairTreads-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Treads"
+                }, 
+                "autodesk.parameter.group:secondaryEnd-1.0.0": {
+                    "normalized_label": "secondary end", 
+                    "type_id": "autodesk.parameter.group:secondaryEnd-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Secondary End"
+                }, 
+                "autodesk.revit.group:geoLocation-1.0.0": {
+                    "normalized_label": "geolocation", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:geoLocation-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Geolocation"
+                }, 
+                "autodesk.revit.group:length-1.0.0": {
+                    "normalized_label": "length", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:length-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Length"
+                }, 
+                "autodesk.revit.group:stairStringers-1.0.0": {
+                    "normalized_label": "stringers", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairStringers-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Stringers"
+                }, 
+                "autodesk.revit.group:systemtypeRisedrop-1.0.0": {
+                    "normalized_label": "rise / drop", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:systemtypeRisedrop-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Rise / Drop"
+                }, 
+                "autodesk.parameter.group:moments-1.0.0": {
+                    "normalized_label": "moments", 
+                    "type_id": "autodesk.parameter.group:moments-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Moments"
+                }, 
+                "autodesk.revit.group:structuralSectionGeometry-1.0.0": {
+                    "normalized_label": "structural section geometry", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:structuralSectionGeometry-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Structural Section Geometry"
+                }, 
+                "autodesk.revit.group:energyAnalysisBuildingData-1.0.0": {
+                    "normalized_label": "building data", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:energyAnalysisBuildingData-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Building Data"
+                }, 
+                "autodesk.revit.group:wallCrossSectionDefinition-1.0.0": {
+                    "normalized_label": "cross-section definition", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:wallCrossSectionDefinition-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Cross-Section Definition"
+                }, 
+                "autodesk.revit.group:primaryUnits-1.0.0": {
+                    "normalized_label": "primary units", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:primaryUnits-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Primary Units"
+                }, 
+                "autodesk.parameter.group:visibility-1.0.0": {
+                    "normalized_label": "visibility", 
+                    "type_id": "autodesk.parameter.group:visibility-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Visibility"
+                }, 
+                "autodesk.revit.group:energyAnalysisDetailedAndConceptualModels-1.0.0": {
+                    "normalized_label": "essential", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:energyAnalysisDetailedAndConceptualModels-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Essential"
+                }, 
+                "autodesk.revit.group:energyAnalysisRoomSpaceData-1.0.0": {
+                    "normalized_label": "room/space data", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:energyAnalysisRoomSpaceData-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Room/Space Data"
+                }, 
+                "autodesk.parameter.group:rebarSystemLayers-1.0.0": {
+                    "normalized_label": "layers", 
+                    "type_id": "autodesk.parameter.group:rebarSystemLayers-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Layers"
+                }, 
+                "autodesk.revit.group:profilen1-1.0.0": {
+                    "normalized_label": "profile 1", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:profilen1-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Profile 1"
+                }, 
+                "autodesk.parameter.group:graphics-1.0.0": {
+                    "normalized_label": "graphics", 
+                    "type_id": "autodesk.parameter.group:graphics-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Graphics"
+                }, 
+                "autodesk.revit.group:energyAnalysisBldgConsMtlThermalProps-1.0.0": {
+                    "normalized_label": "material thermal properties", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:energyAnalysisBldgConsMtlThermalProps-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Material Thermal Properties"
+                }, 
+                "autodesk.parameter.group:mechanicalLoads-1.0.0": {
+                    "normalized_label": "mechanical - loads", 
+                    "type_id": "autodesk.parameter.group:mechanicalLoads-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Mechanical - Loads"
+                }, 
+                "autodesk.revit.group:lining-1.0.0": {
+                    "normalized_label": "lining", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:lining-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Lining"
+                }, 
+                "autodesk.revit.group:fitting-1.0.0": {
+                    "normalized_label": "fittings", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:fitting-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Fittings"
+                }, 
+                "autodesk.revit.group:curtainGridn2-1.0.0": {
+                    "normalized_label": "grid 2", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainGridn2-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Grid 2"
+                }, 
+                "autodesk.parameter.group:overallLegend-1.0.0": {
+                    "normalized_label": "overall legend", 
+                    "type_id": "autodesk.parameter.group:overallLegend-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Overall Legend"
+                }, 
+                "autodesk.parameter.group:mechanicalAirflow-1.0.0": {
+                    "normalized_label": "mechanical - flow", 
+                    "type_id": "autodesk.parameter.group:mechanicalAirflow-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Mechanical - Flow"
+                }, 
+                "autodesk.revit.group:railingSystemSegmentPosts-1.0.0": {
+                    "normalized_label": "posts", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:railingSystemSegmentPosts-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Posts"
+                }, 
+                "autodesk.revit.group:analyticalProperties-1.0.0": {
+                    "normalized_label": "analytical properties", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:analyticalProperties-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Analytical Properties"
+                }, 
+                "autodesk.parameter.group:dimensions-1.0.0": {
+                    "normalized_label": "dimensions", 
+                    "type_id": "autodesk.parameter.group:dimensions-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Dimensions"
+                }, 
+                "autodesk.revit.group:conceptualEnergyDataBuildingServices-1.0.0": {
+                    "normalized_label": "energy model - building services", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:conceptualEnergyDataBuildingServices-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Energy Model - Building Services"
+                }, 
+                "autodesk.parameter.group:forces-1.0.0": {
+                    "normalized_label": "forces", 
+                    "type_id": "autodesk.parameter.group:forces-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Forces"
+                }, 
+                "autodesk.revit.group:underlay-1.0.0": {
+                    "normalized_label": "underlay", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:underlay-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Underlay"
+                }, 
+                "autodesk.parameter.group:rebarArray-1.0.0": {
+                    "normalized_label": "rebar set", 
+                    "type_id": "autodesk.parameter.group:rebarArray-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Rebar Set"
+                }, 
+                "autodesk.revit.group:curtainMullionVert-1.0.0": {
+                    "normalized_label": "vertical mullions", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainMullionVert-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Vertical Mullions"
+                }, 
+                "autodesk.parameter.group:structural-1.0.0": {
+                    "normalized_label": "structural", 
+                    "type_id": "autodesk.parameter.group:structural-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Structural"
+                }, 
+                "autodesk.parameter.group:text-1.0.0": {
+                    "normalized_label": "text", 
+                    "type_id": "autodesk.parameter.group:text-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Text"
+                }, 
+                "autodesk.parameter.group:electricalLoads-1.0.0": {
+                    "normalized_label": "electrical - loads", 
+                    "type_id": "autodesk.parameter.group:electricalLoads-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Electrical - Loads"
+                }, 
+                "autodesk.revit.group:curtainMullionn1-1.0.0": {
+                    "normalized_label": "grid 1 mullions", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainMullionn1-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Grid 1 Mullions"
+                }, 
+                "autodesk.revit.group:continuousrailBeginBottomExtension-1.0.0": {
+                    "normalized_label": "extension (beginning/bottom)", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:continuousrailBeginBottomExtension-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Extension (Beginning/Bottom)"
+                }, 
+                "autodesk.parameter.group:plumbing-1.0.0": {
+                    "normalized_label": "plumbing", 
+                    "type_id": "autodesk.parameter.group:plumbing-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Plumbing"
+                }, 
+                "autodesk.revit.group:trussFamilyDiagWeb-1.0.0": {
+                    "normalized_label": "diagonal webs", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:trussFamilyDiagWeb-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Diagonal Webs"
+                }, 
+                "autodesk.revit.group:trussFamilyVertWeb-1.0.0": {
+                    "normalized_label": "vertical webs", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:trussFamilyVertWeb-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Vertical Webs"
+                }, 
+                "autodesk.revit.group:curtainGridHoriz-1.0.0": {
+                    "normalized_label": "horizontal grid", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainGridHoriz-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Horizontal Grid"
+                }, 
+                "autodesk.revit.group:pattern-1.0.0": {
+                    "normalized_label": "pattern", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:pattern-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Pattern"
+                }, 
+                "autodesk.revit.group:railingSystemFamilySegmentPattern-1.0.0": {
+                    "normalized_label": "segment pattern (default)", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:railingSystemFamilySegmentPattern-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Segment Pattern (default)"
+                }, 
+                "autodesk.parameter.group:analysisResults-1.0.0": {
+                    "normalized_label": "analysis results", 
+                    "type_id": "autodesk.parameter.group:analysisResults-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Analysis Results"
+                }, 
+                "autodesk.revit.group:stairsOpenEndConnection-1.0.0": {
+                    "normalized_label": "end connection", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairsOpenEndConnection-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "End Connection"
+                }, 
+                "autodesk.revit.group:splitProfileDimensions-1.0.0": {
+                    "normalized_label": "dimensions (linear units or % of thickness)", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:splitProfileDimensions-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Dimensions     (linear units or % of thickness)"
+                }, 
+                "autodesk.revit.group:stairsCalculatorRules-1.0.0": {
+                    "normalized_label": "calculation rules", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairsCalculatorRules-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Calculation Rules"
+                }, 
+                "autodesk.revit.group:geometryPositioning-1.0.0": {
+                    "normalized_label": "geometric position", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:geometryPositioning-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Geometric Position"
+                }, 
+                "autodesk.revit.group:curtainGridU-1.0.0": {
+                    "normalized_label": "u grid", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainGridU-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "U Grid"
+                }, 
+                "autodesk.revit.group:stairsWinders-1.0.0": {
+                    "normalized_label": "winders", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairsWinders-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Winders"
+                }, 
+                "autodesk.revit.group:curtainGridV-1.0.0": {
+                    "normalized_label": "v grid", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainGridV-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "V Grid"
+                }, 
+                "autodesk.revit.group:area-1.0.0": {
+                    "normalized_label": "area", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:area-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Area"
+                }, 
+                "autodesk.revit.group:curtainMullionHoriz-1.0.0": {
+                    "normalized_label": "horizontal mullions", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainMullionHoriz-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Horizontal Mullions"
+                }, 
+                "autodesk.revit.group:viewCamera-1.0.0": {
+                    "normalized_label": "camera", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:viewCamera-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Camera"
+                }, 
+                "autodesk.revit.group:translationIn-1.0.0": {
+                    "normalized_label": "translation in", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:translationIn-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Translation in"
+                }, 
+                "autodesk.revit.group:energyAnalysisConceptualModel-1.0.0": {
+                    "normalized_label": "energy analytical model", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:energyAnalysisConceptualModel-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Energy Analytical Model"
+                }, 
+                "autodesk.parameter.group:title-1.0.0": {
+                    "normalized_label": "title text", 
+                    "type_id": "autodesk.parameter.group:title-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Title Text"
+                }
+            }, 
+            "by_normalized_label": {
+                "pattern repeat": {
+                    "normalized_label": "pattern repeat", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:railingSystemSegmentPatternRepeat-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Pattern Repeat"
+                }, 
+                "fire protection": {
+                    "normalized_label": "fire protection", 
+                    "type_id": "autodesk.parameter.group:fireProtection-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Fire Protection"
+                }, 
+                "posts": {
+                    "normalized_label": "posts", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:railingSystemSegmentPosts-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Posts"
+                }, 
+                "view to sheet positioning": {
+                    "normalized_label": "view to sheet positioning", 
+                    "type_id": "autodesk.parameter.group:viewToSheetPositioning-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": false, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "View to Sheet Positioning"
+                }, 
+                "phasing": {
+                    "normalized_label": "phasing", 
+                    "type_id": "autodesk.parameter.group:phasing-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Phasing"
+                }, 
+                "u grid": {
+                    "normalized_label": "u grid", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainGridU-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "U Grid"
+                }, 
+                "extension (beginning/bottom)": {
+                    "normalized_label": "extension (beginning/bottom)", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:continuousrailBeginBottomExtension-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Extension (Beginning/Bottom)"
+                }, 
+                "extents": {
+                    "normalized_label": "extents", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:viewExtents-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Extents"
+                }, 
+                "stringers": {
+                    "normalized_label": "stringers", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairStringers-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Stringers"
+                }, 
+                "horizontal mullions": {
+                    "normalized_label": "horizontal mullions", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainMullionHoriz-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Horizontal Mullions"
+                }, 
+                "vertical mullions": {
+                    "normalized_label": "vertical mullions", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainMullionVert-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Vertical Mullions"
+                }, 
+                "grid": {
+                    "normalized_label": "grid", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainGrid-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Grid"
+                }, 
+                "profile 1": {
+                    "normalized_label": "profile 1", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:profilen1-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Profile 1"
+                }, 
+                "data": {
+                    "normalized_label": "data", 
+                    "type_id": "autodesk.parameter.group:data-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Data"
+                }, 
+                "set": {
+                    "normalized_label": "set", 
+                    "type_id": "autodesk.parameter.group:couplerArray-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Set"
+                }, 
+                "segments and fittings": {
+                    "normalized_label": "segments and fittings", 
+                    "type_id": "autodesk.parameter.group:segmentsFittings-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Segments and Fittings"
+                }, 
+                "detailed model": {
+                    "normalized_label": "detailed model", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:energyAnalysisDetailedModel-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Detailed Model"
+                }, 
+                "structural section geometry": {
+                    "normalized_label": "structural section geometry", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:structuralSectionGeometry-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Structural Section Geometry"
+                }, 
+                "identity data": {
+                    "normalized_label": "identity data", 
+                    "type_id": "autodesk.parameter.group:identityData-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Identity Data"
+                }, 
+                "segment pattern (default)": {
+                    "normalized_label": "segment pattern (default)", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:railingSystemFamilySegmentPattern-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Segment Pattern (default)"
+                }, 
+                "translation in": {
+                    "normalized_label": "translation in", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:translationIn-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Translation in"
+                }, 
+                "cross-section definition": {
+                    "normalized_label": "cross-section definition", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:wallCrossSectionDefinition-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Cross-Section Definition"
+                }, 
+                "terminations": {
+                    "normalized_label": "terminations", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:termination-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Terminations"
+                }, 
+                "grid 2": {
+                    "normalized_label": "grid 2", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainGridn2-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Grid 2"
+                }, 
+                "analytical properties": {
+                    "normalized_label": "analytical properties", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:analyticalProperties-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Analytical Properties"
+                }, 
+                "v grid": {
+                    "normalized_label": "v grid", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainGridV-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "V Grid"
+                }, 
+                "length": {
+                    "normalized_label": "length", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:length-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Length"
+                }, 
+                "underlay": {
+                    "normalized_label": "underlay", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:underlay-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Underlay"
+                }, 
+                "ifc parameters": {
+                    "normalized_label": "ifc parameters", 
+                    "type_id": "autodesk.parameter.group:ifc-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "IFC Parameters"
+                }, 
+                "rotation about": {
+                    "normalized_label": "rotation about", 
+                    "type_id": "autodesk.revit.group:rotationAbout-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": false, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Rotation about"
+                }, 
+                "general": {
+                    "normalized_label": "general", 
+                    "type_id": "autodesk.parameter.group:general-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "General"
+                }, 
+                "electrical - circuiting": {
+                    "normalized_label": "electrical - circuiting", 
+                    "type_id": "autodesk.parameter.group:electricalCircuiting-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Electrical - Circuiting"
+                }, 
+                "risers": {
+                    "normalized_label": "risers", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairRisers-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Risers"
+                }, 
+                "plumbing": {
+                    "normalized_label": "plumbing", 
+                    "type_id": "autodesk.parameter.group:plumbing-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Plumbing"
+                }, 
+                "dimensions (linear units or % of thickness)": {
+                    "normalized_label": "dimensions (linear units or % of thickness)", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:splitProfileDimensions-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Dimensions     (linear units or % of thickness)"
+                }, 
+                "structural analysis": {
+                    "normalized_label": "structural analysis", 
+                    "type_id": "autodesk.parameter.group:structuralAnalysis-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Structural Analysis"
+                }, 
+                "other": {
+                    "normalized_label": "other", 
+                    "type_id": "autodesk.parameter.group:other-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Other"
+                }, 
+                "geolocation": {
+                    "normalized_label": "geolocation", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:geoLocation-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Geolocation"
+                }, 
+                "horizontal grid": {
+                    "normalized_label": "horizontal grid", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainGridHoriz-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Horizontal Grid"
+                }, 
+                "vertical grid": {
+                    "normalized_label": "vertical grid", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainGridVert-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Vertical Grid"
+                }, 
+                "fabrication product data": {
+                    "normalized_label": "fabrication product data", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:fabricationProductData-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Fabrication Product Data"
+                }, 
+                "treads": {
+                    "normalized_label": "treads", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairTreads-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Treads"
+                }, 
+                "slab shape edit": {
+                    "normalized_label": "slab shape edit", 
+                    "type_id": "autodesk.parameter.group:slabShapeEdit-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Slab Shape Edit"
+                }, 
+                "primary units": {
+                    "normalized_label": "primary units", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:primaryUnits-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Primary Units"
+                }, 
+                "calculation rules": {
+                    "normalized_label": "calculation rules", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairsCalculatorRules-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Calculation Rules"
+                }, 
+                "grid 2 mullions": {
+                    "normalized_label": "grid 2 mullions", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainMullionn2-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Grid 2 Mullions"
+                }, 
+                "insulation": {
+                    "normalized_label": "insulation", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:insulation-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Insulation"
+                }, 
+                "vertical webs": {
+                    "normalized_label": "vertical webs", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:trussFamilyVertWeb-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Vertical Webs"
+                }, 
+                "visibility": {
+                    "normalized_label": "visibility", 
+                    "type_id": "autodesk.parameter.group:visibility-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Visibility"
+                }, 
+                "analytical model": {
+                    "normalized_label": "analytical model", 
+                    "type_id": "autodesk.parameter.group:analyticalModel-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Analytical Model"
+                }, 
+                "life safety": {
+                    "normalized_label": "life safety", 
+                    "type_id": "autodesk.parameter.group:lifeSafety-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Life Safety"
+                }, 
+                "green building properties": {
+                    "normalized_label": "green building properties", 
+                    "type_id": "autodesk.parameter.group:greenBuilding-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Green Building Properties"
+                }, 
+                "room/space data": {
+                    "normalized_label": "room/space data", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:energyAnalysisRoomSpaceData-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Room/Space Data"
+                }, 
+                "display": {
+                    "normalized_label": "display", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:display-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Display"
+                }, 
+                "extension (end/top)": {
+                    "normalized_label": "extension (end/top)", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:continuousrailEndTopExtension-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Extension (End/Top)"
+                }, 
+                "mechanical": {
+                    "normalized_label": "mechanical", 
+                    "type_id": "autodesk.parameter.group:mechanical-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Mechanical"
+                }, 
+                "supports": {
+                    "normalized_label": "supports", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairsSupports-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Supports"
+                }, 
+                "threads/risers": {
+                    "normalized_label": "threads/risers", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairsTreadsRisers-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Threads/Risers"
+                }, 
+                "text": {
+                    "normalized_label": "text", 
+                    "type_id": "autodesk.parameter.group:text-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Text"
+                }, 
+                "nodes": {
+                    "normalized_label": "nodes", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:nodes-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Nodes"
+                }, 
+                "reference": {
+                    "normalized_label": "reference", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:reference-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Reference"
+                }, 
+                "title text": {
+                    "normalized_label": "title text", 
+                    "type_id": "autodesk.parameter.group:title-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Title Text"
+                }, 
+                "electrical": {
+                    "normalized_label": "electrical", 
+                    "type_id": "autodesk.parameter.group:electrical-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Electrical"
+                }, 
+                "lining": {
+                    "normalized_label": "lining", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:lining-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Lining"
+                }, 
+                "pattern application": {
+                    "normalized_label": "pattern application", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:patternApplication-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Pattern Application"
+                }, 
+                "energy analysis": {
+                    "normalized_label": "energy analysis", 
+                    "type_id": "autodesk.parameter.group:energyAnalysis-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Energy Analysis"
+                }, 
+                "forces": {
+                    "normalized_label": "forces", 
+                    "type_id": "autodesk.parameter.group:forces-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Forces"
+                }, 
+                "construction": {
+                    "normalized_label": "construction", 
+                    "type_id": "autodesk.parameter.group:construction-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Construction"
+                }, 
+                "handrail 1": {
+                    "normalized_label": "handrail 1", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:railingSystemFamilyHandrails-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Handrail 1"
+                }, 
+                "analysis results": {
+                    "normalized_label": "analysis results", 
+                    "type_id": "autodesk.parameter.group:analysisResults-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Analysis Results"
+                }, 
+                "profile": {
+                    "normalized_label": "profile", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:profile-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Profile"
+                }, 
+                "mechanical - flow": {
+                    "normalized_label": "mechanical - flow", 
+                    "type_id": "autodesk.parameter.group:mechanicalAirflow-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Mechanical - Flow"
+                }, 
+                "essential": {
+                    "normalized_label": "essential", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:energyAnalysisDetailedAndConceptualModels-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Essential"
+                }, 
+                "electrical analysis": {
+                    "normalized_label": "electrical analysis", 
+                    "type_id": "autodesk.parameter.group:electricalAnalysis-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Electrical Analysis"
+                }, 
+                "model properties": {
+                    "normalized_label": "model properties", 
+                    "type_id": "autodesk.parameter.group:adskModelProperties-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Model Properties"
+                }, 
+                "layers": {
+                    "normalized_label": "layers", 
+                    "type_id": "autodesk.parameter.group:rebarSystemLayers-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Layers"
+                }, 
+                "alternate units": {
+                    "normalized_label": "alternate units", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:alternateUnits-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Alternate Units"
+                }, 
+                "winders": {
+                    "normalized_label": "winders", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairsWinders-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Winders"
+                }, 
+                "material thermal properties": {
+                    "normalized_label": "material thermal properties", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:energyAnalysisBldgConsMtlThermalProps-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Material Thermal Properties"
+                }, 
+                "end connection": {
+                    "normalized_label": "end connection", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:stairsOpenEndConnection-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "End Connection"
+                }, 
+                "handrail 2": {
+                    "normalized_label": "handrail 2", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:railingSystemSecondaryFamilyHandrails-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Handrail 2"
+                }, 
+                "pattern": {
+                    "normalized_label": "pattern", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:pattern-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Pattern"
+                }, 
+                "secondary end": {
+                    "normalized_label": "secondary end", 
+                    "type_id": "autodesk.parameter.group:secondaryEnd-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Secondary End"
+                }, 
+                "grid 1": {
+                    "normalized_label": "grid 1", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainGridn1-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Grid 1"
+                }, 
+                "energy analytical model": {
+                    "normalized_label": "energy analytical model", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:energyAnalysisConceptualModel-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Energy Analytical Model"
+                }, 
+                "electrical engineering": {
+                    "normalized_label": "electrical engineering", 
+                    "type_id": "autodesk.parameter.group:electricalEngineering-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Electrical Engineering"
+                }, 
+                "energy model - building services": {
+                    "normalized_label": "energy model - building services", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:conceptualEnergyDataBuildingServices-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Energy Model - Building Services"
+                }, 
+                "camera": {
+                    "normalized_label": "camera", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:viewCamera-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Camera"
+                }, 
+                "constraints": {
+                    "normalized_label": "constraints", 
+                    "type_id": "autodesk.parameter.group:constraints-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Constraints"
+                }, 
+                "profile 2": {
+                    "normalized_label": "profile 2", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:profilen2-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Profile 2"
+                }, 
+                "conceptual energy data": {
+                    "normalized_label": "conceptual energy data", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:conceptualEnergyData-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Conceptual Energy Data"
+                }, 
+                "adaptive component": {
+                    "normalized_label": "adaptive component", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:flexible-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Adaptive Component"
+                }, 
+                "analytical alignment": {
+                    "normalized_label": "analytical alignment", 
+                    "type_id": "autodesk.parameter.group:analyticalAlignment-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Analytical Alignment"
+                }, 
+                "sub-division": {
+                    "normalized_label": "sub-division", 
+                    "type_id": "autodesk.parameter.group:toposolidSubdivision-1.0.1", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Sub-Division"
+                }, 
+                "top rail": {
+                    "normalized_label": "top rail", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:railingSystemFamilyTopRail-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Top Rail"
+                }, 
+                "division geometry": {
+                    "normalized_label": "division geometry", 
+                    "type_id": "autodesk.parameter.group:divisionGeometry-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Division Geometry"
+                }, 
+                "electrical - lighting": {
+                    "normalized_label": "electrical - lighting", 
+                    "type_id": "autodesk.parameter.group:electricalLighting-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Electrical - Lighting"
+                }, 
+                "primary end": {
+                    "normalized_label": "primary end", 
+                    "type_id": "autodesk.parameter.group:primaryEnd-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Primary End"
+                }, 
+                "electrical - loads": {
+                    "normalized_label": "electrical - loads", 
+                    "type_id": "autodesk.parameter.group:electricalLoads-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Electrical - Loads"
+                }, 
+                "rise / drop": {
+                    "normalized_label": "rise / drop", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:systemtypeRisedrop-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Rise / Drop"
+                }, 
+                "rebar set": {
+                    "normalized_label": "rebar set", 
+                    "type_id": "autodesk.parameter.group:rebarArray-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Rebar Set"
+                }, 
+                "graphics": {
+                    "normalized_label": "graphics", 
+                    "type_id": "autodesk.parameter.group:graphics-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Graphics"
+                }, 
+                "releases / member forces": {
+                    "normalized_label": "releases / member forces", 
+                    "type_id": "autodesk.parameter.group:releasesMemberForces-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Releases / Member Forces"
+                }, 
+                "overall legend": {
+                    "normalized_label": "overall legend", 
+                    "type_id": "autodesk.parameter.group:overallLegend-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Overall Legend"
+                }, 
+                "materials and finishes": {
+                    "normalized_label": "materials and finishes", 
+                    "type_id": "autodesk.parameter.group:materials-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Materials and Finishes"
+                }, 
+                "building data": {
+                    "normalized_label": "building data", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:energyAnalysisBuildingData-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Building Data"
+                }, 
+                "pattern remainder": {
+                    "normalized_label": "pattern remainder", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:railingSystemSegmentPatternRemainder-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Pattern Remainder"
+                }, 
+                "area": {
+                    "normalized_label": "area", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:area-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Area"
+                }, 
+                "fittings": {
+                    "normalized_label": "fittings", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:fitting-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Fittings"
+                }, 
+                "route analysis": {
+                    "normalized_label": "route analysis", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:routeAnalysis-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Route Analysis"
+                }, 
+                "structural section dimensions": {
+                    "normalized_label": "structural section dimensions", 
+                    "type_id": "autodesk.parameter.group:structuralSectionDimensions-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Structural Section Dimensions"
+                }, 
+                "geometric position": {
+                    "normalized_label": "geometric position", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:geometryPositioning-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Geometric Position"
+                }, 
+                "grid 1 mullions": {
+                    "normalized_label": "grid 1 mullions", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:curtainMullionn1-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Grid 1 Mullions"
+                }, 
+                "visualization": {
+                    "normalized_label": "visualization", 
+                    "type_id": "autodesk.parameter.group:visualization-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Visualization"
+                }, 
+                "advanced": {
+                    "normalized_label": "advanced", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:energyAnalysisAdvanced-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Advanced"
+                }, 
+                "diagonal webs": {
+                    "normalized_label": "diagonal webs", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:trussFamilyDiagWeb-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Diagonal Webs"
+                }, 
+                "dimensions": {
+                    "normalized_label": "dimensions", 
+                    "type_id": "autodesk.parameter.group:dimensions-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Dimensions"
+                }, 
+                "bottom chords": {
+                    "normalized_label": "bottom chords", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:trussFamilyBottomChord-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Bottom Chords"
+                }, 
+                "top chords": {
+                    "normalized_label": "top chords", 
+                    "version_block": "2025-2027", 
+                    "source": "api", 
+                    "type_id": "autodesk.revit.group:trussFamilyTopChord-1.0.0", 
+                    "bucket": "other", 
+                    "is_user_assignable": false, 
+                    "label": "Top Chords"
+                }, 
+                "structural": {
+                    "normalized_label": "structural", 
+                    "type_id": "autodesk.parameter.group:structural-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Structural"
+                }, 
+                "moments": {
+                    "normalized_label": "moments", 
+                    "type_id": "autodesk.parameter.group:moments-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Moments"
+                }, 
+                "mechanical - loads": {
+                    "normalized_label": "mechanical - loads", 
+                    "type_id": "autodesk.parameter.group:mechanicalLoads-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Mechanical - Loads"
+                }, 
+                "photometrics": {
+                    "normalized_label": "photometrics", 
+                    "type_id": "autodesk.parameter.group:lightPhotometrics-1.0.0", 
+                    "version_block": "2025-2027", 
+                    "is_user_assignable": true, 
+                    "source": "expected_list", 
+                    "bucket": "actual", 
+                    "label": "Photometrics"
+                }
+            }
+        }, 
+        "other_groups": [
+            {
+                "normalized_label": "adaptive component", 
+                "type_id": "autodesk.revit.group:flexible-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Adaptive Component"
+            }, 
+            {
+                "normalized_label": "advanced", 
+                "type_id": "autodesk.revit.group:energyAnalysisAdvanced-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Advanced"
+            }, 
+            {
+                "normalized_label": "alternate units", 
+                "type_id": "autodesk.revit.group:alternateUnits-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Alternate Units"
+            }, 
+            {
+                "normalized_label": "analytical properties", 
+                "type_id": "autodesk.revit.group:analyticalProperties-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Analytical Properties"
+            }, 
+            {
+                "normalized_label": "area", 
+                "type_id": "autodesk.revit.group:area-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Area"
+            }, 
+            {
+                "normalized_label": "bottom chords", 
+                "type_id": "autodesk.revit.group:trussFamilyBottomChord-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Bottom Chords"
+            }, 
+            {
+                "normalized_label": "building data", 
+                "type_id": "autodesk.revit.group:energyAnalysisBuildingData-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Building Data"
+            }, 
+            {
+                "normalized_label": "calculation rules", 
+                "type_id": "autodesk.revit.group:stairsCalculatorRules-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Calculation Rules"
+            }, 
+            {
+                "normalized_label": "camera", 
+                "type_id": "autodesk.revit.group:viewCamera-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Camera"
+            }, 
+            {
+                "normalized_label": "conceptual energy data", 
+                "type_id": "autodesk.revit.group:conceptualEnergyData-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Conceptual Energy Data"
+            }, 
+            {
+                "normalized_label": "cross-section definition", 
+                "type_id": "autodesk.revit.group:wallCrossSectionDefinition-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Cross-Section Definition"
+            }, 
+            {
+                "normalized_label": "detailed model", 
+                "type_id": "autodesk.revit.group:energyAnalysisDetailedModel-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Detailed Model"
+            }, 
+            {
+                "normalized_label": "diagonal webs", 
+                "type_id": "autodesk.revit.group:trussFamilyDiagWeb-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Diagonal Webs"
+            }, 
+            {
+                "normalized_label": "dimensions (linear units or % of thickness)", 
+                "type_id": "autodesk.revit.group:splitProfileDimensions-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Dimensions     (linear units or % of thickness)"
+            }, 
+            {
+                "normalized_label": "display", 
+                "type_id": "autodesk.revit.group:display-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Display"
+            }, 
+            {
+                "normalized_label": "end connection", 
+                "type_id": "autodesk.revit.group:stairsOpenEndConnection-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "End Connection"
+            }, 
+            {
+                "normalized_label": "energy analytical model", 
+                "type_id": "autodesk.revit.group:energyAnalysisConceptualModel-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Energy Analytical Model"
+            }, 
+            {
+                "normalized_label": "energy model - building services", 
+                "type_id": "autodesk.revit.group:conceptualEnergyDataBuildingServices-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Energy Model - Building Services"
+            }, 
+            {
+                "normalized_label": "essential", 
+                "type_id": "autodesk.revit.group:energyAnalysisDetailedAndConceptualModels-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Essential"
+            }, 
+            {
+                "normalized_label": "extension (beginning/bottom)", 
+                "type_id": "autodesk.revit.group:continuousrailBeginBottomExtension-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Extension (Beginning/Bottom)"
+            }, 
+            {
+                "normalized_label": "extension (end/top)", 
+                "type_id": "autodesk.revit.group:continuousrailEndTopExtension-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Extension (End/Top)"
+            }, 
+            {
+                "normalized_label": "extents", 
+                "type_id": "autodesk.revit.group:viewExtents-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Extents"
+            }, 
+            {
+                "normalized_label": "fabrication product data", 
+                "type_id": "autodesk.revit.group:fabricationProductData-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Fabrication Product Data"
+            }, 
+            {
+                "normalized_label": "fittings", 
+                "type_id": "autodesk.revit.group:fitting-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Fittings"
+            }, 
+            {
+                "normalized_label": "geolocation", 
+                "type_id": "autodesk.revit.group:geoLocation-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Geolocation"
+            }, 
+            {
+                "normalized_label": "geometric position", 
+                "type_id": "autodesk.revit.group:geometryPositioning-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Geometric Position"
+            }, 
+            {
+                "normalized_label": "grid", 
+                "type_id": "autodesk.revit.group:curtainGrid-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Grid"
+            }, 
+            {
+                "normalized_label": "grid 1", 
+                "type_id": "autodesk.revit.group:curtainGridn1-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Grid 1"
+            }, 
+            {
+                "normalized_label": "grid 1 mullions", 
+                "type_id": "autodesk.revit.group:curtainMullionn1-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Grid 1 Mullions"
+            }, 
+            {
+                "normalized_label": "grid 2", 
+                "type_id": "autodesk.revit.group:curtainGridn2-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Grid 2"
+            }, 
+            {
+                "normalized_label": "grid 2 mullions", 
+                "type_id": "autodesk.revit.group:curtainMullionn2-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Grid 2 Mullions"
+            }, 
+            {
+                "normalized_label": "handrail 1", 
+                "type_id": "autodesk.revit.group:railingSystemFamilyHandrails-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Handrail 1"
+            }, 
+            {
+                "normalized_label": "handrail 2", 
+                "type_id": "autodesk.revit.group:railingSystemSecondaryFamilyHandrails-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Handrail 2"
+            }, 
+            {
+                "normalized_label": "horizontal grid", 
+                "type_id": "autodesk.revit.group:curtainGridHoriz-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Horizontal Grid"
+            }, 
+            {
+                "normalized_label": "horizontal mullions", 
+                "type_id": "autodesk.revit.group:curtainMullionHoriz-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Horizontal Mullions"
+            }, 
+            {
+                "normalized_label": "insulation", 
+                "type_id": "autodesk.revit.group:insulation-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Insulation"
+            }, 
+            {
+                "normalized_label": "length", 
+                "type_id": "autodesk.revit.group:length-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Length"
+            }, 
+            {
+                "normalized_label": "lining", 
+                "type_id": "autodesk.revit.group:lining-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Lining"
+            }, 
+            {
+                "normalized_label": "material thermal properties", 
+                "type_id": "autodesk.revit.group:energyAnalysisBldgConsMtlThermalProps-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Material Thermal Properties"
+            }, 
+            {
+                "normalized_label": "nodes", 
+                "type_id": "autodesk.revit.group:nodes-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Nodes"
+            }, 
+            {
+                "normalized_label": "pattern", 
+                "type_id": "autodesk.revit.group:pattern-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Pattern"
+            }, 
+            {
+                "normalized_label": "pattern application", 
+                "type_id": "autodesk.revit.group:patternApplication-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Pattern Application"
+            }, 
+            {
+                "normalized_label": "pattern remainder", 
+                "type_id": "autodesk.revit.group:railingSystemSegmentPatternRemainder-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Pattern Remainder"
+            }, 
+            {
+                "normalized_label": "pattern repeat", 
+                "type_id": "autodesk.revit.group:railingSystemSegmentPatternRepeat-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Pattern Repeat"
+            }, 
+            {
+                "normalized_label": "posts", 
+                "type_id": "autodesk.revit.group:railingSystemSegmentPosts-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Posts"
+            }, 
+            {
+                "normalized_label": "primary units", 
+                "type_id": "autodesk.revit.group:primaryUnits-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Primary Units"
+            }, 
+            {
+                "normalized_label": "profile", 
+                "type_id": "autodesk.revit.group:profile-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Profile"
+            }, 
+            {
+                "normalized_label": "profile 1", 
+                "type_id": "autodesk.revit.group:profilen1-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Profile 1"
+            }, 
+            {
+                "normalized_label": "profile 2", 
+                "type_id": "autodesk.revit.group:profilen2-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Profile 2"
+            }, 
+            {
+                "normalized_label": "reference", 
+                "type_id": "autodesk.revit.group:reference-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Reference"
+            }, 
+            {
+                "normalized_label": "rise / drop", 
+                "type_id": "autodesk.revit.group:systemtypeRisedrop-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Rise / Drop"
+            }, 
+            {
+                "normalized_label": "risers", 
+                "type_id": "autodesk.revit.group:stairRisers-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Risers"
+            }, 
+            {
+                "normalized_label": "room/space data", 
+                "type_id": "autodesk.revit.group:energyAnalysisRoomSpaceData-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Room/Space Data"
+            }, 
+            {
+                "normalized_label": "route analysis", 
+                "type_id": "autodesk.revit.group:routeAnalysis-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Route Analysis"
+            }, 
+            {
+                "normalized_label": "segment pattern (default)", 
+                "type_id": "autodesk.revit.group:railingSystemFamilySegmentPattern-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Segment Pattern (default)"
+            }, 
+            {
+                "normalized_label": "stringers", 
+                "type_id": "autodesk.revit.group:stairStringers-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Stringers"
+            }, 
+            {
+                "normalized_label": "structural section geometry", 
+                "type_id": "autodesk.revit.group:structuralSectionGeometry-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Structural Section Geometry"
+            }, 
+            {
+                "normalized_label": "supports", 
+                "type_id": "autodesk.revit.group:stairsSupports-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Supports"
+            }, 
+            {
+                "normalized_label": "terminations", 
+                "type_id": "autodesk.revit.group:termination-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Terminations"
+            }, 
+            {
+                "normalized_label": "threads/risers", 
+                "type_id": "autodesk.revit.group:stairsTreadsRisers-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Threads/Risers"
+            }, 
+            {
+                "normalized_label": "top chords", 
+                "type_id": "autodesk.revit.group:trussFamilyTopChord-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Top Chords"
+            }, 
+            {
+                "normalized_label": "top rail", 
+                "type_id": "autodesk.revit.group:railingSystemFamilyTopRail-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Top Rail"
+            }, 
+            {
+                "normalized_label": "translation in", 
+                "type_id": "autodesk.revit.group:translationIn-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Translation in"
+            }, 
+            {
+                "normalized_label": "treads", 
+                "type_id": "autodesk.revit.group:stairTreads-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Treads"
+            }, 
+            {
+                "normalized_label": "u grid", 
+                "type_id": "autodesk.revit.group:curtainGridU-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "U Grid"
+            }, 
+            {
+                "normalized_label": "underlay", 
+                "type_id": "autodesk.revit.group:underlay-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Underlay"
+            }, 
+            {
+                "normalized_label": "v grid", 
+                "type_id": "autodesk.revit.group:curtainGridV-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "V Grid"
+            }, 
+            {
+                "normalized_label": "vertical grid", 
+                "type_id": "autodesk.revit.group:curtainGridVert-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Vertical Grid"
+            }, 
+            {
+                "normalized_label": "vertical mullions", 
+                "type_id": "autodesk.revit.group:curtainMullionVert-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Vertical Mullions"
+            }, 
+            {
+                "normalized_label": "vertical webs", 
+                "type_id": "autodesk.revit.group:trussFamilyVertWeb-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Vertical Webs"
+            }, 
+            {
+                "normalized_label": "winders", 
+                "type_id": "autodesk.revit.group:stairsWinders-1.0.0", 
+                "version_block": "2025-2027", 
+                "is_user_assignable": false, 
+                "source": "api", 
+                "bucket": "other", 
+                "label": "Winders"
+            }
+        ], 
+        "other_group_labels": [
+            "Adaptive Component", 
+            "Advanced", 
+            "Alternate Units", 
+            "Analytical Properties", 
+            "Area", 
+            "Bottom Chords", 
+            "Building Data", 
+            "Calculation Rules", 
+            "Camera", 
+            "Conceptual Energy Data", 
+            "Cross-Section Definition", 
+            "Detailed Model", 
+            "Diagonal Webs", 
+            "Dimensions     (linear units or % of thickness)", 
+            "Display", 
+            "End Connection", 
+            "Energy Analytical Model", 
+            "Energy Model - Building Services", 
+            "Essential", 
+            "Extension (Beginning/Bottom)", 
+            "Extension (End/Top)", 
+            "Extents", 
+            "Fabrication Product Data", 
+            "Fittings", 
+            "Geolocation", 
+            "Geometric Position", 
+            "Grid", 
+            "Grid 1", 
+            "Grid 1 Mullions", 
+            "Grid 2", 
+            "Grid 2 Mullions", 
+            "Handrail 1", 
+            "Handrail 2", 
+            "Horizontal Grid", 
+            "Horizontal Mullions", 
+            "Insulation", 
+            "Length", 
+            "Lining", 
+            "Material Thermal Properties", 
+            "Nodes", 
+            "Pattern", 
+            "Pattern Application", 
+            "Pattern Remainder", 
+            "Pattern Repeat", 
+            "Posts", 
+            "Primary Units", 
+            "Profile", 
+            "Profile 1", 
+            "Profile 2", 
+            "Reference", 
+            "Rise / Drop", 
+            "Risers", 
+            "Room/Space Data", 
+            "Route Analysis", 
+            "Segment Pattern (default)", 
+            "Stringers", 
+            "Structural Section Geometry", 
+            "Supports", 
+            "Terminations", 
+            "Threads/Risers", 
+            "Top Chords", 
+            "Top Rail", 
+            "Translation in", 
+            "Treads", 
+            "U Grid", 
+            "Underlay", 
+            "V Grid", 
+            "Vertical Grid", 
+            "Vertical Mullions", 
+            "Vertical Webs", 
+            "Winders"
+        ]
+    }, 
+    "version_block": "2025-2027"
+}

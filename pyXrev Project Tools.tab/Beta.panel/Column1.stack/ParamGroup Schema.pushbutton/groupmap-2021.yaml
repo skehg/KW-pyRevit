@@ -1,0 +1,3344 @@
+---
+mapping_type: parameter_group_displaynames
+group_api_type: Autodesk.Revit.DB.BuiltInParameterGroup
+version_block: 2020-2022
+last_verified: 2026-08-04
+forge_namespace: Autodesk.Revit.DB.BuiltInParameterGroup
+generated_by: GroupMapBuilder 1.0
+schema_version: 1
+revit_version: 2021
+source: api-reflection
+---
+{
+    "groups": {
+        "lookup": {
+            "by_type_id": {
+                "enum:PG_TRUSS_FAMILY_DIAG_WEB": {
+                    "label": "Diagonal Webs", 
+                    "type_id": "enum:PG_TRUSS_FAMILY_DIAG_WEB", 
+                    "normalized_label": "diagonal webs", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_SYSTEMTYPE_RISEDROP": {
+                    "label": "Rise / Drop", 
+                    "type_id": "enum:PG_SYSTEMTYPE_RISEDROP", 
+                    "normalized_label": "rise / drop", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_ENERGY_ANALYSIS": {
+                    "source": "expected_list", 
+                    "label": "Energy Analysis", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS", 
+                    "normalized_label": "energy analysis", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_GENERAL": {
+                    "source": "expected_list", 
+                    "label": "General", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_GENERAL", 
+                    "normalized_label": "general", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_ROUTE_ANALYSIS": {
+                    "label": "Route Analysis", 
+                    "type_id": "enum:PG_ROUTE_ANALYSIS", 
+                    "normalized_label": "route analysis", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_COUPLER_ARRAY": {
+                    "source": "expected_list", 
+                    "label": "Set", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_COUPLER_ARRAY", 
+                    "normalized_label": "set", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_MATERIALS": {
+                    "source": "expected_list", 
+                    "label": "Materials and Finishes", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_MATERIALS", 
+                    "normalized_label": "materials and finishes", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_IDENTITY_DATA": {
+                    "source": "expected_list", 
+                    "label": "Identity Data", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_IDENTITY_DATA", 
+                    "normalized_label": "identity data", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_PROFILE": {
+                    "label": "Profile", 
+                    "type_id": "enum:PG_PROFILE", 
+                    "normalized_label": "profile", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_FLEXIBLE": {
+                    "label": "Adaptive Component", 
+                    "type_id": "enum:PG_FLEXIBLE", 
+                    "normalized_label": "adaptive component", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_STRUCTURAL": {
+                    "source": "expected_list", 
+                    "label": "Structural", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_STRUCTURAL", 
+                    "normalized_label": "structural", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_ELECTRICAL_LIGHTING": {
+                    "source": "expected_list", 
+                    "label": "Electrical - Lighting", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ELECTRICAL_LIGHTING", 
+                    "normalized_label": "electrical - lighting", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_CURTAIN_GRID_1": {
+                    "label": "Grid 1", 
+                    "type_id": "enum:PG_CURTAIN_GRID_1", 
+                    "normalized_label": "grid 1", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_INSULATION": {
+                    "label": "Insulation", 
+                    "type_id": "enum:PG_INSULATION", 
+                    "normalized_label": "insulation", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_PLUMBING": {
+                    "source": "expected_list", 
+                    "label": "Plumbing", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_PLUMBING", 
+                    "normalized_label": "plumbing", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_CURTAIN_MULLION_1": {
+                    "label": "Grid 1 Mullions", 
+                    "type_id": "enum:PG_CURTAIN_MULLION_1", 
+                    "normalized_label": "grid 1 mullions", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_STAIRS_OPEN_END_CONNECTION": {
+                    "label": "End Connection", 
+                    "type_id": "enum:PG_STAIRS_OPEN_END_CONNECTION", 
+                    "normalized_label": "end connection", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_CURTAIN_MULLION_2": {
+                    "label": "Grid 2 Mullions", 
+                    "type_id": "enum:PG_CURTAIN_MULLION_2", 
+                    "normalized_label": "grid 2 mullions", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_STRUCTURAL_SECTION_GEOMETRY": {
+                    "label": "Structural Section Geometry", 
+                    "type_id": "enum:PG_STRUCTURAL_SECTION_GEOMETRY", 
+                    "normalized_label": "structural section geometry", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_STAIR_RISERS": {
+                    "label": "Risers", 
+                    "type_id": "enum:PG_STAIR_RISERS", 
+                    "normalized_label": "risers", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_MECHANICAL_AIRFLOW": {
+                    "source": "expected_list", 
+                    "label": "Mechanical - Flow", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_MECHANICAL_AIRFLOW", 
+                    "normalized_label": "mechanical - flow", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_GEOMETRY": {
+                    "source": "expected_list", 
+                    "label": "Dimensions", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_GEOMETRY", 
+                    "normalized_label": "dimensions", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_STAIRS_TREADS_RISERS": {
+                    "label": "Threads/Risers", 
+                    "type_id": "enum:PG_STAIRS_TREADS_RISERS", 
+                    "normalized_label": "threads/risers", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_ROTATION_ABOUT": {
+                    "label": "Rotation about", 
+                    "type_id": "enum:PG_ROTATION_ABOUT", 
+                    "normalized_label": "rotation about", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_CURTAIN_MULLION_VERT": {
+                    "label": "Vertical Mullions", 
+                    "type_id": "enum:PG_CURTAIN_MULLION_VERT", 
+                    "normalized_label": "vertical mullions", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_TITLE": {
+                    "source": "expected_list", 
+                    "label": "Title Text", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_TITLE", 
+                    "normalized_label": "title text", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_GEO_LOCATION": {
+                    "label": "Geolocation", 
+                    "type_id": "enum:PG_GEO_LOCATION", 
+                    "normalized_label": "geolocation", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_ENERGY_ANALYSIS_DETAILED_AND_CONCEPTUAL_MODELS": {
+                    "label": "Essential", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS_DETAILED_AND_CONCEPTUAL_MODELS", 
+                    "normalized_label": "essential", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_SEGMENTS_FITTINGS": {
+                    "source": "expected_list", 
+                    "label": "Segments and Fittings", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_SEGMENTS_FITTINGS", 
+                    "normalized_label": "segments and fittings", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_SLAB_SHAPE_EDIT": {
+                    "source": "expected_list", 
+                    "label": "Slab Shape Edit", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_SLAB_SHAPE_EDIT", 
+                    "normalized_label": "slab shape edit", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_ANALYTICAL_PROPERTIES": {
+                    "label": "Analytical Properties", 
+                    "type_id": "enum:PG_ANALYTICAL_PROPERTIES", 
+                    "normalized_label": "analytical properties", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_STAIRS_SUPPORTS": {
+                    "label": "Supports", 
+                    "type_id": "enum:PG_STAIRS_SUPPORTS", 
+                    "normalized_label": "supports", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_ENERGY_ANALYSIS_DETAILED_MODEL": {
+                    "label": "Detailed Model", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS_DETAILED_MODEL", 
+                    "normalized_label": "detailed model", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_STAIR_STRINGERS": {
+                    "label": "Stringers", 
+                    "type_id": "enum:PG_STAIR_STRINGERS", 
+                    "normalized_label": "stringers", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_ANALYTICAL_MODEL": {
+                    "source": "expected_list", 
+                    "label": "Analytical Model", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ANALYTICAL_MODEL", 
+                    "normalized_label": "analytical model", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_ANALYTICAL_ALIGNMENT": {
+                    "source": "expected_list", 
+                    "label": "Analytical Alignment", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ANALYTICAL_ALIGNMENT", 
+                    "normalized_label": "analytical alignment", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_LINING": {
+                    "label": "Lining", 
+                    "type_id": "enum:PG_LINING", 
+                    "normalized_label": "lining", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_GEOMETRY_POSITIONING": {
+                    "label": "Geometric Position", 
+                    "type_id": "enum:PG_GEOMETRY_POSITIONING", 
+                    "normalized_label": "geometric position", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_REFERENCE": {
+                    "label": "Reference", 
+                    "type_id": "enum:PG_REFERENCE", 
+                    "normalized_label": "reference", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_VISIBILITY": {
+                    "source": "expected_list", 
+                    "label": "Visibility", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_VISIBILITY", 
+                    "normalized_label": "visibility", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_RAILING_SYSTEM_FAMILY_SEGMENT_PATTERN": {
+                    "label": "Segment Pattern (default)", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_FAMILY_SEGMENT_PATTERN", 
+                    "normalized_label": "segment pattern (default)", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_LENGTH": {
+                    "label": "Length", 
+                    "type_id": "enum:PG_LENGTH", 
+                    "normalized_label": "length", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_PATTERN_APPLICATION": {
+                    "label": "Pattern Application", 
+                    "type_id": "enum:PG_PATTERN_APPLICATION", 
+                    "normalized_label": "pattern application", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_FITTING": {
+                    "label": "Fittings", 
+                    "type_id": "enum:PG_FITTING", 
+                    "normalized_label": "fittings", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_NODES": {
+                    "label": "Nodes", 
+                    "type_id": "enum:PG_NODES", 
+                    "normalized_label": "nodes", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_STRUCTURAL_ANALYSIS": {
+                    "source": "expected_list", 
+                    "label": "Structural Analysis", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_STRUCTURAL_ANALYSIS", 
+                    "normalized_label": "structural analysis", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_RAILING_SYSTEM_FAMILY_TOP_RAIL": {
+                    "label": "Top Rail", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_FAMILY_TOP_RAIL", 
+                    "normalized_label": "top rail", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_CURTAIN_MULLION_HORIZ": {
+                    "label": "Horizontal Mullions", 
+                    "type_id": "enum:PG_CURTAIN_MULLION_HORIZ", 
+                    "normalized_label": "horizontal mullions", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_ELECTRICAL_CIRCUITING": {
+                    "source": "expected_list", 
+                    "label": "Electrical - Circuiting", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ELECTRICAL_CIRCUITING", 
+                    "normalized_label": "electrical - circuiting", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_PROFILE_2": {
+                    "label": "Profile 2", 
+                    "type_id": "enum:PG_PROFILE_2", 
+                    "normalized_label": "profile 2", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_PROFILE_1": {
+                    "label": "Profile 1", 
+                    "type_id": "enum:PG_PROFILE_1", 
+                    "normalized_label": "profile 1", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_RELEASES_MEMBER_FORCES": {
+                    "source": "expected_list", 
+                    "label": "Releases / Member Forces", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_RELEASES_MEMBER_FORCES", 
+                    "normalized_label": "releases / member forces", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_ADSK_MODEL_PROPERTIES": {
+                    "source": "expected_list", 
+                    "label": "Model Properties", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ADSK_MODEL_PROPERTIES", 
+                    "normalized_label": "model properties", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_LIGHT_PHOTOMETRICS": {
+                    "source": "expected_list", 
+                    "label": "Photometrics", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_LIGHT_PHOTOMETRICS", 
+                    "normalized_label": "photometrics", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_STAIRS_CALCULATOR_RULES": {
+                    "label": "Calculation Rules", 
+                    "type_id": "enum:PG_STAIRS_CALCULATOR_RULES", 
+                    "normalized_label": "calculation rules", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_TRUSS_FAMILY_TOP_CHORD": {
+                    "label": "Top Chords", 
+                    "type_id": "enum:PG_TRUSS_FAMILY_TOP_CHORD", 
+                    "normalized_label": "top chords", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_TRUSS_FAMILY_VERT_WEB": {
+                    "label": "Vertical Webs", 
+                    "type_id": "enum:PG_TRUSS_FAMILY_VERT_WEB", 
+                    "normalized_label": "vertical webs", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_CONTINUOUSRAIL_END_TOP_EXTENSION": {
+                    "label": "Extension (End/Top)", 
+                    "type_id": "enum:PG_CONTINUOUSRAIL_END_TOP_EXTENSION", 
+                    "normalized_label": "extension (end/top)", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_TRUSS_FAMILY_BOTTOM_CHORD": {
+                    "label": "Bottom Chords", 
+                    "type_id": "enum:PG_TRUSS_FAMILY_BOTTOM_CHORD", 
+                    "normalized_label": "bottom chords", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_SPLIT_PROFILE_DIMENSIONS": {
+                    "label": "Dimensions     (linear units or % of thickness)", 
+                    "type_id": "enum:PG_SPLIT_PROFILE_DIMENSIONS", 
+                    "normalized_label": "dimensions (linear units or % of thickness)", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_MECHANICAL_LOADS": {
+                    "source": "expected_list", 
+                    "label": "Mechanical - Loads", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_MECHANICAL_LOADS", 
+                    "normalized_label": "mechanical - loads", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_RAILING_SYSTEM_SEGMENT_PATTERN_REMAINDER": {
+                    "label": "Pattern Remainder", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_SEGMENT_PATTERN_REMAINDER", 
+                    "normalized_label": "pattern remainder", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_VIEW_CAMERA": {
+                    "label": "Camera", 
+                    "type_id": "enum:PG_VIEW_CAMERA", 
+                    "normalized_label": "camera", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_ELECTRICAL_LOADS": {
+                    "source": "expected_list", 
+                    "label": "Electrical - Loads", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ELECTRICAL_LOADS", 
+                    "normalized_label": "electrical - loads", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_OVERALL_LEGEND": {
+                    "source": "expected_list", 
+                    "label": "Overall Legend", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_OVERALL_LEGEND", 
+                    "normalized_label": "overall legend", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_ENERGY_ANALYSIS_ADVANCED": {
+                    "label": "Advanced", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS_ADVANCED", 
+                    "normalized_label": "advanced", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_DATA": {
+                    "source": "expected_list", 
+                    "label": "Data", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_DATA", 
+                    "normalized_label": "data", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_CURTAIN_GRID_VERT": {
+                    "label": "Vertical Grid", 
+                    "type_id": "enum:PG_CURTAIN_GRID_VERT", 
+                    "normalized_label": "vertical grid", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_CURTAIN_GRID_2": {
+                    "label": "Grid 2", 
+                    "type_id": "enum:PG_CURTAIN_GRID_2", 
+                    "normalized_label": "grid 2", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_MECHANICAL": {
+                    "source": "expected_list", 
+                    "label": "Mechanical", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_MECHANICAL", 
+                    "normalized_label": "mechanical", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_CONSTRAINTS": {
+                    "source": "expected_list", 
+                    "label": "Constraints", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_CONSTRAINTS", 
+                    "normalized_label": "constraints", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_TERMINTATION": {
+                    "label": "Terminations", 
+                    "type_id": "enum:PG_TERMINTATION", 
+                    "normalized_label": "terminations", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_ENERGY_ANALYSIS_BLDG_CONS_MTL_THERMAL_PROPS": {
+                    "label": "Material Thermal Properties", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS_BLDG_CONS_MTL_THERMAL_PROPS", 
+                    "normalized_label": "material thermal properties", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_MOMENTS": {
+                    "source": "expected_list", 
+                    "label": "Moments", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_MOMENTS", 
+                    "normalized_label": "moments", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_REBAR_ARRAY": {
+                    "source": "expected_list", 
+                    "label": "Rebar Set", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_REBAR_ARRAY", 
+                    "normalized_label": "rebar set", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_TRANSLATION_IN": {
+                    "label": "Translation in", 
+                    "type_id": "enum:PG_TRANSLATION_IN", 
+                    "normalized_label": "translation in", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_AELECTRICAL": {
+                    "source": "expected_list", 
+                    "label": "Electrical", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_AELECTRICAL", 
+                    "normalized_label": "electrical", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_FABRICATION_PRODUCT_DATA": {
+                    "label": "Fabrication Product Data", 
+                    "type_id": "enum:PG_FABRICATION_PRODUCT_DATA", 
+                    "normalized_label": "fabrication product data", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_SECONDARY_END": {
+                    "source": "expected_list", 
+                    "label": "Secondary End", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_SECONDARY_END", 
+                    "normalized_label": "secondary end", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_ANALYSIS_RESULTS": {
+                    "source": "expected_list", 
+                    "label": "Analysis Results", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ANALYSIS_RESULTS", 
+                    "normalized_label": "analysis results", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_ENERGY_ANALYSIS_ROOM_SPACE_DATA": {
+                    "label": "Room/Space Data", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS_ROOM_SPACE_DATA", 
+                    "normalized_label": "room/space data", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_STAIR_TREADS": {
+                    "label": "Treads", 
+                    "type_id": "enum:PG_STAIR_TREADS", 
+                    "normalized_label": "treads", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_GRAPHICS": {
+                    "source": "expected_list", 
+                    "label": "Graphics", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_GRAPHICS", 
+                    "normalized_label": "graphics", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_RAILING_SYSTEM_SEGMENT_POSTS": {
+                    "label": "Posts", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_SEGMENT_POSTS", 
+                    "normalized_label": "posts", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_FIRE_PROTECTION": {
+                    "source": "expected_list", 
+                    "label": "Fire Protection", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_FIRE_PROTECTION", 
+                    "normalized_label": "fire protection", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:INVALID": {
+                    "source": "expected_list", 
+                    "label": "Other", 
+                    "bucket": "actual", 
+                    "type_id": "enum:INVALID", 
+                    "normalized_label": "other", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_CURTAIN_GRID": {
+                    "label": "Grid", 
+                    "type_id": "enum:PG_CURTAIN_GRID", 
+                    "normalized_label": "grid", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_RAILING_SYSTEM_SEGMENT_U_GRID": {
+                    "label": "U Grid", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_SEGMENT_U_GRID", 
+                    "normalized_label": "u grid", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_RAILING_SYSTEM_SECONDARY_FAMILY_HANDRAILS": {
+                    "label": "Handrail 2", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_SECONDARY_FAMILY_HANDRAILS", 
+                    "normalized_label": "handrail 2", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_RAILING_SYSTEM_SEGMENT_PATTERN_REPEAT": {
+                    "label": "Pattern Repeat", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_SEGMENT_PATTERN_REPEAT", 
+                    "normalized_label": "pattern repeat", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_CONCEPTUAL_ENERGY_DATA_BUILDING_SERVICES": {
+                    "label": "Energy Model - Building Services", 
+                    "type_id": "enum:PG_CONCEPTUAL_ENERGY_DATA_BUILDING_SERVICES", 
+                    "normalized_label": "energy model - building services", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_RAILING_SYSTEM_FAMILY_HANDRAILS": {
+                    "label": "Handrail 1", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_FAMILY_HANDRAILS", 
+                    "normalized_label": "handrail 1", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_AREA": {
+                    "label": "Area", 
+                    "type_id": "enum:PG_AREA", 
+                    "normalized_label": "area", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_GREEN_BUILDING": {
+                    "source": "expected_list", 
+                    "label": "Green Building Properties", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_GREEN_BUILDING", 
+                    "normalized_label": "green building properties", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_UNDERLAY": {
+                    "label": "Underlay", 
+                    "type_id": "enum:PG_UNDERLAY", 
+                    "normalized_label": "underlay", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_PHASING": {
+                    "source": "expected_list", 
+                    "label": "Phasing", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_PHASING", 
+                    "normalized_label": "phasing", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_ENERGY_ANALYSIS_CONCEPTUAL_MODEL": {
+                    "label": "Energy Analytical Model", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS_CONCEPTUAL_MODEL", 
+                    "normalized_label": "energy analytical model", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_PRIMARY_END": {
+                    "source": "expected_list", 
+                    "label": "Primary End", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_PRIMARY_END", 
+                    "normalized_label": "primary end", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_RAILING_SYSTEM_SEGMENT_V_GRID": {
+                    "label": "V Grid", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_SEGMENT_V_GRID", 
+                    "normalized_label": "v grid", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_IFC": {
+                    "source": "expected_list", 
+                    "label": "IFC Parameters", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_IFC", 
+                    "normalized_label": "ifc parameters", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_REBAR_SYSTEM_LAYERS": {
+                    "source": "expected_list", 
+                    "label": "Layers", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_REBAR_SYSTEM_LAYERS", 
+                    "normalized_label": "layers", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_CURTAIN_GRID_HORIZ": {
+                    "label": "Horizontal Grid", 
+                    "type_id": "enum:PG_CURTAIN_GRID_HORIZ", 
+                    "normalized_label": "horizontal grid", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_PATTERN": {
+                    "label": "Pattern", 
+                    "type_id": "enum:PG_PATTERN", 
+                    "normalized_label": "pattern", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_ELECTRICAL": {
+                    "source": "expected_list", 
+                    "label": "Electrical Engineering", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ELECTRICAL", 
+                    "normalized_label": "electrical engineering", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_ENERGY_ANALYSIS_BUILDING_DATA": {
+                    "label": "Building Data", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS_BUILDING_DATA", 
+                    "normalized_label": "building data", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_FORCES": {
+                    "source": "expected_list", 
+                    "label": "Forces", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_FORCES", 
+                    "normalized_label": "forces", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_DIVISION_GEOMETRY": {
+                    "source": "expected_list", 
+                    "label": "Division Geometry", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_DIVISION_GEOMETRY", 
+                    "normalized_label": "division geometry", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_CONSTRUCTION": {
+                    "source": "expected_list", 
+                    "label": "Construction", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_CONSTRUCTION", 
+                    "normalized_label": "construction", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_DISPLAY": {
+                    "label": "Display", 
+                    "type_id": "enum:PG_DISPLAY", 
+                    "normalized_label": "display", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_STAIRS_WINDERS": {
+                    "label": "Winders", 
+                    "type_id": "enum:PG_STAIRS_WINDERS", 
+                    "normalized_label": "winders", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_VIEW_EXTENTS": {
+                    "label": "Extents", 
+                    "type_id": "enum:PG_VIEW_EXTENTS", 
+                    "normalized_label": "extents", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_CONTINUOUSRAIL_BEGIN_BOTTOM_EXTENSION": {
+                    "label": "Extension (Beginning/Bottom)", 
+                    "type_id": "enum:PG_CONTINUOUSRAIL_BEGIN_BOTTOM_EXTENSION", 
+                    "normalized_label": "extension (beginning/bottom)", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "enum:PG_TEXT": {
+                    "source": "expected_list", 
+                    "label": "Text", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_TEXT", 
+                    "normalized_label": "text", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "enum:PG_CONCEPTUAL_ENERGY_DATA": {
+                    "label": "Conceptual Energy Data", 
+                    "type_id": "enum:PG_CONCEPTUAL_ENERGY_DATA", 
+                    "normalized_label": "conceptual energy data", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }
+            }, 
+            "by_normalized_label": {
+                "identity data": {
+                    "source": "expected_list", 
+                    "label": "Identity Data", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_IDENTITY_DATA", 
+                    "normalized_label": "identity data", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "vertical mullions": {
+                    "label": "Vertical Mullions", 
+                    "type_id": "enum:PG_CURTAIN_MULLION_VERT", 
+                    "normalized_label": "vertical mullions", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "fabrication product data": {
+                    "label": "Fabrication Product Data", 
+                    "type_id": "enum:PG_FABRICATION_PRODUCT_DATA", 
+                    "normalized_label": "fabrication product data", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "forces": {
+                    "source": "expected_list", 
+                    "label": "Forces", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_FORCES", 
+                    "normalized_label": "forces", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "structural analysis": {
+                    "source": "expected_list", 
+                    "label": "Structural Analysis", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_STRUCTURAL_ANALYSIS", 
+                    "normalized_label": "structural analysis", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "division geometry": {
+                    "source": "expected_list", 
+                    "label": "Division Geometry", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_DIVISION_GEOMETRY", 
+                    "normalized_label": "division geometry", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "releases / member forces": {
+                    "source": "expected_list", 
+                    "label": "Releases / Member Forces", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_RELEASES_MEMBER_FORCES", 
+                    "normalized_label": "releases / member forces", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "underlay": {
+                    "label": "Underlay", 
+                    "type_id": "enum:PG_UNDERLAY", 
+                    "normalized_label": "underlay", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "u grid": {
+                    "label": "U Grid", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_SEGMENT_U_GRID", 
+                    "normalized_label": "u grid", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "pattern": {
+                    "label": "Pattern", 
+                    "type_id": "enum:PG_PATTERN", 
+                    "normalized_label": "pattern", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "segments and fittings": {
+                    "source": "expected_list", 
+                    "label": "Segments and Fittings", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_SEGMENTS_FITTINGS", 
+                    "normalized_label": "segments and fittings", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "structural section geometry": {
+                    "label": "Structural Section Geometry", 
+                    "type_id": "enum:PG_STRUCTURAL_SECTION_GEOMETRY", 
+                    "normalized_label": "structural section geometry", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "supports": {
+                    "label": "Supports", 
+                    "type_id": "enum:PG_STAIRS_SUPPORTS", 
+                    "normalized_label": "supports", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "title text": {
+                    "source": "expected_list", 
+                    "label": "Title Text", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_TITLE", 
+                    "normalized_label": "title text", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "room/space data": {
+                    "label": "Room/Space Data", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS_ROOM_SPACE_DATA", 
+                    "normalized_label": "room/space data", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "text": {
+                    "source": "expected_list", 
+                    "label": "Text", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_TEXT", 
+                    "normalized_label": "text", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "essential": {
+                    "label": "Essential", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS_DETAILED_AND_CONCEPTUAL_MODELS", 
+                    "normalized_label": "essential", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "winders": {
+                    "label": "Winders", 
+                    "type_id": "enum:PG_STAIRS_WINDERS", 
+                    "normalized_label": "winders", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "material thermal properties": {
+                    "label": "Material Thermal Properties", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS_BLDG_CONS_MTL_THERMAL_PROPS", 
+                    "normalized_label": "material thermal properties", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "other": {
+                    "source": "expected_list", 
+                    "label": "Other", 
+                    "bucket": "actual", 
+                    "type_id": "enum:INVALID", 
+                    "normalized_label": "other", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "conceptual energy data": {
+                    "label": "Conceptual Energy Data", 
+                    "type_id": "enum:PG_CONCEPTUAL_ENERGY_DATA", 
+                    "normalized_label": "conceptual energy data", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "top rail": {
+                    "label": "Top Rail", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_FAMILY_TOP_RAIL", 
+                    "normalized_label": "top rail", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "geometric position": {
+                    "label": "Geometric Position", 
+                    "type_id": "enum:PG_GEOMETRY_POSITIONING", 
+                    "normalized_label": "geometric position", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "photometrics": {
+                    "source": "expected_list", 
+                    "label": "Photometrics", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_LIGHT_PHOTOMETRICS", 
+                    "normalized_label": "photometrics", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "risers": {
+                    "label": "Risers", 
+                    "type_id": "enum:PG_STAIR_RISERS", 
+                    "normalized_label": "risers", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "energy model - building services": {
+                    "label": "Energy Model - Building Services", 
+                    "type_id": "enum:PG_CONCEPTUAL_ENERGY_DATA_BUILDING_SERVICES", 
+                    "normalized_label": "energy model - building services", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "construction": {
+                    "source": "expected_list", 
+                    "label": "Construction", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_CONSTRUCTION", 
+                    "normalized_label": "construction", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "grid 1": {
+                    "label": "Grid 1", 
+                    "type_id": "enum:PG_CURTAIN_GRID_1", 
+                    "normalized_label": "grid 1", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "dimensions (linear units or % of thickness)": {
+                    "label": "Dimensions     (linear units or % of thickness)", 
+                    "type_id": "enum:PG_SPLIT_PROFILE_DIMENSIONS", 
+                    "normalized_label": "dimensions (linear units or % of thickness)", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "phasing": {
+                    "source": "expected_list", 
+                    "label": "Phasing", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_PHASING", 
+                    "normalized_label": "phasing", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "data": {
+                    "source": "expected_list", 
+                    "label": "Data", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_DATA", 
+                    "normalized_label": "data", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "mechanical": {
+                    "source": "expected_list", 
+                    "label": "Mechanical", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_MECHANICAL", 
+                    "normalized_label": "mechanical", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "dimensions": {
+                    "source": "expected_list", 
+                    "label": "Dimensions", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_GEOMETRY", 
+                    "normalized_label": "dimensions", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "profile 2": {
+                    "label": "Profile 2", 
+                    "type_id": "enum:PG_PROFILE_2", 
+                    "normalized_label": "profile 2", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "profile 1": {
+                    "label": "Profile 1", 
+                    "type_id": "enum:PG_PROFILE_1", 
+                    "normalized_label": "profile 1", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "advanced": {
+                    "label": "Advanced", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS_ADVANCED", 
+                    "normalized_label": "advanced", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "grid 2 mullions": {
+                    "label": "Grid 2 Mullions", 
+                    "type_id": "enum:PG_CURTAIN_MULLION_2", 
+                    "normalized_label": "grid 2 mullions", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "route analysis": {
+                    "label": "Route Analysis", 
+                    "type_id": "enum:PG_ROUTE_ANALYSIS", 
+                    "normalized_label": "route analysis", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "length": {
+                    "label": "Length", 
+                    "type_id": "enum:PG_LENGTH", 
+                    "normalized_label": "length", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "ifc parameters": {
+                    "source": "expected_list", 
+                    "label": "IFC Parameters", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_IFC", 
+                    "normalized_label": "ifc parameters", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "energy analysis": {
+                    "source": "expected_list", 
+                    "label": "Energy Analysis", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS", 
+                    "normalized_label": "energy analysis", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "grid 2": {
+                    "label": "Grid 2", 
+                    "type_id": "enum:PG_CURTAIN_GRID_2", 
+                    "normalized_label": "grid 2", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "electrical - lighting": {
+                    "source": "expected_list", 
+                    "label": "Electrical - Lighting", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ELECTRICAL_LIGHTING", 
+                    "normalized_label": "electrical - lighting", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "posts": {
+                    "label": "Posts", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_SEGMENT_POSTS", 
+                    "normalized_label": "posts", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "electrical engineering": {
+                    "source": "expected_list", 
+                    "label": "Electrical Engineering", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ELECTRICAL", 
+                    "normalized_label": "electrical engineering", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "analytical properties": {
+                    "label": "Analytical Properties", 
+                    "type_id": "enum:PG_ANALYTICAL_PROPERTIES", 
+                    "normalized_label": "analytical properties", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "set": {
+                    "source": "expected_list", 
+                    "label": "Set", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_COUPLER_ARRAY", 
+                    "normalized_label": "set", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "mechanical - loads": {
+                    "source": "expected_list", 
+                    "label": "Mechanical - Loads", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_MECHANICAL_LOADS", 
+                    "normalized_label": "mechanical - loads", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "top chords": {
+                    "label": "Top Chords", 
+                    "type_id": "enum:PG_TRUSS_FAMILY_TOP_CHORD", 
+                    "normalized_label": "top chords", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "model properties": {
+                    "source": "expected_list", 
+                    "label": "Model Properties", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ADSK_MODEL_PROPERTIES", 
+                    "normalized_label": "model properties", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "analytical alignment": {
+                    "source": "expected_list", 
+                    "label": "Analytical Alignment", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ANALYTICAL_ALIGNMENT", 
+                    "normalized_label": "analytical alignment", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "constraints": {
+                    "source": "expected_list", 
+                    "label": "Constraints", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_CONSTRAINTS", 
+                    "normalized_label": "constraints", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "pattern repeat": {
+                    "label": "Pattern Repeat", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_SEGMENT_PATTERN_REPEAT", 
+                    "normalized_label": "pattern repeat", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "v grid": {
+                    "label": "V Grid", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_SEGMENT_V_GRID", 
+                    "normalized_label": "v grid", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "energy analytical model": {
+                    "label": "Energy Analytical Model", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS_CONCEPTUAL_MODEL", 
+                    "normalized_label": "energy analytical model", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "detailed model": {
+                    "label": "Detailed Model", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS_DETAILED_MODEL", 
+                    "normalized_label": "detailed model", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "general": {
+                    "source": "expected_list", 
+                    "label": "General", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_GENERAL", 
+                    "normalized_label": "general", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "bottom chords": {
+                    "label": "Bottom Chords", 
+                    "type_id": "enum:PG_TRUSS_FAMILY_BOTTOM_CHORD", 
+                    "normalized_label": "bottom chords", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "lining": {
+                    "label": "Lining", 
+                    "type_id": "enum:PG_LINING", 
+                    "normalized_label": "lining", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "translation in": {
+                    "label": "Translation in", 
+                    "type_id": "enum:PG_TRANSLATION_IN", 
+                    "normalized_label": "translation in", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "extension (end/top)": {
+                    "label": "Extension (End/Top)", 
+                    "type_id": "enum:PG_CONTINUOUSRAIL_END_TOP_EXTENSION", 
+                    "normalized_label": "extension (end/top)", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "fire protection": {
+                    "source": "expected_list", 
+                    "label": "Fire Protection", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_FIRE_PROTECTION", 
+                    "normalized_label": "fire protection", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "threads/risers": {
+                    "label": "Threads/Risers", 
+                    "type_id": "enum:PG_STAIRS_TREADS_RISERS", 
+                    "normalized_label": "threads/risers", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "stringers": {
+                    "label": "Stringers", 
+                    "type_id": "enum:PG_STAIR_STRINGERS", 
+                    "normalized_label": "stringers", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "horizontal mullions": {
+                    "label": "Horizontal Mullions", 
+                    "type_id": "enum:PG_CURTAIN_MULLION_HORIZ", 
+                    "normalized_label": "horizontal mullions", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "segment pattern (default)": {
+                    "label": "Segment Pattern (default)", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_FAMILY_SEGMENT_PATTERN", 
+                    "normalized_label": "segment pattern (default)", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "grid 1 mullions": {
+                    "label": "Grid 1 Mullions", 
+                    "type_id": "enum:PG_CURTAIN_MULLION_1", 
+                    "normalized_label": "grid 1 mullions", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "building data": {
+                    "label": "Building Data", 
+                    "type_id": "enum:PG_ENERGY_ANALYSIS_BUILDING_DATA", 
+                    "normalized_label": "building data", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "reference": {
+                    "label": "Reference", 
+                    "type_id": "enum:PG_REFERENCE", 
+                    "normalized_label": "reference", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "plumbing": {
+                    "source": "expected_list", 
+                    "label": "Plumbing", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_PLUMBING", 
+                    "normalized_label": "plumbing", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "calculation rules": {
+                    "label": "Calculation Rules", 
+                    "type_id": "enum:PG_STAIRS_CALCULATOR_RULES", 
+                    "normalized_label": "calculation rules", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "green building properties": {
+                    "source": "expected_list", 
+                    "label": "Green Building Properties", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_GREEN_BUILDING", 
+                    "normalized_label": "green building properties", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "pattern remainder": {
+                    "label": "Pattern Remainder", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_SEGMENT_PATTERN_REMAINDER", 
+                    "normalized_label": "pattern remainder", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "electrical": {
+                    "source": "expected_list", 
+                    "label": "Electrical", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_AELECTRICAL", 
+                    "normalized_label": "electrical", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "electrical - circuiting": {
+                    "source": "expected_list", 
+                    "label": "Electrical - Circuiting", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ELECTRICAL_CIRCUITING", 
+                    "normalized_label": "electrical - circuiting", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "horizontal grid": {
+                    "label": "Horizontal Grid", 
+                    "type_id": "enum:PG_CURTAIN_GRID_HORIZ", 
+                    "normalized_label": "horizontal grid", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "camera": {
+                    "label": "Camera", 
+                    "type_id": "enum:PG_VIEW_CAMERA", 
+                    "normalized_label": "camera", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "grid": {
+                    "label": "Grid", 
+                    "type_id": "enum:PG_CURTAIN_GRID", 
+                    "normalized_label": "grid", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "rebar set": {
+                    "source": "expected_list", 
+                    "label": "Rebar Set", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_REBAR_ARRAY", 
+                    "normalized_label": "rebar set", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "diagonal webs": {
+                    "label": "Diagonal Webs", 
+                    "type_id": "enum:PG_TRUSS_FAMILY_DIAG_WEB", 
+                    "normalized_label": "diagonal webs", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "moments": {
+                    "source": "expected_list", 
+                    "label": "Moments", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_MOMENTS", 
+                    "normalized_label": "moments", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "materials and finishes": {
+                    "source": "expected_list", 
+                    "label": "Materials and Finishes", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_MATERIALS", 
+                    "normalized_label": "materials and finishes", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "treads": {
+                    "label": "Treads", 
+                    "type_id": "enum:PG_STAIR_TREADS", 
+                    "normalized_label": "treads", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "handrail 1": {
+                    "label": "Handrail 1", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_FAMILY_HANDRAILS", 
+                    "normalized_label": "handrail 1", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "extents": {
+                    "label": "Extents", 
+                    "type_id": "enum:PG_VIEW_EXTENTS", 
+                    "normalized_label": "extents", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "area": {
+                    "label": "Area", 
+                    "type_id": "enum:PG_AREA", 
+                    "normalized_label": "area", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "vertical webs": {
+                    "label": "Vertical Webs", 
+                    "type_id": "enum:PG_TRUSS_FAMILY_VERT_WEB", 
+                    "normalized_label": "vertical webs", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "display": {
+                    "label": "Display", 
+                    "type_id": "enum:PG_DISPLAY", 
+                    "normalized_label": "display", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "analytical model": {
+                    "source": "expected_list", 
+                    "label": "Analytical Model", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ANALYTICAL_MODEL", 
+                    "normalized_label": "analytical model", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "vertical grid": {
+                    "label": "Vertical Grid", 
+                    "type_id": "enum:PG_CURTAIN_GRID_VERT", 
+                    "normalized_label": "vertical grid", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "secondary end": {
+                    "source": "expected_list", 
+                    "label": "Secondary End", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_SECONDARY_END", 
+                    "normalized_label": "secondary end", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "analysis results": {
+                    "source": "expected_list", 
+                    "label": "Analysis Results", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ANALYSIS_RESULTS", 
+                    "normalized_label": "analysis results", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "electrical - loads": {
+                    "source": "expected_list", 
+                    "label": "Electrical - Loads", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_ELECTRICAL_LOADS", 
+                    "normalized_label": "electrical - loads", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "rotation about": {
+                    "label": "Rotation about", 
+                    "type_id": "enum:PG_ROTATION_ABOUT", 
+                    "normalized_label": "rotation about", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "insulation": {
+                    "label": "Insulation", 
+                    "type_id": "enum:PG_INSULATION", 
+                    "normalized_label": "insulation", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "structural": {
+                    "source": "expected_list", 
+                    "label": "Structural", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_STRUCTURAL", 
+                    "normalized_label": "structural", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "end connection": {
+                    "label": "End Connection", 
+                    "type_id": "enum:PG_STAIRS_OPEN_END_CONNECTION", 
+                    "normalized_label": "end connection", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "mechanical - flow": {
+                    "source": "expected_list", 
+                    "label": "Mechanical - Flow", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_MECHANICAL_AIRFLOW", 
+                    "normalized_label": "mechanical - flow", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "handrail 2": {
+                    "label": "Handrail 2", 
+                    "type_id": "enum:PG_RAILING_SYSTEM_SECONDARY_FAMILY_HANDRAILS", 
+                    "normalized_label": "handrail 2", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "geolocation": {
+                    "label": "Geolocation", 
+                    "type_id": "enum:PG_GEO_LOCATION", 
+                    "normalized_label": "geolocation", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "nodes": {
+                    "label": "Nodes", 
+                    "type_id": "enum:PG_NODES", 
+                    "normalized_label": "nodes", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "primary end": {
+                    "source": "expected_list", 
+                    "label": "Primary End", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_PRIMARY_END", 
+                    "normalized_label": "primary end", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "layers": {
+                    "source": "expected_list", 
+                    "label": "Layers", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_REBAR_SYSTEM_LAYERS", 
+                    "normalized_label": "layers", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "visibility": {
+                    "source": "expected_list", 
+                    "label": "Visibility", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_VISIBILITY", 
+                    "normalized_label": "visibility", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "extension (beginning/bottom)": {
+                    "label": "Extension (Beginning/Bottom)", 
+                    "type_id": "enum:PG_CONTINUOUSRAIL_BEGIN_BOTTOM_EXTENSION", 
+                    "normalized_label": "extension (beginning/bottom)", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "overall legend": {
+                    "source": "expected_list", 
+                    "label": "Overall Legend", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_OVERALL_LEGEND", 
+                    "normalized_label": "overall legend", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "graphics": {
+                    "source": "expected_list", 
+                    "label": "Graphics", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_GRAPHICS", 
+                    "normalized_label": "graphics", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "terminations": {
+                    "label": "Terminations", 
+                    "type_id": "enum:PG_TERMINTATION", 
+                    "normalized_label": "terminations", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "pattern application": {
+                    "label": "Pattern Application", 
+                    "type_id": "enum:PG_PATTERN_APPLICATION", 
+                    "normalized_label": "pattern application", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "fittings": {
+                    "label": "Fittings", 
+                    "type_id": "enum:PG_FITTING", 
+                    "normalized_label": "fittings", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "profile": {
+                    "label": "Profile", 
+                    "type_id": "enum:PG_PROFILE", 
+                    "normalized_label": "profile", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "adaptive component": {
+                    "label": "Adaptive Component", 
+                    "type_id": "enum:PG_FLEXIBLE", 
+                    "normalized_label": "adaptive component", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }, 
+                "slab shape edit": {
+                    "source": "expected_list", 
+                    "label": "Slab Shape Edit", 
+                    "bucket": "actual", 
+                    "type_id": "enum:PG_SLAB_SHAPE_EDIT", 
+                    "normalized_label": "slab shape edit", 
+                    "is_user_assignable": true, 
+                    "version_block": "2020-2022"
+                }, 
+                "rise / drop": {
+                    "label": "Rise / Drop", 
+                    "type_id": "enum:PG_SYSTEMTYPE_RISEDROP", 
+                    "normalized_label": "rise / drop", 
+                    "bucket": "other", 
+                    "version_block": "2020-2022", 
+                    "is_user_assignable": false, 
+                    "source": "api"
+                }
+            }
+        }, 
+        "other_groups": [
+            {
+                "source": "api", 
+                "label": "Adaptive Component", 
+                "bucket": "other", 
+                "type_id": "enum:PG_FLEXIBLE", 
+                "normalized_label": "adaptive component", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Advanced", 
+                "bucket": "other", 
+                "type_id": "enum:PG_ENERGY_ANALYSIS_ADVANCED", 
+                "normalized_label": "advanced", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Analytical Properties", 
+                "bucket": "other", 
+                "type_id": "enum:PG_ANALYTICAL_PROPERTIES", 
+                "normalized_label": "analytical properties", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Area", 
+                "bucket": "other", 
+                "type_id": "enum:PG_AREA", 
+                "normalized_label": "area", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Bottom Chords", 
+                "bucket": "other", 
+                "type_id": "enum:PG_TRUSS_FAMILY_BOTTOM_CHORD", 
+                "normalized_label": "bottom chords", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Building Data", 
+                "bucket": "other", 
+                "type_id": "enum:PG_ENERGY_ANALYSIS_BUILDING_DATA", 
+                "normalized_label": "building data", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Calculation Rules", 
+                "bucket": "other", 
+                "type_id": "enum:PG_STAIRS_CALCULATOR_RULES", 
+                "normalized_label": "calculation rules", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Camera", 
+                "bucket": "other", 
+                "type_id": "enum:PG_VIEW_CAMERA", 
+                "normalized_label": "camera", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Conceptual Energy Data", 
+                "bucket": "other", 
+                "type_id": "enum:PG_CONCEPTUAL_ENERGY_DATA", 
+                "normalized_label": "conceptual energy data", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Detailed Model", 
+                "bucket": "other", 
+                "type_id": "enum:PG_ENERGY_ANALYSIS_DETAILED_MODEL", 
+                "normalized_label": "detailed model", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Diagonal Webs", 
+                "bucket": "other", 
+                "type_id": "enum:PG_TRUSS_FAMILY_DIAG_WEB", 
+                "normalized_label": "diagonal webs", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Dimensions     (linear units or % of thickness)", 
+                "bucket": "other", 
+                "type_id": "enum:PG_SPLIT_PROFILE_DIMENSIONS", 
+                "normalized_label": "dimensions (linear units or % of thickness)", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Display", 
+                "bucket": "other", 
+                "type_id": "enum:PG_DISPLAY", 
+                "normalized_label": "display", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "End Connection", 
+                "bucket": "other", 
+                "type_id": "enum:PG_STAIRS_OPEN_END_CONNECTION", 
+                "normalized_label": "end connection", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Energy Analytical Model", 
+                "bucket": "other", 
+                "type_id": "enum:PG_ENERGY_ANALYSIS_CONCEPTUAL_MODEL", 
+                "normalized_label": "energy analytical model", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Energy Model - Building Services", 
+                "bucket": "other", 
+                "type_id": "enum:PG_CONCEPTUAL_ENERGY_DATA_BUILDING_SERVICES", 
+                "normalized_label": "energy model - building services", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Essential", 
+                "bucket": "other", 
+                "type_id": "enum:PG_ENERGY_ANALYSIS_DETAILED_AND_CONCEPTUAL_MODELS", 
+                "normalized_label": "essential", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Extension (Beginning/Bottom)", 
+                "bucket": "other", 
+                "type_id": "enum:PG_CONTINUOUSRAIL_BEGIN_BOTTOM_EXTENSION", 
+                "normalized_label": "extension (beginning/bottom)", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Extension (End/Top)", 
+                "bucket": "other", 
+                "type_id": "enum:PG_CONTINUOUSRAIL_END_TOP_EXTENSION", 
+                "normalized_label": "extension (end/top)", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Extents", 
+                "bucket": "other", 
+                "type_id": "enum:PG_VIEW_EXTENTS", 
+                "normalized_label": "extents", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Fabrication Product Data", 
+                "bucket": "other", 
+                "type_id": "enum:PG_FABRICATION_PRODUCT_DATA", 
+                "normalized_label": "fabrication product data", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Fittings", 
+                "bucket": "other", 
+                "type_id": "enum:PG_FITTING", 
+                "normalized_label": "fittings", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Geolocation", 
+                "bucket": "other", 
+                "type_id": "enum:PG_GEO_LOCATION", 
+                "normalized_label": "geolocation", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Geometric Position", 
+                "bucket": "other", 
+                "type_id": "enum:PG_GEOMETRY_POSITIONING", 
+                "normalized_label": "geometric position", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Grid", 
+                "bucket": "other", 
+                "type_id": "enum:PG_CURTAIN_GRID", 
+                "normalized_label": "grid", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Grid 1", 
+                "bucket": "other", 
+                "type_id": "enum:PG_CURTAIN_GRID_1", 
+                "normalized_label": "grid 1", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Grid 1 Mullions", 
+                "bucket": "other", 
+                "type_id": "enum:PG_CURTAIN_MULLION_1", 
+                "normalized_label": "grid 1 mullions", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Grid 2", 
+                "bucket": "other", 
+                "type_id": "enum:PG_CURTAIN_GRID_2", 
+                "normalized_label": "grid 2", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Grid 2 Mullions", 
+                "bucket": "other", 
+                "type_id": "enum:PG_CURTAIN_MULLION_2", 
+                "normalized_label": "grid 2 mullions", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Handrail 1", 
+                "bucket": "other", 
+                "type_id": "enum:PG_RAILING_SYSTEM_FAMILY_HANDRAILS", 
+                "normalized_label": "handrail 1", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Handrail 2", 
+                "bucket": "other", 
+                "type_id": "enum:PG_RAILING_SYSTEM_SECONDARY_FAMILY_HANDRAILS", 
+                "normalized_label": "handrail 2", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Horizontal Grid", 
+                "bucket": "other", 
+                "type_id": "enum:PG_CURTAIN_GRID_HORIZ", 
+                "normalized_label": "horizontal grid", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Horizontal Mullions", 
+                "bucket": "other", 
+                "type_id": "enum:PG_CURTAIN_MULLION_HORIZ", 
+                "normalized_label": "horizontal mullions", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Insulation", 
+                "bucket": "other", 
+                "type_id": "enum:PG_INSULATION", 
+                "normalized_label": "insulation", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Length", 
+                "bucket": "other", 
+                "type_id": "enum:PG_LENGTH", 
+                "normalized_label": "length", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Lining", 
+                "bucket": "other", 
+                "type_id": "enum:PG_LINING", 
+                "normalized_label": "lining", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Material Thermal Properties", 
+                "bucket": "other", 
+                "type_id": "enum:PG_ENERGY_ANALYSIS_BLDG_CONS_MTL_THERMAL_PROPS", 
+                "normalized_label": "material thermal properties", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Nodes", 
+                "bucket": "other", 
+                "type_id": "enum:PG_NODES", 
+                "normalized_label": "nodes", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Pattern", 
+                "bucket": "other", 
+                "type_id": "enum:PG_PATTERN", 
+                "normalized_label": "pattern", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Pattern Application", 
+                "bucket": "other", 
+                "type_id": "enum:PG_PATTERN_APPLICATION", 
+                "normalized_label": "pattern application", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Pattern Remainder", 
+                "bucket": "other", 
+                "type_id": "enum:PG_RAILING_SYSTEM_SEGMENT_PATTERN_REMAINDER", 
+                "normalized_label": "pattern remainder", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Pattern Repeat", 
+                "bucket": "other", 
+                "type_id": "enum:PG_RAILING_SYSTEM_SEGMENT_PATTERN_REPEAT", 
+                "normalized_label": "pattern repeat", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Posts", 
+                "bucket": "other", 
+                "type_id": "enum:PG_RAILING_SYSTEM_SEGMENT_POSTS", 
+                "normalized_label": "posts", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Profile", 
+                "bucket": "other", 
+                "type_id": "enum:PG_PROFILE", 
+                "normalized_label": "profile", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Profile 1", 
+                "bucket": "other", 
+                "type_id": "enum:PG_PROFILE_1", 
+                "normalized_label": "profile 1", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Profile 2", 
+                "bucket": "other", 
+                "type_id": "enum:PG_PROFILE_2", 
+                "normalized_label": "profile 2", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Reference", 
+                "bucket": "other", 
+                "type_id": "enum:PG_REFERENCE", 
+                "normalized_label": "reference", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Rise / Drop", 
+                "bucket": "other", 
+                "type_id": "enum:PG_SYSTEMTYPE_RISEDROP", 
+                "normalized_label": "rise / drop", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Risers", 
+                "bucket": "other", 
+                "type_id": "enum:PG_STAIR_RISERS", 
+                "normalized_label": "risers", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Room/Space Data", 
+                "bucket": "other", 
+                "type_id": "enum:PG_ENERGY_ANALYSIS_ROOM_SPACE_DATA", 
+                "normalized_label": "room/space data", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Rotation about", 
+                "bucket": "other", 
+                "type_id": "enum:PG_ROTATION_ABOUT", 
+                "normalized_label": "rotation about", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Route Analysis", 
+                "bucket": "other", 
+                "type_id": "enum:PG_ROUTE_ANALYSIS", 
+                "normalized_label": "route analysis", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Segment Pattern (default)", 
+                "bucket": "other", 
+                "type_id": "enum:PG_RAILING_SYSTEM_FAMILY_SEGMENT_PATTERN", 
+                "normalized_label": "segment pattern (default)", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Stringers", 
+                "bucket": "other", 
+                "type_id": "enum:PG_STAIR_STRINGERS", 
+                "normalized_label": "stringers", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Structural Section Geometry", 
+                "bucket": "other", 
+                "type_id": "enum:PG_STRUCTURAL_SECTION_GEOMETRY", 
+                "normalized_label": "structural section geometry", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Supports", 
+                "bucket": "other", 
+                "type_id": "enum:PG_STAIRS_SUPPORTS", 
+                "normalized_label": "supports", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Terminations", 
+                "bucket": "other", 
+                "type_id": "enum:PG_TERMINTATION", 
+                "normalized_label": "terminations", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Threads/Risers", 
+                "bucket": "other", 
+                "type_id": "enum:PG_STAIRS_TREADS_RISERS", 
+                "normalized_label": "threads/risers", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Top Chords", 
+                "bucket": "other", 
+                "type_id": "enum:PG_TRUSS_FAMILY_TOP_CHORD", 
+                "normalized_label": "top chords", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Top Rail", 
+                "bucket": "other", 
+                "type_id": "enum:PG_RAILING_SYSTEM_FAMILY_TOP_RAIL", 
+                "normalized_label": "top rail", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Translation in", 
+                "bucket": "other", 
+                "type_id": "enum:PG_TRANSLATION_IN", 
+                "normalized_label": "translation in", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Treads", 
+                "bucket": "other", 
+                "type_id": "enum:PG_STAIR_TREADS", 
+                "normalized_label": "treads", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "U Grid", 
+                "bucket": "other", 
+                "type_id": "enum:PG_RAILING_SYSTEM_SEGMENT_U_GRID", 
+                "normalized_label": "u grid", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Underlay", 
+                "bucket": "other", 
+                "type_id": "enum:PG_UNDERLAY", 
+                "normalized_label": "underlay", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "V Grid", 
+                "bucket": "other", 
+                "type_id": "enum:PG_RAILING_SYSTEM_SEGMENT_V_GRID", 
+                "normalized_label": "v grid", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Vertical Grid", 
+                "bucket": "other", 
+                "type_id": "enum:PG_CURTAIN_GRID_VERT", 
+                "normalized_label": "vertical grid", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Vertical Mullions", 
+                "bucket": "other", 
+                "type_id": "enum:PG_CURTAIN_MULLION_VERT", 
+                "normalized_label": "vertical mullions", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Vertical Webs", 
+                "bucket": "other", 
+                "type_id": "enum:PG_TRUSS_FAMILY_VERT_WEB", 
+                "normalized_label": "vertical webs", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "api", 
+                "label": "Winders", 
+                "bucket": "other", 
+                "type_id": "enum:PG_STAIRS_WINDERS", 
+                "normalized_label": "winders", 
+                "is_user_assignable": false, 
+                "version_block": "2020-2022"
+            }
+        ], 
+        "other_group_labels": [
+            "Adaptive Component", 
+            "Advanced", 
+            "Analytical Properties", 
+            "Area", 
+            "Bottom Chords", 
+            "Building Data", 
+            "Calculation Rules", 
+            "Camera", 
+            "Conceptual Energy Data", 
+            "Detailed Model", 
+            "Diagonal Webs", 
+            "Dimensions     (linear units or % of thickness)", 
+            "Display", 
+            "End Connection", 
+            "Energy Analytical Model", 
+            "Energy Model - Building Services", 
+            "Essential", 
+            "Extension (Beginning/Bottom)", 
+            "Extension (End/Top)", 
+            "Extents", 
+            "Fabrication Product Data", 
+            "Fittings", 
+            "Geolocation", 
+            "Geometric Position", 
+            "Grid", 
+            "Grid 1", 
+            "Grid 1 Mullions", 
+            "Grid 2", 
+            "Grid 2 Mullions", 
+            "Handrail 1", 
+            "Handrail 2", 
+            "Horizontal Grid", 
+            "Horizontal Mullions", 
+            "Insulation", 
+            "Length", 
+            "Lining", 
+            "Material Thermal Properties", 
+            "Nodes", 
+            "Pattern", 
+            "Pattern Application", 
+            "Pattern Remainder", 
+            "Pattern Repeat", 
+            "Posts", 
+            "Profile", 
+            "Profile 1", 
+            "Profile 2", 
+            "Reference", 
+            "Rise / Drop", 
+            "Risers", 
+            "Room/Space Data", 
+            "Rotation about", 
+            "Route Analysis", 
+            "Segment Pattern (default)", 
+            "Stringers", 
+            "Structural Section Geometry", 
+            "Supports", 
+            "Terminations", 
+            "Threads/Risers", 
+            "Top Chords", 
+            "Top Rail", 
+            "Translation in", 
+            "Treads", 
+            "U Grid", 
+            "Underlay", 
+            "V Grid", 
+            "Vertical Grid", 
+            "Vertical Mullions", 
+            "Vertical Webs", 
+            "Winders"
+        ], 
+        "actual_groups": [
+            {
+                "source": "expected_list", 
+                "label": "Analysis Results", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_ANALYSIS_RESULTS", 
+                "normalized_label": "analysis results", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Analytical Alignment", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_ANALYTICAL_ALIGNMENT", 
+                "normalized_label": "analytical alignment", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Analytical Model", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_ANALYTICAL_MODEL", 
+                "normalized_label": "analytical model", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Constraints", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_CONSTRAINTS", 
+                "normalized_label": "constraints", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Construction", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_CONSTRUCTION", 
+                "normalized_label": "construction", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Data", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_DATA", 
+                "normalized_label": "data", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Dimensions", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_GEOMETRY", 
+                "normalized_label": "dimensions", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Division Geometry", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_DIVISION_GEOMETRY", 
+                "normalized_label": "division geometry", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Electrical", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_AELECTRICAL", 
+                "normalized_label": "electrical", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Electrical - Circuiting", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_ELECTRICAL_CIRCUITING", 
+                "normalized_label": "electrical - circuiting", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Electrical - Lighting", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_ELECTRICAL_LIGHTING", 
+                "normalized_label": "electrical - lighting", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Electrical - Loads", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_ELECTRICAL_LOADS", 
+                "normalized_label": "electrical - loads", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Electrical Engineering", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_ELECTRICAL", 
+                "normalized_label": "electrical engineering", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Energy Analysis", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_ENERGY_ANALYSIS", 
+                "normalized_label": "energy analysis", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Fire Protection", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_FIRE_PROTECTION", 
+                "normalized_label": "fire protection", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Forces", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_FORCES", 
+                "normalized_label": "forces", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "General", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_GENERAL", 
+                "normalized_label": "general", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Graphics", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_GRAPHICS", 
+                "normalized_label": "graphics", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Green Building Properties", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_GREEN_BUILDING", 
+                "normalized_label": "green building properties", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Identity Data", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_IDENTITY_DATA", 
+                "normalized_label": "identity data", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "IFC Parameters", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_IFC", 
+                "normalized_label": "ifc parameters", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Layers", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_REBAR_SYSTEM_LAYERS", 
+                "normalized_label": "layers", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Materials and Finishes", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_MATERIALS", 
+                "normalized_label": "materials and finishes", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Mechanical", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_MECHANICAL", 
+                "normalized_label": "mechanical", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Mechanical - Flow", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_MECHANICAL_AIRFLOW", 
+                "normalized_label": "mechanical - flow", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Mechanical - Loads", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_MECHANICAL_LOADS", 
+                "normalized_label": "mechanical - loads", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Model Properties", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_ADSK_MODEL_PROPERTIES", 
+                "normalized_label": "model properties", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Moments", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_MOMENTS", 
+                "normalized_label": "moments", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Other", 
+                "bucket": "actual", 
+                "type_id": "enum:INVALID", 
+                "normalized_label": "other", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Overall Legend", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_OVERALL_LEGEND", 
+                "normalized_label": "overall legend", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Phasing", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_PHASING", 
+                "normalized_label": "phasing", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Photometrics", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_LIGHT_PHOTOMETRICS", 
+                "normalized_label": "photometrics", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Plumbing", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_PLUMBING", 
+                "normalized_label": "plumbing", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Primary End", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_PRIMARY_END", 
+                "normalized_label": "primary end", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Rebar Set", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_REBAR_ARRAY", 
+                "normalized_label": "rebar set", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Releases / Member Forces", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_RELEASES_MEMBER_FORCES", 
+                "normalized_label": "releases / member forces", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Secondary End", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_SECONDARY_END", 
+                "normalized_label": "secondary end", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Segments and Fittings", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_SEGMENTS_FITTINGS", 
+                "normalized_label": "segments and fittings", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Set", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_COUPLER_ARRAY", 
+                "normalized_label": "set", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Slab Shape Edit", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_SLAB_SHAPE_EDIT", 
+                "normalized_label": "slab shape edit", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Structural", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_STRUCTURAL", 
+                "normalized_label": "structural", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Structural Analysis", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_STRUCTURAL_ANALYSIS", 
+                "normalized_label": "structural analysis", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Text", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_TEXT", 
+                "normalized_label": "text", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Title Text", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_TITLE", 
+                "normalized_label": "title text", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }, 
+            {
+                "source": "expected_list", 
+                "label": "Visibility", 
+                "bucket": "actual", 
+                "type_id": "enum:PG_VISIBILITY", 
+                "normalized_label": "visibility", 
+                "is_user_assignable": true, 
+                "version_block": "2020-2022"
+            }
+        ], 
+        "actual_group_labels": [
+            "Analysis Results", 
+            "Analytical Alignment", 
+            "Analytical Model", 
+            "Constraints", 
+            "Construction", 
+            "Data", 
+            "Dimensions", 
+            "Division Geometry", 
+            "Electrical", 
+            "Electrical - Circuiting", 
+            "Electrical - Lighting", 
+            "Electrical - Loads", 
+            "Electrical Engineering", 
+            "Energy Analysis", 
+            "Fire Protection", 
+            "Forces", 
+            "General", 
+            "Graphics", 
+            "Green Building Properties", 
+            "Identity Data", 
+            "IFC Parameters", 
+            "Layers", 
+            "Materials and Finishes", 
+            "Mechanical", 
+            "Mechanical - Flow", 
+            "Mechanical - Loads", 
+            "Model Properties", 
+            "Moments", 
+            "Other", 
+            "Overall Legend", 
+            "Phasing", 
+            "Photometrics", 
+            "Plumbing", 
+            "Primary End", 
+            "Rebar Set", 
+            "Releases / Member Forces", 
+            "Secondary End", 
+            "Segments and Fittings", 
+            "Set", 
+            "Slab Shape Edit", 
+            "Structural", 
+            "Structural Analysis", 
+            "Text", 
+            "Title Text", 
+            "Visibility"
+        ], 
+        "missing_expected_labels": []
+    }, 
+    "version_block": "2020-2022", 
+    "mapping": {
+        "enum:PG_TRUSS_FAMILY_DIAG_WEB": "Diagonal Webs", 
+        "enum:PG_SYSTEMTYPE_RISEDROP": "Rise / Drop", 
+        "enum:PG_ENERGY_ANALYSIS": "Energy Analysis", 
+        "enum:PG_GENERAL": "General", 
+        "enum:PG_ROUTE_ANALYSIS": "Route Analysis", 
+        "enum:PG_COUPLER_ARRAY": "Set", 
+        "enum:PG_MATERIALS": "Materials and Finishes", 
+        "enum:PG_IDENTITY_DATA": "Identity Data", 
+        "enum:PG_PROFILE": "Profile", 
+        "enum:PG_FLEXIBLE": "Adaptive Component", 
+        "enum:PG_STRUCTURAL": "Structural", 
+        "enum:PG_ELECTRICAL_LIGHTING": "Electrical - Lighting", 
+        "enum:PG_CURTAIN_GRID_1": "Grid 1", 
+        "enum:PG_INSULATION": "Insulation", 
+        "enum:PG_PLUMBING": "Plumbing", 
+        "enum:PG_CURTAIN_MULLION_1": "Grid 1 Mullions", 
+        "enum:PG_CURTAIN_MULLION_2": "Grid 2 Mullions", 
+        "enum:PG_STAIRS_OPEN_END_CONNECTION": "End Connection", 
+        "enum:PG_GEOMETRY": "Dimensions", 
+        "enum:PG_STAIR_RISERS": "Risers", 
+        "enum:PG_MECHANICAL_AIRFLOW": "Mechanical - Flow", 
+        "enum:PG_STRUCTURAL_SECTION_GEOMETRY": "Structural Section Geometry", 
+        "enum:PG_CURTAIN_MULLION_VERT": "Vertical Mullions", 
+        "enum:PG_ROTATION_ABOUT": "Rotation about", 
+        "enum:PG_STAIRS_TREADS_RISERS": "Threads/Risers", 
+        "enum:PG_TITLE": "Title Text", 
+        "enum:PG_GEO_LOCATION": "Geolocation", 
+        "enum:PG_ENERGY_ANALYSIS_DETAILED_AND_CONCEPTUAL_MODELS": "Essential", 
+        "enum:PG_SEGMENTS_FITTINGS": "Segments and Fittings", 
+        "enum:PG_ANALYTICAL_PROPERTIES": "Analytical Properties", 
+        "enum:PG_SLAB_SHAPE_EDIT": "Slab Shape Edit", 
+        "enum:PG_STAIRS_SUPPORTS": "Supports", 
+        "enum:PG_ENERGY_ANALYSIS_DETAILED_MODEL": "Detailed Model", 
+        "enum:PG_STAIR_STRINGERS": "Stringers", 
+        "enum:PG_ANALYTICAL_MODEL": "Analytical Model", 
+        "enum:PG_ANALYTICAL_ALIGNMENT": "Analytical Alignment", 
+        "enum:PG_LINING": "Lining", 
+        "enum:PG_GEOMETRY_POSITIONING": "Geometric Position", 
+        "enum:PG_CURTAIN_GRID_U": "U Grid", 
+        "enum:PG_REFERENCE": "Reference", 
+        "enum:PG_VISIBILITY": "Visibility", 
+        "enum:PG_RAILING_SYSTEM_FAMILY_SEGMENT_PATTERN": "Segment Pattern (default)", 
+        "enum:PG_LENGTH": "Length", 
+        "enum:PG_PATTERN_APPLICATION": "Pattern Application", 
+        "enum:PG_FITTING": "Fittings", 
+        "enum:PG_NODES": "Nodes", 
+        "enum:PG_STRUCTURAL_ANALYSIS": "Structural Analysis", 
+        "enum:PG_RAILING_SYSTEM_FAMILY_TOP_RAIL": "Top Rail", 
+        "enum:PG_CURTAIN_MULLION_HORIZ": "Horizontal Mullions", 
+        "enum:PG_ELECTRICAL_CIRCUITING": "Electrical - Circuiting", 
+        "enum:PG_PROFILE_2": "Profile 2", 
+        "enum:PG_PROFILE_1": "Profile 1", 
+        "enum:PG_RELEASES_MEMBER_FORCES": "Releases / Member Forces", 
+        "enum:PG_ADSK_MODEL_PROPERTIES": "Model Properties", 
+        "enum:PG_LIGHT_PHOTOMETRICS": "Photometrics", 
+        "enum:PG_STAIRS_CALCULATOR_RULES": "Calculation Rules", 
+        "enum:PG_TRUSS_FAMILY_TOP_CHORD": "Top Chords", 
+        "enum:PG_TRUSS_FAMILY_VERT_WEB": "Vertical Webs", 
+        "enum:PG_CONTINUOUSRAIL_END_TOP_EXTENSION": "Extension (End/Top)", 
+        "enum:PG_TRUSS_FAMILY_BOTTOM_CHORD": "Bottom Chords", 
+        "enum:PG_SPLIT_PROFILE_DIMENSIONS": "Dimensions     (linear units or % of thickness)", 
+        "enum:PG_MECHANICAL_LOADS": "Mechanical - Loads", 
+        "enum:PG_RAILING_SYSTEM_SEGMENT_PATTERN_REMAINDER": "Pattern Remainder", 
+        "enum:PG_VIEW_CAMERA": "Camera", 
+        "enum:PG_ELECTRICAL_LOADS": "Electrical - Loads", 
+        "enum:PG_OVERALL_LEGEND": "Overall Legend", 
+        "enum:PG_ENERGY_ANALYSIS_ADVANCED": "Advanced", 
+        "enum:PG_DATA": "Data", 
+        "enum:PG_CURTAIN_GRID_VERT": "Vertical Grid", 
+        "enum:PG_CURTAIN_GRID_2": "Grid 2", 
+        "enum:PG_MECHANICAL": "Mechanical", 
+        "enum:PG_CONSTRAINTS": "Constraints", 
+        "enum:PG_TERMINTATION": "Terminations", 
+        "enum:PG_ENERGY_ANALYSIS_BLDG_CONS_MTL_THERMAL_PROPS": "Material Thermal Properties", 
+        "enum:PG_MOMENTS": "Moments", 
+        "enum:PG_REBAR_ARRAY": "Rebar Set", 
+        "enum:PG_AELECTRICAL": "Electrical", 
+        "enum:PG_FABRICATION_PRODUCT_DATA": "Fabrication Product Data", 
+        "enum:PG_TRANSLATION_IN": "Translation in", 
+        "enum:PG_SECONDARY_END": "Secondary End", 
+        "enum:PG_ANALYSIS_RESULTS": "Analysis Results", 
+        "enum:PG_ENERGY_ANALYSIS_ROOM_SPACE_DATA": "Room/Space Data", 
+        "enum:PG_STAIR_TREADS": "Treads", 
+        "enum:PG_GRAPHICS": "Graphics", 
+        "enum:PG_RAILING_SYSTEM_SEGMENT_POSTS": "Posts", 
+        "enum:PG_FIRE_PROTECTION": "Fire Protection", 
+        "enum:INVALID": "Other", 
+        "enum:PG_CURTAIN_GRID_V": "V Grid", 
+        "enum:PG_CURTAIN_GRID": "Grid", 
+        "enum:PG_RAILING_SYSTEM_SEGMENT_U_GRID": "U Grid", 
+        "enum:PG_RAILING_SYSTEM_SECONDARY_FAMILY_HANDRAILS": "Handrail 2", 
+        "enum:PG_RAILING_SYSTEM_SEGMENT_PATTERN_REPEAT": "Pattern Repeat", 
+        "enum:PG_CONCEPTUAL_ENERGY_DATA_BUILDING_SERVICES": "Energy Model - Building Services", 
+        "enum:PG_RAILING_SYSTEM_FAMILY_HANDRAILS": "Handrail 1", 
+        "enum:PG_AREA": "Area", 
+        "enum:PG_GREEN_BUILDING": "Green Building Properties", 
+        "enum:PG_UNDERLAY": "Underlay", 
+        "enum:PG_PHASING": "Phasing", 
+        "enum:PG_ENERGY_ANALYSIS_CONCEPTUAL_MODEL": "Energy Analytical Model", 
+        "enum:PG_PRIMARY_END": "Primary End", 
+        "enum:PG_SUPPORT": "Supports", 
+        "enum:PG_RAILING_SYSTEM_SEGMENT_V_GRID": "V Grid", 
+        "enum:PG_IFC": "IFC Parameters", 
+        "enum:PG_REBAR_SYSTEM_LAYERS": "Layers", 
+        "enum:PG_PATTERN": "Pattern", 
+        "enum:PG_CURTAIN_GRID_HORIZ": "Horizontal Grid", 
+        "enum:PG_ELECTRICAL": "Electrical Engineering", 
+        "enum:PG_ENERGY_ANALYSIS_BUILDING_DATA": "Building Data", 
+        "enum:PG_FORCES": "Forces", 
+        "enum:PG_DIVISION_GEOMETRY": "Division Geometry", 
+        "enum:PG_CONSTRUCTION": "Construction", 
+        "enum:PG_DISPLAY": "Display", 
+        "enum:PG_STAIRS_WINDERS": "Winders", 
+        "enum:PG_VIEW_EXTENTS": "Extents", 
+        "enum:PG_CONTINUOUSRAIL_BEGIN_BOTTOM_EXTENSION": "Extension (Beginning/Bottom)", 
+        "enum:PG_TEXT": "Text", 
+        "enum:PG_CONCEPTUAL_ENERGY_DATA": "Conceptual Energy Data"
+    }, 
+    "version": 2021, 
+    "group_api_type": "Autodesk.Revit.DB.BuiltInParameterGroup"
+}

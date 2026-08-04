@@ -43,8 +43,11 @@ from pyrevit import forms, revit
 from formula_highlight import FormulaEditorHighlightMixin
 from formula_analyzer import analyze_formula as _analyze_formula, replace_formula_subexpr as _replace_formula_subexpr
 from family_param_utils import (
+    DEFAULT_VISIBLE_GROUP_LABELS,
     find_directly_used_params,
     find_formula_referencing_params,
+    get_group_label_filter,
+    normalize_group_label,
 )
 from sort_param_utils import (
     get_current_parameter_order as _sort_get_current_order,
@@ -63,6 +66,17 @@ doc = revit.doc
 uiapp = __revit__  # noqa: F821
 app = uiapp.Application
 SCRIPT_DIR = os.path.dirname(__file__)
+
+_DEFAULT_VISIBLE_GROUP_LABELS_NORMALIZED = set(
+    normalize_group_label(x) for x in DEFAULT_VISIBLE_GROUP_LABELS
+)
+
+_LAST_GROUP_OPTIONS_DEBUG = {
+    "source": "unknown",
+    "path": None,
+    "version": None,
+    "count": 0,
+}
 
 
 class OptionItem(object):
@@ -472,6 +486,7 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         self._all_types_by_discipline = _build_all_type_options_by_discipline()
         self._discipline_options = sorted(self._all_types_by_discipline.keys())
         self._group_options = _build_group_options(self.fm)
+        self._build_group_option_indexes()
         self._shared_options = _build_shared_definition_options()
 
         self.cmbNewDiscipline.ItemsSource = self._discipline_options
@@ -496,7 +511,7 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         self._restore_window_position()
         self._restore_column_layout()
         self._update_batch_panel()
-        self._set_status("Ready.", "neutral")
+        self._set_status(_group_options_debug_message(), "neutral")
 
     def _bind_combo_options(self, combo, options):
         combo.ItemsSource = options
@@ -504,6 +519,20 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         combo.SelectedValuePath = "Value"
         if options:
             combo.SelectedIndex = 0
+
+    def _build_group_option_indexes(self):
+        """Build stable lookup indexes for fast and version-safe group matching."""
+        self._group_option_by_key = {}
+        self._group_option_by_label = {}
+
+        for opt in self._group_options:
+            key = _group_identity_key_for_selection(opt.Value)
+            if key and key not in self._group_option_by_key:
+                self._group_option_by_key[key] = opt
+
+            label_key = normalize_group_label(opt.Label)
+            if label_key and label_key not in self._group_option_by_label:
+                self._group_option_by_label[label_key] = opt
 
     def _set_status(self, message, tone):
         self.txtStatus.Text = message or ""
@@ -620,6 +649,23 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         if current_group is None:
             return
 
+        key = _group_identity_key_for_selection(current_group)
+        if key:
+            target = self._group_option_by_key.get(key)
+            if target is not None:
+                self.cmbEditGroup.SelectedItem = target
+                return
+
+        try:
+            current_label_key = normalize_group_label(_label_for_group(current_group))
+        except Exception:
+            current_label_key = ""
+        if current_label_key:
+            target = self._group_option_by_label.get(current_label_key)
+            if target is not None:
+                self.cmbEditGroup.SelectedItem = target
+                return
+
         for opt in self._group_options:
             if str(opt.Value) == str(current_group):
                 self.cmbEditGroup.SelectedItem = opt
@@ -721,34 +767,46 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
                     break
 
     def _do_group_move(self, fp, target_group):
-        """Move fp to target_group using whatever API is available.  Raises on failure."""
-        m = getattr(self.fm, "MoveParameter", None)
-        if callable(m):
-            m(fp, target_group)
-            return
+        """Move fp to target_group using whichever API and group type works."""
+        candidates = _group_move_candidates(target_group)
+        errors = []
 
-        m = getattr(self.fm, "SetParameterGroup", None)
-        if callable(m):
-            m(fp, target_group)
-            return
+        for candidate in candidates:
+            m = getattr(self.fm, "MoveParameter", None)
+            if callable(m):
+                try:
+                    m(fp, candidate)
+                    return
+                except Exception as ex:
+                    errors.append(str(ex))
 
-        try:
-            m = self.fm.GetType().GetMethod("SetParameterGroup")
-            if m is not None:
-                m.Invoke(self.fm, System.Array[System.Object]([fp, target_group]))
-                return
-        except Exception:
-            pass
+            m = getattr(self.fm, "SetParameterGroup", None)
+            if callable(m):
+                try:
+                    m(fp, candidate)
+                    return
+                except Exception as ex:
+                    errors.append(str(ex))
 
-        try:
-            defn = fp.Definition
-            prop = defn.GetType().GetProperty("ParameterGroup")
-            if prop is not None and prop.CanWrite:
-                prop.SetValue(defn, target_group, None)
-                return
-        except Exception:
-            pass
+            try:
+                m = self.fm.GetType().GetMethod("SetParameterGroup")
+                if m is not None:
+                    m.Invoke(self.fm, System.Array[System.Object]([fp, candidate]))
+                    return
+            except Exception as ex:
+                errors.append(str(ex))
 
+            try:
+                defn = fp.Definition
+                prop = defn.GetType().GetProperty("ParameterGroup")
+                if prop is not None and prop.CanWrite:
+                    prop.SetValue(defn, candidate, None)
+                    return
+            except Exception as ex:
+                errors.append(str(ex))
+
+        if errors:
+            raise Exception("Group move failed: {}".format(errors[-1]))
         raise Exception("Group move is not available in this Revit version.")
 
     def _set_shared_mode(self, is_shared):
@@ -1561,7 +1619,7 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         source_param = item.Param
         source_group = _get_group_type(source_param.Definition)
 
-        if str(source_group) == str(target_group):
+        if _group_values_equal(source_group, target_group):
             self._set_status("Parameter is already in that group.", "neutral")
             return
 
@@ -1925,6 +1983,7 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
 
         selected_group_value = group_value
         selected_group_label = _label_for_group(selected_group_value) or str(selected_group_value)
+        group_value = _coerce_group_for_add_parameter(group_value)
         used_fallback_group = False
         if not _is_user_assignable_group(self.fm, selected_group_value):
             # Defensive guard: keep creation working if an unassignable group slips
@@ -2273,7 +2332,7 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
                 skipped.append(it.Name)
                 continue
 
-            if str(source_group) == str(target_group):
+            if _group_values_equal(source_group, target_group):
                 skipped.append(it.Name)
                 continue
 
@@ -3077,14 +3136,135 @@ def _get_group_type(definition):
 
 def _default_group_type_general():
     """Return the 'General' parameter group value compatible with the running Revit version."""
+    if _BIPG_AVAILABLE:
+        return BuiltInParameterGroup.PG_GENERAL
     try:
         from Autodesk.Revit.DB import GroupTypeId
         return GroupTypeId.General
     except Exception:
         pass
-    if _BIPG_AVAILABLE:
-        return BuiltInParameterGroup.PG_GENERAL
     return None
+
+
+def _coerce_group_for_add_parameter(group_value):
+    """Coerce group type for FamilyManager.AddParameter compatibility.
+
+    Some environments can surface ForgeTypeId values while AddParameter still
+    expects BuiltInParameterGroup. In that case, map by UI label.
+    """
+    if group_value is None:
+        return None
+
+    type_id = getattr(group_value, "TypeId", None)
+    if _BIPG_AVAILABLE and isinstance(type_id, str) and type_id:
+        target_label = normalize_group_label(_label_for_group(group_value))
+        if not target_label:
+            return _default_group_type_general()
+
+        try:
+            for enum_group in System.Enum.GetValues(BuiltInParameterGroup):
+                if normalize_group_label(_label_for_group(enum_group)) == target_label:
+                    return enum_group
+        except Exception:
+            pass
+
+        return _default_group_type_general()
+
+    return group_value
+
+
+def _group_identity_key_for_selection(group_value):
+    """Return a stable key for comparing group values across API versions."""
+    if group_value is None:
+        return None
+
+    type_id = getattr(group_value, "TypeId", None)
+    if isinstance(type_id, str) and type_id:
+        return "ftid:{}".format(type_id.strip().lower())
+
+    if _BIPG_AVAILABLE:
+        try:
+            return "enum:{}".format(str(group_value))
+        except Exception:
+            pass
+
+    try:
+        return "str:{}".format(str(group_value))
+    except Exception:
+        return None
+
+
+def _group_values_equal(group_a, group_b):
+    """Return True when two group values represent the same logical group."""
+    key_a = _group_identity_key_for_selection(group_a)
+    key_b = _group_identity_key_for_selection(group_b)
+    if key_a and key_b and key_a == key_b:
+        return True
+
+    try:
+        label_a = normalize_group_label(_label_for_group(group_a))
+        label_b = normalize_group_label(_label_for_group(group_b))
+        return bool(label_a and label_b and label_a == label_b)
+    except Exception:
+        return False
+
+
+def _coerce_group_to_group_typeid(group_value):
+    """Best-effort conversion from enum-like group value to ForgeTypeId."""
+    if group_value is None:
+        return None
+
+    type_id = getattr(group_value, "TypeId", None)
+    if isinstance(type_id, str) and type_id:
+        return group_value
+
+    target_label = normalize_group_label(_label_for_group(group_value))
+    if not target_label:
+        return None
+
+    try:
+        from Autodesk.Revit.DB import GroupTypeId
+    except Exception:
+        return None
+
+    try:
+        for attr_name in dir(GroupTypeId):
+            if attr_name.startswith('_'):
+                continue
+            try:
+                candidate = getattr(GroupTypeId, attr_name)
+            except Exception:
+                continue
+            candidate_type_id = getattr(candidate, "TypeId", None)
+            if not candidate_type_id:
+                continue
+            if normalize_group_label(_label_for_group(candidate)) == target_label:
+                return candidate
+    except Exception:
+        pass
+
+    return None
+
+
+def _group_move_candidates(target_group):
+    """Return unique candidate group values to try for group-move APIs."""
+    candidates = []
+    seen = set()
+
+    def _add(value):
+        if value is None:
+            return
+        key = _group_identity_key_for_selection(value)
+        if not key or key in seen:
+            return
+        seen.add(key)
+        candidates.append(value)
+
+    _add(target_group)
+    _add(_coerce_group_for_add_parameter(target_group))
+    _add(_coerce_group_to_group_typeid(target_group))
+
+    return candidates
 
 
 def _infer_subexpr_datatype(subexpr_text, all_items):
@@ -3372,57 +3552,6 @@ def _build_type_options(fm):
     return options
 
 
-# Groups shown by Revit in the Family Types / Edit Family Parameters dialog.
-# Used to filter the full BuiltInParameterGroup enum down to the same subset.
-_FAMILY_PARAM_GROUP_LABELS = frozenset((
-    "analysis results",
-    "analytical alignment",
-    "analytical model",
-    "constraints",
-    "construction",
-    "data",
-    "dimensions",
-    "division geometry",
-    "electrical",
-    "electrical - circuiting",
-    "electrical - lighting",
-    "electrical - loads",
-    "electrical engineering",
-    "energy analysis",
-    "fire protection",
-    "forces",
-    "general",
-    "graphics",
-    "green building properties",
-    "identity data",
-    "ifc parameters",
-    "layers",
-    "materials and finishes",
-    "mechanical",
-    "mechanical - flow",
-    "mechanical - loads",
-    "model properties",
-    "moments",
-    "other",
-    "overall legend",
-    "phasing",
-    "photometrics",
-    "plumbing",
-    "primary end",
-    "rebar set",
-    "releases / member forces",
-    "secondary end",
-    "segments and fittings",
-    "set",
-    "slab shape edit",
-    "structural",
-    "structural analysis",
-    "text",
-    "title text",
-    "visibility",
-))
-
-
 def _build_group_options(fm):
     # Enumerate available parameter groups and keep only those Revit shows in the
     # Family Types / Create Parameter dialog.
@@ -3431,6 +3560,79 @@ def _build_group_options(fm):
     # Revit 2020-2022: fall back to BuiltInParameterGroup enum values.
     options = []
     seen = set()
+    group_filter = get_group_label_filter(doc, fallback_labels=DEFAULT_VISIBLE_GROUP_LABELS)
+    allowed_labels = group_filter.get("normalized_set", set())
+    allowed_type_ids = group_filter.get("allowed_type_ids", set())
+    label_order = group_filter.get("order", {})
+
+    global _LAST_GROUP_OPTIONS_DEBUG
+    _LAST_GROUP_OPTIONS_DEBUG = {
+        "source": group_filter.get("source", "unknown"),
+        "path": group_filter.get("path"),
+        "version": group_filter.get("version"),
+        "count": 0,
+    }
+
+    def _group_identity_key(group_value):
+        if group_value is None:
+            return None
+        type_id = getattr(group_value, "TypeId", None)
+        if isinstance(type_id, str) and type_id:
+            return type_id
+        if _BIPG_AVAILABLE:
+            try:
+                return "enum:{}".format(str(group_value))
+            except Exception:
+                pass
+        return None
+
+    def _is_other_group(identity_key, label):
+        if isinstance(identity_key, str) and ":other-1.0.0" in identity_key.lower():
+            return True
+        return normalize_group_label(label) == "other"
+
+    def _collect_group_candidates(group_type):
+        """Collect group values from both attribute walk and CLR reflection."""
+        collected = []
+        seen_keys = set()
+
+        def _push(value):
+            key = _group_identity_key(value)
+            if not key or key in seen_keys:
+                return
+            seen_keys.add(key)
+            collected.append(value)
+
+        # Attribute walk (fast path, works for most values)
+        for _attr in dir(group_type):
+            if _attr.startswith('_'):
+                continue
+            try:
+                _push(getattr(group_type, _attr))
+            except Exception:
+                continue
+
+        # Reflection fallback (captures values sometimes skipped by dir/getattr)
+        try:
+            from System.Reflection import BindingFlags
+            clr_type = clr.GetClrType(group_type)
+            flags = BindingFlags.Public | BindingFlags.Static
+
+            for prop in clr_type.GetProperties(flags):
+                try:
+                    _push(prop.GetValue(None, None))
+                except Exception:
+                    continue
+
+            for field in clr_type.GetFields(flags):
+                try:
+                    _push(field.GetValue(None))
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+        return collected
 
     has_group_type_id = False
     try:
@@ -3444,17 +3646,11 @@ def _build_group_options(fm):
         # CLR reflection (GetProperties/GetValue) is unreliable in IronPython;
         # dir()/getattr() handles .NET static properties natively.
         try:
-            for _attr in dir(GroupTypeId):
-                if _attr.startswith('_'):
-                    continue
-                try:
-                    val = getattr(GroupTypeId, _attr)
-                except Exception:
-                    continue
+            for val in _collect_group_candidates(GroupTypeId):
                 if val is None:
                     continue
                 # ForgeTypeId instances expose a TypeId string; skip nested types/methods.
-                type_id_str = getattr(val, 'TypeId', None)
+                type_id_str = _group_identity_key(val)
                 if not type_id_str or not isinstance(type_id_str, str):
                     continue
                 if type_id_str in seen:
@@ -3462,7 +3658,15 @@ def _build_group_options(fm):
                 label = _label_for_group(val)
                 if not label:
                     continue
-                if not _is_user_assignable_group(fm, val):
+                if allowed_type_ids and type_id_str not in allowed_type_ids:
+                    continue
+                normalized_label = normalize_group_label(label)
+                # Primary filter: map-driven visible groups for this Revit version.
+                if allowed_labels and normalized_label not in allowed_labels:
+                    continue
+                # Always enforce assignable groups so non-assignable map entries
+                # cannot leak into the Create/Edit/Batch group dropdowns.
+                if (not _is_other_group(type_id_str, label)) and (not _is_user_assignable_group(fm, val)):
                     continue
                 seen.add(type_id_str)
                 options.append(OptionItem(label, val))
@@ -3473,7 +3677,9 @@ def _build_group_options(fm):
         # Revit 2020-2022: use BuiltInParameterGroup enum.
         try:
             for group in System.Enum.GetValues(BuiltInParameterGroup):
-                key = str(group)
+                key = _group_identity_key(group)
+                if not key:
+                    continue
                 if key in seen:
                     continue
                 try:
@@ -3482,15 +3688,76 @@ def _build_group_options(fm):
                     continue
                 if not label or label == key:
                     continue
-                if not _is_user_assignable_group(fm, group):
+                if allowed_type_ids and key not in allowed_type_ids:
+                    continue
+                normalized_label = normalize_group_label(label)
+                if allowed_labels and normalized_label not in allowed_labels:
+                    continue
+                if (not _is_other_group(key, label)) and (not _is_user_assignable_group(fm, group)):
                     continue
                 seen.add(key)
                 options.append(OptionItem(label, group))
         except Exception:
             pass
 
-    options.sort(key=lambda o: o.Label.lower())
+    # Final safety net: ensure "Other" is always available.
+    has_other = any(normalize_group_label(opt.Label) == "other" for opt in options)
+    if not has_other:
+        other_added = False
+
+        # Preferred (2023+): construct known ForgeTypeId for Other.
+        try:
+            from Autodesk.Revit.DB import ForgeTypeId
+            other_value = ForgeTypeId("autodesk.parameter.group:other-1.0.0")
+            other_label = _label_for_group(other_value)
+            other_key = _group_identity_key(other_value)
+            if other_key and other_label and normalize_group_label(other_label) == "other":
+                if other_key not in seen:
+                    seen.add(other_key)
+                    options.append(OptionItem(other_label, other_value))
+                other_added = True
+        except Exception:
+            pass
+
+        # Legacy fallback: locate enum value labeled "Other".
+        if (not other_added) and _BIPG_AVAILABLE:
+            try:
+                for group in System.Enum.GetValues(BuiltInParameterGroup):
+                    label = _label_for_group(group)
+                    if normalize_group_label(label) != "other":
+                        continue
+                    key = _group_identity_key(group)
+                    if key and key not in seen:
+                        seen.add(key)
+                        options.append(OptionItem(label, group))
+                    break
+            except Exception:
+                pass
+
+    def _sort_key(opt):
+        normalized = normalize_group_label(opt.Label)
+        return (label_order.get(normalized, 10 ** 6), opt.Label.lower())
+
+    options.sort(key=_sort_key)
+    _LAST_GROUP_OPTIONS_DEBUG["count"] = len(options)
     return options
+
+
+def _group_options_debug_message():
+    info = _LAST_GROUP_OPTIONS_DEBUG or {}
+    source = info.get("source") or "unknown"
+    count = info.get("count", 0)
+    version = info.get("version")
+    path = info.get("path")
+
+    if source == "groupmap" and path:
+        try:
+            fname = os.path.basename(path)
+        except Exception:
+            fname = path
+        return "Ready. Groups: {} ({} / Revit {}).".format(count, fname, version)
+
+    return "Ready. Groups: {} (fallback list / Revit {}).".format(count, version)
 
 
 def _label_for_group(group):
@@ -3537,7 +3804,9 @@ def _is_user_assignable_group(fm, group):
 
     # Fallback for older/missing APIs: keep groups from Revit's family dialog set.
     label = _label_for_group(group)
-    return bool(label and label.lower() in _FAMILY_PARAM_GROUP_LABELS)
+    if not label:
+        return False
+    return normalize_group_label(label) in _DEFAULT_VISIBLE_GROUP_LABELS_NORMALIZED
 
 
 def _build_shared_definition_options():

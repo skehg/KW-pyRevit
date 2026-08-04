@@ -127,6 +127,22 @@ def get_group_api_type_name():
         return "Autodesk.Revit.DB.BuiltInParameterGroup"
     return "unknown"
 
+
+def get_shared_groupmap_dir(local_dir):
+    """Return preferred output directory for groupmap files.
+
+    Uses <extension>/lib so all tools can consume a single versioned map set.
+    Falls back to the command folder when lib is unavailable.
+    """
+    try:
+        project_root = os.path.abspath(os.path.join(local_dir, "..", "..", "..", ".."))
+        lib_dir = os.path.join(project_root, "lib")
+        if os.path.isdir(lib_dir):
+            return lib_dir
+    except Exception:
+        pass
+    return local_dir
+
 def get_group_values():
     """Return parameter group values for the running Revit version."""
     group_values = []
@@ -373,6 +389,7 @@ version = get_revit_version()
 version_block = get_version_block(version)
 group_api_type = get_group_api_type_name()
 ext_dir = os.path.dirname(__file__)
+output_dir = get_shared_groupmap_dir(ext_dir)
 
 output.print_md("## Building Group Map for Revit {} ({})".format(version, version_block))
 
@@ -453,7 +470,7 @@ group_manifest = {
 # Write file
 # ------------------------------------------------------------
 
-outfile = os.path.join(ext_dir, "groupmap-{}.yaml".format(version))
+outfile = os.path.join(output_dir, "groupmap-{}.yaml".format(version))
 
 with open(outfile, "w") as f:
     # YAML frontmatter
