@@ -1983,20 +1983,48 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
 
         selected_group_value = group_value
         selected_group_label = _label_for_group(selected_group_value) or str(selected_group_value)
-        group_value = _coerce_group_for_add_parameter(group_value)
         used_fallback_group = False
-        if not _is_user_assignable_group(self.fm, selected_group_value):
-            # Defensive guard: keep creation working if an unassignable group slips
-            # through from cached UI state or version/API edge cases.
-            group_value = _default_group_type_general()
-            used_fallback_group = True
+        new_param = None
+        last_error = None
 
         try:
             with revit.Transaction("Create Family Parameter"):
-                if is_shared:
-                    new_param = self.fm.AddParameter(shared_def, group_value, is_instance)
-                else:
-                    new_param = self.fm.AddParameter(new_name, group_value, type_value, is_instance)
+                # Try the selected group first (and compatible representations)
+                # without rolling back the whole transaction for expected type
+                # mismatch probes.
+                for group_candidate in _group_add_parameter_candidates(selected_group_value):
+                    try:
+                        if is_shared:
+                            new_param = self.fm.AddParameter(shared_def, group_candidate, is_instance)
+                        else:
+                            new_param = self.fm.AddParameter(new_name, group_candidate, type_value, is_instance)
+                        break
+                    except Exception as ex:
+                        last_error = ex
+                        if _is_group_argument_type_mismatch_error(ex):
+                            continue
+                        raise
+
+                # Final fallback only if selected group cannot be used at all.
+                if new_param is None:
+                    fallback_group = _default_group_type_general()
+                    if fallback_group is not None:
+                        for group_candidate in _group_add_parameter_candidates(fallback_group):
+                            try:
+                                if is_shared:
+                                    new_param = self.fm.AddParameter(shared_def, group_candidate, is_instance)
+                                else:
+                                    new_param = self.fm.AddParameter(new_name, group_candidate, type_value, is_instance)
+                                used_fallback_group = True
+                                break
+                            except Exception as ex:
+                                last_error = ex
+                                if _is_group_argument_type_mismatch_error(ex):
+                                    continue
+                                raise
+
+                if new_param is None:
+                    raise Exception(last_error or "Unable to create parameter in selected group.")
 
                 if initial_value_text:
                     ok, reason = _apply_initial_value(self.fm, new_param, initial_value_text)
@@ -3136,8 +3164,17 @@ def _get_group_type(definition):
 
 def _default_group_type_general():
     """Return the 'General' parameter group value compatible with the running Revit version."""
+    major = _revit_major_version()
+    if major is not None and major >= 2023:
+        try:
+            from Autodesk.Revit.DB import GroupTypeId
+            return GroupTypeId.General
+        except Exception:
+            pass
+
     if _BIPG_AVAILABLE:
         return BuiltInParameterGroup.PG_GENERAL
+
     try:
         from Autodesk.Revit.DB import GroupTypeId
         return GroupTypeId.General
@@ -3155,7 +3192,17 @@ def _coerce_group_for_add_parameter(group_value):
     if group_value is None:
         return None
 
+    major = _revit_major_version()
     type_id = getattr(group_value, "TypeId", None)
+
+    # Revit 2023+ AddParameter expects ForgeTypeId for the group argument.
+    if major is not None and major >= 2023:
+        if isinstance(type_id, str) and type_id:
+            return group_value
+        converted = _coerce_group_to_group_typeid(group_value)
+        return converted or group_value
+
+    # Revit 2020-2022 expects BuiltInParameterGroup.
     if _BIPG_AVAILABLE and isinstance(type_id, str) and type_id:
         target_label = normalize_group_label(_label_for_group(group_value))
         if not target_label:
@@ -3171,6 +3218,14 @@ def _coerce_group_for_add_parameter(group_value):
         return _default_group_type_general()
 
     return group_value
+
+
+def _revit_major_version():
+    """Return current Revit major version as int, or None when unavailable."""
+    try:
+        return int(app.VersionNumber)
+    except Exception:
+        return None
 
 
 def _group_identity_key_for_selection(group_value):
@@ -3265,6 +3320,62 @@ def _group_move_candidates(target_group):
     _add(_coerce_group_to_group_typeid(target_group))
 
     return candidates
+
+
+def _group_add_parameter_candidates(target_group):
+    """Return ordered group candidates for FamilyManager.AddParameter.
+
+    Revit 2023+ prefers ForgeTypeId. Revit 2020-2022 prefers enum values.
+    """
+    major = _revit_major_version()
+    prefer_forge = (major is not None and major >= 2023)
+
+    if prefer_forge:
+        primary = [
+            target_group,
+            _coerce_group_to_group_typeid(target_group),
+            _coerce_group_for_add_parameter(target_group),
+            _default_group_type_general(),
+            _coerce_group_to_group_typeid(_default_group_type_general()),
+        ]
+    else:
+        primary = [
+            _coerce_group_for_add_parameter(target_group),
+            target_group,
+            _coerce_group_to_group_typeid(target_group),
+            _default_group_type_general(),
+            _coerce_group_to_group_typeid(_default_group_type_general()),
+        ]
+
+    candidates = []
+    seen = set()
+    for value in primary:
+        if value is None:
+            continue
+        key = _group_identity_key_for_selection(value)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        candidates.append(value)
+    return candidates
+
+
+def _is_group_argument_type_mismatch_error(ex):
+    """Return True when AddParameter failed only due to group arg type mismatch."""
+    try:
+        msg = str(ex).lower()
+    except Exception:
+        return False
+
+    # Typical variants:
+    # - expected ForgeTypeId, got BuiltInParameterGroup
+    # - expected BuiltInParameterGroup, got ForgeTypeId
+    has_expected = "expected" in msg and "got" in msg
+    mentions_group_types = (
+        ("forgetypeid" in msg and "builtinparametergroup" in msg)
+        or ("grouptypeid" in msg and "builtinparametergroup" in msg)
+    )
+    return bool(has_expected and mentions_group_types)
 
 
 def _infer_subexpr_datatype(subexpr_text, all_items):

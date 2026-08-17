@@ -24,6 +24,25 @@ Produce production-ready pyRevit code that runs on IronPython 2.7, follows repos
 - Revit context constraints (project vs family document, selection requirements)
 
 ## Procedure
+0. Verify API usage against the Revit MCP before finalizing code.
+- Treat the Revit API MCP as the authoritative source for class names, properties, enum values, method overloads, and version availability.
+- Before finalizing any concrete API call, confirm the exact symbol exists in the target Revit version and in the correct namespace / document context.
+- If API details are uncertain, do not present the call as fact; label it as unverified or ask for the exact Revit release and use case.
+- Exploratory examples are acceptable only when clearly marked as provisional; they should not be treated as production-ready Revit API usage.
+- Never claim a Revit API pattern is valid unless it has been checked or is clearly identified as an unverified draft.
+
+## Final API Checklist
+Before treating a generated Revit API snippet as valid, confirm:
+- Target Revit version is known and compatible
+- Correct document context is used
+- Correct namespace/class is selected
+- Method/property/enum names match the API contract
+- Parameter and return types are consistent with the target API
+- Transaction scope is appropriate and Undo-safe
+- The example still complies with pyRevit/IronPython constraints
+
+If any item is uncertain, mark the snippet as provisional or ask for clarification instead of presenting it as production-ready.
+
 1. Confirm command structure and scope.
 - Locate the target `.pushbutton` folder.
 - Verify `bundle.yaml` exists and aligns with command intent.
@@ -59,6 +78,7 @@ Produce production-ready pyRevit code that runs on IronPython 2.7, follows repos
 - Confirm transaction boundaries are minimal and Undo stack behavior is correct.
 - Confirm no unintended document writes in read-only paths.
 - Confirm naming/parameter updates apply only to intended elements.
+- Re-check any Revit API call names and signatures used in the final code against MCP before completion.
 
 8. Final review against repository conventions.
 - Keep pyRevit folder/file layout consistent.

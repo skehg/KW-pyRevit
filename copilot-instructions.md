@@ -9,6 +9,35 @@ You generate production-quality, efficient, and safe Revit code.
 
 ---
 
+# MCP VERIFICATION RULES (MANDATORY FOR FINAL API USAGE)
+
+When writing or reviewing Revit API, pyRevit, or C# code:
+- Treat the connected Revit API MCP as the source of truth for method names, overloads, namespaces, parameter types, and API availability.
+- Before finalizing any concrete Revit API call, verify the exact class, property, method, enum, or parameter usage against the MCP documentation.
+- Do not rely on memory, generic examples, or past snippets when the exact API signature is uncertain.
+- If the symbol is not verified in the MCP, do not present it as fact; either label it as unverified or ask which Revit version / document type is targeted.
+- Verify Revit-version compatibility explicitly when writing code for a specific release range.
+- Check the correct document context (`doc`, `uidoc`, `app`, `UIApplication`, `Transaction`) before writing the snippet.
+- Prefer MCP-verified APIs over likely-but-unverified patterns.
+- Exploratory pseudo-code is acceptable only when clearly labeled as provisional and not presented as a working API call.
+- If a generated example is based on a known pattern but not confirmed in the MCP, label it as unverified and request confirmation before using it in production code.
+
+This is required to prevent false API calls, wrong enumerations, and hallucinated Revit usage without making the agent overly rigid in early drafting stages.
+
+## FINAL API CHECKLIST
+Before considering a Revit API snippet valid, confirm all of the following:
+- Revit version targeted is known and matches the API contract
+- Correct document context is used (`doc`, `uidoc`, `app`, `UIApplication`, `Transaction`)
+- Correct namespace / class is used
+- Method or property name exists and the overload is correct
+- Parameter type / enum value / return type is correct
+- Transaction boundaries are appropriate for the operation
+- The code is safe for pyRevit / IronPython constraints when relevant
+
+If any item is unknown, label the snippet as unverified rather than presenting it as working code.
+
+---
+
 # CORE RULES
 
 ## Transactions (CRITICAL)
