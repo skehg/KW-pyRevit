@@ -637,7 +637,7 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         self._formula_set_text(item.Formula or "")
         self._set_edit_group_selection(item.Param)
         self.btnToggleInstanceType.Content = item.InstanceTypeLabel
-        self.btnToggleInstanceType.IsEnabled = not item.IsShared
+        self.btnToggleInstanceType.IsEnabled = True
         self._update_formula_bracket_feedback()
 
     def _set_edit_group_selection(self, family_param):
@@ -715,30 +715,22 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         self.btnBatchDuplicate.IsEnabled = True
         self.btnBatchDelete.IsEnabled = True
 
-        # Toggle: active only when all non-shared items share the same state
-        non_shared = [it for it in items if not it.IsShared]
-        if not non_shared:
+        # Toggle is active only when all selected parameters share the same state.
+        states = set(it.InstanceTypeLabel for it in items)
+        if len(states) == 1:
+            current_state = list(states)[0]
+            target_state = u"Type" if current_state == u"Instance" else u"Instance"
+            self.btnBatchToggle.IsEnabled = True
+            self.btnBatchToggle.Content = u"Make {}".format(target_state)
+            self.txtBatchToggleInfo.Text = u"All {} selected are {}.".format(
+                len(items), current_state
+            )
+        else:
             self.btnBatchToggle.IsEnabled = False
             self.btnBatchToggle.Content = u"Toggle"
-            self.txtBatchToggleInfo.Text = u"All selected are shared (cannot toggle)."
-        else:
-            states = set(it.InstanceTypeLabel for it in non_shared)
-            if len(states) == 1:
-                current_state = list(states)[0]
-                target_state = u"Type" if current_state == u"Instance" else u"Instance"
-                self.btnBatchToggle.IsEnabled = True
-                self.btnBatchToggle.Content = u"Make {}".format(target_state)
-                info = u"All {} non-shared are {}.".format(len(non_shared), current_state)
-                skipped = len(items) - len(non_shared)
-                if skipped:
-                    info += u"  ({} shared will be skipped.)".format(skipped)
-                self.txtBatchToggleInfo.Text = info
-            else:
-                self.btnBatchToggle.IsEnabled = False
-                self.btnBatchToggle.Content = u"Toggle"
-                self.txtBatchToggleInfo.Text = (
-                    u"Mixed Instance/Type \u2014 select all same state to enable toggle."
-                )
+            self.txtBatchToggleInfo.Text = (
+                u"Mixed Instance/Type \u2014 select all same state to enable toggle."
+            )
 
         # Group combo: <Varies> when groups differ, pre-select when all same
         self._set_batch_group_combo(items)
@@ -802,6 +794,21 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
                 if prop is not None and prop.CanWrite:
                     prop.SetValue(defn, candidate, None)
                     return
+            except Exception as ex:
+                errors.append(str(ex))
+
+        major = _revit_major_version()
+        if major is not None and major >= 2023:
+            try:
+                _set_parameter_definition_group_with_forge(fp, target_group)
+                return
+            except Exception as ex:
+                errors.append(str(ex))
+
+        if major is not None and major >= 2023 and _is_shared_parameter(fp):
+            try:
+                _replace_parameter_group_with_forge(self.fm, fp, target_group)
+                return
             except Exception as ex:
                 errors.append(str(ex))
 
@@ -1312,9 +1319,6 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         Does NOT call _reload_parameter_items or _set_status — that is the caller's
         responsibility.
         """
-        if item.IsShared:
-            return ('error', u"Shared parameters cannot have their instance/type changed.")
-
         source_param = item.Param
         is_currently_instance = bool(getattr(source_param, "IsInstance", False))
 
@@ -1452,14 +1456,13 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         Type→Instance: single pass in any order — Instance params may freely reference
         Type params so ordering never causes a failure.
         """
-        non_shared = [it for it in items if not it.IsShared]
-        shared_names = [it.Name for it in items if it.IsShared]
+        scope_items = list(items)
 
-        if not non_shared:
-            self._set_status(u"No non-shared parameters to toggle.", "error")
+        if not scope_items:
+            self._set_status(u"No parameters to toggle.", "error")
             return
 
-        is_currently_instance = bool(getattr(non_shared[0].Param, "IsInstance", False))
+        is_currently_instance = bool(getattr(scope_items[0].Param, "IsInstance", False))
         direction = u"Type" if is_currently_instance else u"Instance"
 
         ok_names = []
@@ -1469,12 +1472,12 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
             # Instance → Type: must convert dependencies before dependents.
             # Pre-sort the selected items topologically so that a param whose formula
             # references another selected param comes AFTER that param in the list.
-            names_in_set = {it.Name for it in non_shared}
+            names_in_set = {it.Name for it in scope_items}
             fp_snap = {_param_name(fp): fp for fp in _get_family_parameters(self.fm)}
 
             # Build internal dependency map: which selected params does each formula reference?
             internal_deps = {}
-            for it in non_shared:
+            for it in scope_items:
                 fp = fp_snap.get(it.Name)
                 formula = _safe_formula(fp) if fp else None
                 if formula:
@@ -1487,7 +1490,7 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
 
             # Kahn's topological sort: items with no pending deps go first
             sorted_items = []
-            remaining = list(non_shared)
+            remaining = list(scope_items)
             done_names = set()
             while remaining:
                 progress = False
@@ -1521,12 +1524,12 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
             # Instance BEFORE Param1 is converted — otherwise the Type param would
             # temporarily have an Instance param in its formula.
             # So we need REVERSE topological order: dependents (leaves) first.
-            names_in_set = {it.Name for it in non_shared}
+            names_in_set = {it.Name for it in scope_items}
             fp_snap = {_param_name(fp): fp for fp in _get_family_parameters(self.fm)}
 
             # Build dependency map: which selected params does each formula reference?
             internal_deps = {}
-            for it in non_shared:
+            for it in scope_items:
                 fp = fp_snap.get(it.Name)
                 formula = _safe_formula(fp) if fp else None
                 if formula:
@@ -1539,7 +1542,7 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
 
             # Topo sort (dependencies first), then reverse = dependents first
             topo = []
-            remaining = list(non_shared)
+            remaining = list(scope_items)
             done_names = set()
             while remaining:
                 progress = False
@@ -1577,8 +1580,6 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
                 len(ok_names), direction,
                 u", ".join(u"'{}'".format(n) for n in ok_names)
             ))
-        if shared_names:
-            parts.append(u"{} shared parameter(s) skipped.".format(len(shared_names)))
         if error_names:
             parts.append(
                 u"Could not convert to {}: {}.  "
@@ -2321,16 +2322,15 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
 
     def on_batch_toggle(self, sender, args):
         items = self._selected_parameter_items()
-        non_shared = [it for it in items if not it.IsShared]
 
-        if not non_shared:
-            self._set_status(u"No non-shared parameters selected.", "error")
+        if not items:
+            self._set_status(u"No parameters selected.", "error")
             return
-        if len(non_shared) == 1:
-            status, msg = self._perform_toggle_single(non_shared[0])
+        if len(items) == 1:
+            status, msg = self._perform_toggle_single(items[0])
             tone = "ok" if status == "ok" else ("neutral" if status == "cancelled" else "error")
             self._set_status(msg, tone)
-            self._reload_parameter_items(select_name=non_shared[0].Name)
+            self._reload_parameter_items(select_name=items[0].Name)
         else:
             self._toggle_multiple(items)
         self._update_batch_panel()
@@ -3301,6 +3301,61 @@ def _coerce_group_to_group_typeid(group_value):
     return None
 
 
+def _coerce_group_to_builtin_parameter_group(group_value):
+    """Best-effort conversion from ForgeTypeId to legacy BuiltInParameterGroup."""
+    if group_value is None:
+        return None
+
+    type_id = getattr(group_value, "TypeId", None)
+    if not isinstance(type_id, str) or not type_id:
+        return group_value
+
+    try:
+        from Autodesk.Revit.DB import ParameterUtils
+    except Exception:
+        return None
+
+    for method_name in (
+        "GetBuiltInParameterGroup",
+        "GetBuiltInGroupTypeId",
+    ):
+        try:
+            converter = getattr(ParameterUtils, method_name, None)
+            if callable(converter):
+                converted = converter(group_value)
+                if converted is not None:
+                    return converted
+        except Exception:
+            pass
+
+    return None
+
+
+def _is_other_group_value(group_value):
+    """Return True when a group value represents Revit's built-in Other group."""
+    type_id = getattr(group_value, "TypeId", None)
+    if isinstance(type_id, str) and ":other-1.0.0" in type_id.lower():
+        return True
+
+    try:
+        return normalize_group_label(_label_for_group(group_value)) == "other"
+    except Exception:
+        return False
+
+
+def _forge_group_for_parameter_group_api(group_value):
+    """Return the ForgeTypeId value accepted by Revit group-changing APIs."""
+    major = _revit_major_version()
+    if major is not None and major >= 2023 and _is_other_group_value(group_value):
+        try:
+            from Autodesk.Revit.DB import ForgeTypeId
+            return ForgeTypeId()
+        except Exception:
+            pass
+
+    return _coerce_group_to_group_typeid(group_value)
+
+
 def _group_move_candidates(target_group):
     """Return unique candidate group values to try for group-move APIs."""
     candidates = []
@@ -3318,8 +3373,92 @@ def _group_move_candidates(target_group):
     _add(target_group)
     _add(_coerce_group_for_add_parameter(target_group))
     _add(_coerce_group_to_group_typeid(target_group))
+    _add(_forge_group_for_parameter_group_api(target_group))
+    _add(_coerce_group_to_builtin_parameter_group(target_group))
 
     return candidates
+
+
+def _find_shared_definition_for_parameter(family_param):
+    """Find the ExternalDefinition for a shared FamilyParameter by GUID."""
+    try:
+        guid = family_param.GUID
+    except Exception:
+        guid = None
+
+    if guid is None:
+        return None
+
+    try:
+        definition_file = app.OpenSharedParameterFile()
+    except Exception:
+        definition_file = None
+
+    if definition_file is None:
+        return None
+
+    try:
+        for group in definition_file.Groups:
+            for definition in group.Definitions:
+                try:
+                    if definition.GUID == guid:
+                        return definition
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    return None
+
+
+def _set_parameter_definition_group_with_forge(family_param, target_group):
+    """Move a family parameter by setting its definition's ForgeTypeId group."""
+    group_type_id = _forge_group_for_parameter_group_api(target_group)
+    if group_type_id is None:
+        raise Exception("Could not resolve target group as ForgeTypeId.")
+
+    definition = getattr(family_param, "Definition", None)
+    if definition is None:
+        raise Exception("Parameter definition is unavailable.")
+
+    setter = getattr(definition, "SetGroupTypeId", None)
+    if callable(setter):
+        setter(group_type_id)
+        return
+
+    try:
+        method = definition.GetType().GetMethod("SetGroupTypeId")
+        if method is not None:
+            method.Invoke(definition, System.Array[System.Object]([group_type_id]))
+            return
+    except Exception as ex:
+        raise Exception(str(ex))
+
+    raise Exception("Definition.SetGroupTypeId is not available.")
+
+
+def _replace_parameter_group_with_forge(family_manager, family_param, target_group):
+    """Move a parameter to a ForgeTypeId group using ReplaceParameter fallback."""
+    replace_parameter = getattr(family_manager, "ReplaceParameter", None)
+    if not callable(replace_parameter):
+        raise Exception("FamilyManager.ReplaceParameter is not available.")
+
+    group_type_id = _forge_group_for_parameter_group_api(target_group)
+    if group_type_id is None:
+        raise Exception("Could not resolve target group as ForgeTypeId.")
+
+    is_instance = bool(getattr(family_param, "IsInstance", False))
+
+    if _is_shared_parameter(family_param):
+        definition = _find_shared_definition_for_parameter(family_param)
+        if definition is None:
+            raise Exception(
+                "Shared parameter definition was not found in the active shared parameter file."
+            )
+        replace_parameter(family_param, definition, group_type_id, is_instance)
+        return
+
+    raise Exception("ReplaceParameter fallback is only valid for shared parameters.")
 
 
 def _group_add_parameter_candidates(target_group):
@@ -3822,6 +3961,13 @@ def _build_group_options(fm):
             other_value = ForgeTypeId("autodesk.parameter.group:other-1.0.0")
             other_label = _label_for_group(other_value)
             other_key = _group_identity_key(other_value)
+            if (
+                not other_label
+                and has_group_type_id
+                and "other" in allowed_labels
+                and other_key in allowed_type_ids
+            ):
+                other_label = "Other"
             if other_key and other_label and normalize_group_label(other_label) == "other":
                 if other_key not in seen:
                     seen.add(other_key)
