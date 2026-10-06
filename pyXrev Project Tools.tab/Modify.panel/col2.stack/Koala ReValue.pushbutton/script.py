@@ -294,6 +294,89 @@ def _int_to_alpha(num):
     return ''.join(chars)
 
 
+SIGNED_NUMERIC_REGEX = re.compile(r'^-?\d+$')
+SIGNED_SUFFIX_NUM_REGEX = re.compile(r'^(.*?)(-?\d+)$')
+PROGRESSION_SOURCE_REGEX = re.compile(r'^(val[1-9]\d*|param[1-5])$', re.IGNORECASE)
+
+
+def _increment_value(value, increment):
+    """Advance a numeric, alphabetic, or prefix-plus-number value."""
+    original = '' if value is None else str(value)
+    text = original.strip()
+    if not text:
+        return original, 'source value is blank'
+
+    if SIGNED_NUMERIC_REGEX.match(text):
+        number = int(text) + increment
+        sign = '-' if number < 0 else ''
+        return '{}{}'.format(sign, str(abs(number)).zfill(len(text.lstrip('-')))), None
+
+    if ALPHA_REGEX.match(text):
+        number = _alpha_to_int(text) + increment
+        if number < 1:
+            return original, 'alphabetic value would move below A'
+        alpha = _int_to_alpha(number)
+        if text.islower():
+            alpha = alpha.lower()
+        return alpha, None
+
+    match = SIGNED_SUFFIX_NUM_REGEX.match(text)
+    if match and match.group(1):
+        prefix = match.group(1)
+        suffix = match.group(2)
+        number = int(suffix) + increment
+        sign = '-' if number < 0 else ''
+        return '{}{}{}'.format(
+            prefix, sign, str(abs(number)).zfill(len(suffix.lstrip('-')))), None
+
+    return original, 'source value is not numeric, alphabetic, or prefix-plus-number'
+
+
+def _parse_progression_expression(expression):
+    """Parse inc/seq expressions that reference one valN or paramN value."""
+    parts = expression.split(':')
+    if len(parts) != 3:
+        return None
+
+    operation = parts[0].strip().lower()
+    source_ref = parts[1].strip().lower()
+    if operation not in ['inc', 'seq']:
+        return None
+    if not PROGRESSION_SOURCE_REGEX.match(source_ref):
+        return None
+
+    try:
+        increment = int(parts[2].strip())
+    except Exception:
+        return None
+
+    return operation, source_ref, increment
+
+
+def _resolve_progression_source(source_ref, tokens, param_dict):
+    """Get one token or selected parameter value for an inc/seq operation."""
+    if source_ref.startswith('val'):
+        try:
+            token_index = int(source_ref[3:]) - 1
+            if token_index >= 0 and token_index < len(tokens):
+                return tokens[token_index]
+        except Exception:
+            pass
+        return ''
+
+    return param_dict.get(source_ref, '')
+
+
+def _sequence_source_refs(pattern):
+    """Return distinct source references used by sequence expressions."""
+    source_refs = []
+    for match in VAL_EXPR_REGEX.finditer(pattern or ''):
+        parsed = _parse_progression_expression(match.group(1).strip())
+        if parsed and parsed[0] == 'seq' and parsed[1] not in source_refs:
+            source_refs.append(parsed[1])
+    return source_refs
+
+
 def build_counter_generator(start_text, increment_text):
     """Build counter generator supporting numeric, alpha, and prefix+numeric."""
     start_text = '' if start_text is None else str(start_text).strip()
@@ -352,7 +435,8 @@ def build_counter_generator(start_text, increment_text):
     return None, 'Unsupported start format. Use numeric, alphabetic, or prefix+numeric (e.g. RM01).'
 
 
-def apply_pattern(input_text, pattern, param_dict, tokenizer_func=None):
+def apply_pattern(input_text, pattern, param_dict, tokenizer_func=None,
+                  sequence_seeds=None, row_index=0, warnings=None):
     """Apply pattern to input_text using tokenization and parameter substitution.
     
     First applies tokenization for {valN}, then parameter substitution for {paramN}.
@@ -361,9 +445,35 @@ def apply_pattern(input_text, pattern, param_dict, tokenizer_func=None):
         tokenizer_func = tokenize
     
     tokens = tokenizer_func(input_text)
+    sequence_seeds = sequence_seeds or {}
+    if warnings is None:
+        warnings = []
     
     def replace_match(m):
         inner = m.group(1).strip()
+
+        progression = _parse_progression_expression(inner)
+        if progression:
+            operation, source_ref, increment = progression
+            source_value = _resolve_progression_source(
+                source_ref, tokens, param_dict)
+
+            if operation == 'inc':
+                result, error = _increment_value(source_value, increment)
+            else:
+                seed_value = sequence_seeds.get(source_ref, '')
+                if not seed_value:
+                    error = 'sequence seed is blank'
+                    result = source_value
+                else:
+                    result, error = _increment_value(
+                        seed_value, row_index * increment)
+                    if error:
+                        result = source_value
+
+            if error:
+                warnings.append('{}: {}'.format(inner, error))
+            return result
 
         if inner.lower() == 'original':
             return param_dict.get('original', '')
@@ -726,7 +836,7 @@ class PreviewItem(object):
         self.final = False
         self.tooltip = ''
     
-    def format_value(self, pattern, param_values, tokenizer_func, counter_value='', original_value='', find_text='', replace_text=''):
+    def format_value(self, pattern, param_values, tokenizer_func, counter_value='', original_value='', find_text='', replace_text='', sequence_seeds=None, row_index=0):
         """Format new name using tokenization and parameter substitution"""
         if self.final:
             return
@@ -752,13 +862,19 @@ class PreviewItem(object):
             param_dict['count'] = '' if counter_value is None else str(counter_value)
             
             # Use the tokenization + parameter substitution pattern application
-            new_name = apply_pattern(self.CurrentName, pattern, param_dict, tokenizer_func)
+            warnings = []
+            new_name = apply_pattern(
+                self.CurrentName, pattern, param_dict, tokenizer_func,
+                sequence_seeds, row_index, warnings)
 
             if find_text:
                 new_name = new_name.replace(find_text, replace_text)
 
             self.NewName = new_name
-            self.tooltip = 'OK'
+            if warnings:
+                self.tooltip = 'Warning: {}'.format('; '.join(warnings))
+            else:
+                self.tooltip = 'OK'
             
         except Exception as ex:
             self.NewName = ''
@@ -1157,11 +1273,27 @@ class ReValueDialog(object):
             self.update_tokenization_display()
             return
         
-        for idx, item in enumerate(self.preview_items):
+        row_contexts = []
+        for item in self.preview_items:
             # CurrentName column always reflects the selected tokenization source.
             original_source = self.get_original_source_text(item.Element)
             item.CurrentName = original_source
             param_values = self.get_selected_param_values(item.Element)
+            row_contexts.append((original_source, param_values))
+
+        sequence_seeds = {}
+        if row_contexts:
+            first_source, first_values = row_contexts[0]
+            first_param_dict = {}
+            for param_index, value in enumerate(first_values, 1):
+                first_param_dict['param{}'.format(param_index)] = value if value else ''
+            first_tokens = tokenizer_func(first_source)
+            for source_ref in _sequence_source_refs(pattern):
+                sequence_seeds[source_ref] = _resolve_progression_source(
+                    source_ref, first_tokens, first_param_dict)
+
+        for idx, item in enumerate(self.preview_items):
+            original_source, param_values = row_contexts[idx]
             counter_value = counter_gen(idx) if counter_gen else ''
             find_text = self.txt_find.Text if self.txt_find else ''
             replace_text = self.txt_replace.Text if self.txt_replace else ''
@@ -1173,6 +1305,8 @@ class ReValueDialog(object):
                 original_source,
                 find_text,
                 replace_text,
+                sequence_seeds,
+                idx,
             )
         
         self.preview_grid.Items.Refresh()

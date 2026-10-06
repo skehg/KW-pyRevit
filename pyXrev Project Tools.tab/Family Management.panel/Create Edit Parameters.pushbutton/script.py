@@ -3470,13 +3470,23 @@ def _group_add_parameter_candidates(target_group):
     prefer_forge = (major is not None and major >= 2023)
 
     if prefer_forge:
-        primary = [
-            target_group,
-            _coerce_group_to_group_typeid(target_group),
-            _coerce_group_for_add_parameter(target_group),
-            _default_group_type_general(),
-            _coerce_group_to_group_typeid(_default_group_type_general()),
-        ]
+        # Revit represents the built-in Other group with an empty ForgeTypeId.
+        # The named autodesk.parameter.group:other ID is not accepted by
+        # FamilyManager.AddParameter in Revit 2023/2024.
+        if _is_other_group_value(target_group):
+            try:
+                from Autodesk.Revit.DB import ForgeTypeId
+                primary = [ForgeTypeId()]
+            except Exception:
+                primary = [target_group]
+        else:
+            primary = [
+                target_group,
+                _coerce_group_to_group_typeid(target_group),
+                _coerce_group_for_add_parameter(target_group),
+                _default_group_type_general(),
+                _coerce_group_to_group_typeid(_default_group_type_general()),
+            ]
     else:
         primary = [
             _coerce_group_for_add_parameter(target_group),

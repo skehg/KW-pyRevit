@@ -49,6 +49,16 @@ You can also use literal delimiters such as `/` or `.`.
 - `{param1}` through `{param5}` map to the 5 parameter dropdowns.
 - You can use parameter placeholders only (no token placeholders required).
 
+## Increment and Sequence Syntax
+
+- `{inc:val3:1}` increments token 3 by 1 for each row using that row's own value.
+- `{inc:param1:-1}` decrements parameter slot 1 by 1 for each row.
+- `{seq:val3:1}` starts with token 3 from the first displayed row, then advances by 1 for each following row.
+- The step is a signed integer; zero is allowed. `{seq:val3:-1}` counts backward from the first displayed row's value.
+- Numeric values keep their digit width (`009` plus 1 becomes `010`); alphabetic values roll over (`Z` plus 1 becomes `AA`); prefixed values keep their prefix (`RM09` plus 1 becomes `RM10`). Negative numeric/prefixed values keep their width (`RM01` minus 2 becomes `RM-01`).
+- Alphabetic values cannot decrement below `A`. Blank or unsupported values remain unchanged in the pattern output and show a preview warning.
+- Increment/sequence operands accept a single `{valN}` or `{param1}` through `{param5}`, not token ranges. `{count}` and `{param6}` retain their existing counter settings and nonnegative increment behavior.
+
 ## Examples
 
 ### Example A - Build combined value and push into selected Original Parameter
