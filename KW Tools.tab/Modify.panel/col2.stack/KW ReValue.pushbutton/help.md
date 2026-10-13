@@ -24,7 +24,7 @@ Koala ReValue renames element types or instances by combining source tokens and 
 - `{inc:val3:1}` : increment token 3 independently for each row.
 - `{inc:param1:-1}` : decrement selected parameter 1 independently for each row.
 - `{seq:val3:1}` : start with token 3 from the first preview row and increment by row position.
-- `{original}` : full un-tokenized source string.
+- `{orig}` : full un-tokenized source string.
 
 ## Notes
 

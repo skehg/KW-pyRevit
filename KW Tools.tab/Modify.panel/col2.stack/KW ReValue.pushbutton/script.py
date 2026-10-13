@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-""""Koala ReValue"
+""""KW ReValue"
 Re-value types/instances using advanced tokenization and pattern mapping.
 Decompose names into tokens, apply parameter re-valuation, reconstruct with flexible syntax.
 """
 
-__title__ = 'Koala\nReValue'
-__author__ = 'Xrev'
+__title__ = 'KW\nReValue'
+__author__ = 'Kent Watson'
 
 import clr
 import os
@@ -27,7 +27,7 @@ uidoc = __revit__.ActiveUIDocument
 
 SCRIPT_DIR = os.path.dirname(__file__)
 
-_ENV_PREFIX = 'KoalaReValue'
+_ENV_PREFIX = 'KWReValue'
 _SESSION_SETTING_DEFAULTS = {
     'mode': 'type',
     'delimiters': r'-_/,\|',
@@ -475,8 +475,8 @@ def apply_pattern(input_text, pattern, param_dict, tokenizer_func=None,
                 warnings.append('{}: {}'.format(inner, error))
             return result
 
-        if inner.lower() == 'original':
-            return param_dict.get('original', '')
+        if inner.lower() == 'orig':
+            return param_dict.get('orig', '')
 
         if inner.lower() == 'count':
             return param_dict.get('count', '')
@@ -855,7 +855,7 @@ class PreviewItem(object):
             for i, val in enumerate(param_values, 1):
                 param_dict['param{}'.format(i)] = val if val else ''
 
-            param_dict['original'] = '' if original_value is None else str(original_value)
+            param_dict['orig'] = '' if original_value is None else str(original_value)
 
             # Counter aliases: {param6} and {count}
             param_dict['param6'] = '' if counter_value is None else str(counter_value)
@@ -1411,7 +1411,7 @@ class ReValueDialog(object):
         """Lazy-load help viewer only when Help is clicked."""
         try:
             from help_viewer import show_help
-            show_help(SCRIPT_DIR, "Koala ReValue")
+            show_help(SCRIPT_DIR, "KW ReValue")
         except Exception as ex:
             forms.alert("Could not open Help window: {}".format(str(ex)))
     
