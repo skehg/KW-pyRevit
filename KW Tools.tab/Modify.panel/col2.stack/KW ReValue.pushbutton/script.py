@@ -10,20 +10,31 @@ __author__ = 'Kent Watson'
 import clr
 import os
 import re
+from decimal import Decimal, InvalidOperation
 clr.AddReference('PresentationCore')
 clr.AddReference('PresentationFramework')
 clr.AddReference('WindowsBase')
 clr.AddReference('System.Xaml')
 
-from System.Windows import Window
+from System.Windows import Window, GridLength, GridUnitType
+from System import Predicate
+from System.Windows.Controls import ComboBoxItem, DataGridEditingUnit
+from System.Windows.Data import CollectionViewSource
 from System.Windows.Markup import XamlReader
 from System.Collections.ObjectModel import ObservableCollection
+from System.Globalization import CultureInfo
 from Autodesk.Revit.DB import *
 from Autodesk.Revit.UI.Selection import ObjectType
+from Autodesk.Revit.Exceptions import OperationCanceledException
 from pyrevit import revit, forms, script as _pyscript
+from pyrevit.compat import get_elementid_value_func
+from filter_expression import (
+    count_rules, evaluate_expression, serialize_expression, validate_expression,
+)
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
+element_id_value = get_elementid_value_func()
 
 SCRIPT_DIR = os.path.dirname(__file__)
 
@@ -42,6 +53,8 @@ _SESSION_SETTING_DEFAULTS = {
     'counter_increment': '1',
     'find_text': '',
     'replace_text': '',
+    'match_whole_word': 'False',
+    'match_case': 'True',
 }
 
 
@@ -510,6 +523,33 @@ def apply_pattern(input_text, pattern, param_dict, tokenizer_func=None,
 # HELPER FUNCTIONS
 # ============================================================================
 
+def get_default_source_label(elements, is_instance_mode):
+    """Describe the system name source without treating it as a parameter."""
+    if not is_instance_mode:
+        return '<Default: Type Name>'
+
+    source_names = set()
+    for element in elements:
+        if isinstance(element, ViewSheet):
+            source_names.add('Sheet Name')
+        elif isinstance(element, View):
+            source_names.add('View Name')
+        elif isinstance(element, ElementType):
+            source_names.add('Type Name')
+        else:
+            element_type = _get_element_type(element)
+            type_name = _safe_type_name(element_type) if element_type is not None else ''
+            if type_name and _safe_element_name(element) == type_name:
+                source_names.add('Type Name')
+            else:
+                source_names.add('Name')
+    if len(source_names) == 1:
+        return '<Default: {}>'.format(next(iter(source_names)))
+    if source_names:
+        return '<Default: Name (varies by element)>'
+    return '<Default: Name>'
+
+
 def _safe_type_name(elem_type):
     """Best-effort type name getter across Revit API edge cases."""
     if elem_type is None:
@@ -733,15 +773,19 @@ def _elementid_param_to_text(param):
         val = param.AsValueString()
         if val:
             return str(val)
-    except Exception:
-        pass
+    except Exception as ex:
+        print("Error reading reference parameter display value: {}".format(ex))
 
-    try:
-        elem_id = param.AsElementId()
-        if elem_id and elem_id.IntegerValue >= 0:
-            return str(elem_id.IntegerValue)
-    except Exception:
-        pass
+    elem_id = param.AsElementId()
+    if elem_id is not None:
+        id_value = element_id_value(elem_id)
+        if id_value >= 0:
+            referenced_element = doc.GetElement(elem_id)
+            if referenced_element is not None:
+                name = _safe_element_name(referenced_element)
+                if name:
+                    return name
+            return str(id_value)
 
     return ''
 
@@ -776,10 +820,9 @@ def collect_all_parameters(elements, is_instance_mode):
                         param_name = param.Definition.Name
                         param_storage = param.StorageType
                         
-                        is_scope_box_param = (param_name or '').strip().lower() == 'scope box'
                         include_param = (
-                            param_storage in [StorageType.String, StorageType.Double, StorageType.Integer]
-                            or (param_storage == StorageType.ElementId and is_scope_box_param)
+                            param_storage in [StorageType.String, StorageType.Double,
+                                              StorageType.Integer, StorageType.ElementId]
                         )
 
                         if include_param:
@@ -827,6 +870,117 @@ def load_xaml_window():
 # ============================================================================
 # Preview Item Class
 # ============================================================================
+FILTER_CONDITIONS = (
+    'Equals', 'Does not equal', 'Contains', 'Starts with', 'Ends with',
+    'Is blank', 'Is not blank', 'Greater than', 'Less than',
+    'Greater than or equal to', 'Less than or equal to',
+)
+NUMERIC_FILTER_CONDITIONS = FILTER_CONDITIONS[7:]
+
+
+def parse_filter_number(text, decimal_separator='.', group_separator=',',
+                        allow_unit=False):
+    """Parse a single displayed number, never concatenate compound measurements."""
+    text = text.strip()
+    separators = re.escape(decimal_separator + group_separator)
+    match = re.match(r'^([+-]?(?:\d[\d' + separators +
+                     r']*|[' + re.escape(decimal_separator) +
+                     r']\d+)(?:[eE][+-]?\d+)?)\s*(.*?)$', text, re.UNICODE)
+    if not match:
+        raise ValueError('Enter a numeric value in the parameter display units.')
+    number, suffix = match.groups()
+    number = number.strip()
+    if suffix and (not allow_unit or re.search(r'[\d/\'"+-]', suffix)):
+        raise ValueError('Use a single decimal number, not compound or fractional units.')
+    if group_separator and group_separator != decimal_separator:
+        mantissa = re.split('[eE]', number)[0]
+        whole = mantissa.split(decimal_separator)[0].lstrip('+-')
+        if group_separator in whole:
+            groups = whole.split(group_separator)
+            if not (1 <= len(groups[0]) <= 3 and
+                    all(len(group) == 3 and group.isdigit() for group in groups[1:])):
+                raise ValueError('Use the current regional decimal and thousands separators.')
+        if decimal_separator in mantissa and group_separator in mantissa.split(decimal_separator, 1)[1]:
+            raise ValueError('Use the current regional decimal and thousands separators.')
+        number = number.replace(group_separator, '')
+    number = number.replace(decimal_separator, '.')
+    try:
+        value = Decimal(number)
+    except InvalidOperation:
+        raise ValueError('Enter a valid numeric value.')
+    if not value.is_finite():
+        raise ValueError('Enter a finite numeric value.')
+    return value
+
+
+def matches_parameter_filter(value, condition, expected, decimal_separator='.',
+                             group_separator=','):
+    if condition in NUMERIC_FILTER_CONDITIONS:
+        actual = parse_filter_number(value, decimal_separator, group_separator, True)
+        target = parse_filter_number(expected, decimal_separator, group_separator)
+        if condition == 'Greater than':
+            return actual > target
+        if condition == 'Less than':
+            return actual < target
+        if condition == 'Greater than or equal to':
+            return actual >= target
+        return actual <= target
+    actual, target = value.lower(), expected.lower()
+    if condition == 'Is blank':
+        return not value.strip()
+    if condition == 'Is not blank':
+        return bool(value.strip())
+    if condition == 'Equals':
+        return actual == target
+    if condition == 'Does not equal':
+        return actual != target
+    if condition == 'Contains':
+        return target in actual
+    if condition == 'Starts with':
+        return actual.startswith(target)
+    if condition == 'Ends with':
+        return actual.endswith(target)
+    raise ValueError('Unknown parameter filter condition: {}'.format(condition))
+
+
+def compare_filter_rule(value, node, decimal_separator='.', group_separator=','):
+    if not node['numeric']:
+        return matches_parameter_filter(value, node['condition'], node['value'])
+    actual = parse_filter_number(value, decimal_separator, group_separator, True)
+    expected = Decimal(node['value'])
+    condition = node['condition']
+    if condition == 'Equals':
+        return actual == expected
+    if condition == 'Does not equal':
+        return actual != expected
+    if condition == 'Greater than':
+        return actual > expected
+    if condition == 'Less than':
+        return actual < expected
+    if condition == 'Greater than or equal to':
+        return actual >= expected
+    if condition == 'Less than or equal to':
+        return actual <= expected
+    raise ValueError('Unknown numeric condition: {}'.format(condition))
+
+
+def replace_final_value(value, find_text, replace_text, match_whole_word=False,
+                        match_case=True):
+    """Replace literal text, optionally restricted by word boundaries and case."""
+    if not find_text:
+        return value
+    if match_case and not match_whole_word:
+        return value.replace(find_text, replace_text)
+
+    expression = re.escape(find_text)
+    if match_whole_word:
+        expression = r'(?<!\w)' + expression + r'(?!\w)'
+    flags = re.UNICODE
+    if not match_case:
+        flags |= re.IGNORECASE
+    return re.sub(expression, lambda match: replace_text, value, flags=flags)
+
+
 class PreviewItem(object):
     """Represents a single element re-value preview"""
     def __init__(self, element, current_name):
@@ -835,8 +989,13 @@ class PreviewItem(object):
         self.NewName = current_name
         self.final = False
         self.tooltip = ''
+        self.FilterMatch = True
+
+    @property
+    def HasChanges(self):
+        return self.NewName != self.CurrentName
     
-    def format_value(self, pattern, param_values, tokenizer_func, counter_value='', original_value='', find_text='', replace_text='', sequence_seeds=None, row_index=0):
+    def format_value(self, pattern, param_values, tokenizer_func, counter_value='', original_value='', find_text='', replace_text='', sequence_seeds=None, row_index=0, match_whole_word=False, match_case=True):
         """Format new name using tokenization and parameter substitution"""
         if self.final:
             return
@@ -868,7 +1027,8 @@ class PreviewItem(object):
                 sequence_seeds, row_index, warnings)
 
             if find_text:
-                new_name = new_name.replace(find_text, replace_text)
+                new_name = replace_final_value(
+                    new_name, find_text, replace_text, match_whole_word, match_case)
 
             self.NewName = new_name
             if warnings:
@@ -928,15 +1088,31 @@ class ReValueDialog(object):
         # Get controls - final value find/replace
         self.txt_find = self.window.FindName('txt_find')
         self.txt_replace = self.window.FindName('txt_replace')
+        self.chk_match_whole_word = self.window.FindName('chk_match_whole_word')
+        self.chk_match_case = self.window.FindName('chk_match_case')
         
         # Get controls - tokenization display
         self.txt_tokenization = self.window.FindName('txt_tokenization')
         
         # Get controls - grid and buttons
         self.preview_grid = self.window.FindName('preview_grid')
+        self.txt_filter_current = self.window.FindName('txt_filter_current')
+        self.txt_filter_new = self.window.FindName('txt_filter_new')
         self.btn_help = self.window.FindName('btn_help')
         self.btn_apply = self.window.FindName('btn_apply')
         self.btn_cancel = self.window.FindName('btn_cancel')
+        self.more_settings = self.window.FindName('more_settings')
+        self.settings_row = self.window.FindName('settings_row')
+        self.preview_row = self.window.FindName('preview_row')
+        self.btn_edit_filters = self.window.FindName('btn_edit_filters')
+        self.btn_clear_filters = self.window.FindName('btn_clear_filters')
+        self.txt_filter_summary = self.window.FindName('txt_filter_summary')
+        self.txt_filter_status = self.window.FindName('txt_filter_status')
+        self.parameter_filter = None
+        self._parameter_filter_error = ''
+        number_format = CultureInfo.CurrentCulture.NumberFormat
+        self._decimal_separator = number_format.NumberDecimalSeparator
+        self._group_separator = number_format.NumberGroupSeparator
         
         # Wire up events
         if self.radio_type:
@@ -959,9 +1135,18 @@ class ReValueDialog(object):
             self.txt_find.TextChanged += self.OnSettingsChanged
         if self.txt_replace:
             self.txt_replace.TextChanged += self.OnSettingsChanged
+        for checkbox in (self.chk_match_whole_word, self.chk_match_case):
+            checkbox.Checked += self.OnSettingsChanged
+            checkbox.Unchecked += self.OnSettingsChanged
         
         self.txt_pattern.TextChanged += self.OnSettingsChanged
         self.preview_grid.SelectedCellsChanged += self.OnGridSelectionChanged
+        self.txt_filter_current.TextChanged += self.OnPreviewFilterChanged
+        self.txt_filter_new.TextChanged += self.OnPreviewFilterChanged
+        self.more_settings.Expanded += self.OnMoreSettingsChanged
+        self.more_settings.Collapsed += self.OnMoreSettingsChanged
+        self.btn_edit_filters.Click += self.OnEditFilters
+        self.btn_clear_filters.Click += self.OnClearFilters
 
         if self.btn_help:
             self.btn_help.Click += self.OnHelp
@@ -998,22 +1183,14 @@ class ReValueDialog(object):
             self.txt_find.Text = session_settings.get('find_text', '') or ''
         if self.txt_replace:
             self.txt_replace.Text = session_settings.get('replace_text', '') or ''
+        self.chk_match_whole_word.IsChecked = session_settings['match_whole_word'].lower() == 'true'
+        self.chk_match_case.IsChecked = session_settings['match_case'].lower() == 'true'
         
         # Collect all parameters
         self.available_params, self.param_values_map = collect_all_parameters(
             self.elements, self.is_instance_mode)
         
-        # Populate original parameter combo box
-        if self.combo_orig_param:
-            self.combo_orig_param.Items.Add('')
-            for param_name in self.available_params:
-                self.combo_orig_param.Items.Add(param_name)
-
-            prev_selection = session_settings.get('orig_param', '')
-            if prev_selection and prev_selection in self.available_params:
-                self.combo_orig_param.SelectedItem = prev_selection
-            else:
-                self.combo_orig_param.SelectedIndex = 0
+        self.populate_source_parameters(session_settings.get('orig_param', ''))
         
         # Populate parameter combo boxes (5 slots)
         for i, combo in enumerate(self.param_combos):
@@ -1064,6 +1241,8 @@ class ReValueDialog(object):
         
         # Set grid data source
         self.preview_grid.ItemsSource = self.preview_items
+        self.preview_view = CollectionViewSource.GetDefaultView(self.preview_items)
+        self.preview_view.Filter = Predicate[object](self.matches_preview_filters)
         
         # Set pattern
         self.txt_pattern.Text = session_settings.get('pattern', '{val1}') or '{val1}'
@@ -1078,6 +1257,24 @@ class ReValueDialog(object):
 
         # Update tokenization display for first item
         self.update_tokenization_display()
+
+    def populate_source_parameters(self, previous_selection):
+        """Keep the system default distinct from real, possibly bracketed names."""
+        if not self.combo_orig_param:
+            return
+        self.combo_orig_param.Items.Clear()
+        self.default_source_item = ComboBoxItem()
+        self.default_source_item.Content = get_default_source_label(
+            self.elements, self.is_instance_mode)
+        self.default_source_item.ToolTip = (
+            'System default: use each element/type name, not a selected parameter.')
+        self.combo_orig_param.Items.Add(self.default_source_item)
+        for param_name in self.available_params:
+            self.combo_orig_param.Items.Add(param_name)
+        if previous_selection and previous_selection in self.available_params:
+            self.combo_orig_param.SelectedItem = previous_selection
+        else:
+            self.combo_orig_param.SelectedIndex = 0
 
     def _selected_combo_text(self, combo):
         """Get selected ComboBox item text safely."""
@@ -1097,7 +1294,7 @@ class ReValueDialog(object):
         mode = 'instance' if self.is_instance_mode else 'type'
         save_session_setting('mode', mode)
         save_session_setting('delimiters', self.get_delimiters())
-        save_session_setting('orig_param', self._selected_combo_text(self.combo_orig_param))
+        save_session_setting('orig_param', self.get_selected_original_param_name())
 
         for i, combo in enumerate(self.param_combos):
             save_session_setting('param{}'.format(i + 1), self._selected_combo_text(combo))
@@ -1114,6 +1311,8 @@ class ReValueDialog(object):
         replace_text = self.txt_replace.Text if self.txt_replace else ''
         save_session_setting('find_text', find_text)
         save_session_setting('replace_text', replace_text)
+        save_session_setting('match_whole_word', bool(self.chk_match_whole_word.IsChecked))
+        save_session_setting('match_case', bool(self.chk_match_case.IsChecked))
     
     def get_delimiters(self):
         """Get current delimiters from UI"""
@@ -1209,12 +1408,9 @@ class ReValueDialog(object):
     
     def get_original_source_text(self, element):
         """Get the text to use as source for tokenization"""
-        if self.combo_orig_param:
-            selected = self.combo_orig_param.SelectedItem
-            if selected:
-                param_name = str(selected).strip()
-                if param_name:
-                    return self.get_param_value(element, param_name)
+        param_name = self.get_selected_original_param_name()
+        if param_name:
+            return self.get_param_value(element, param_name)
         
         # Fall back to element/type name
         if self.is_instance_mode:
@@ -1228,7 +1424,7 @@ class ReValueDialog(object):
             return ''
 
         selected = self.combo_orig_param.SelectedItem
-        if not selected:
+        if selected is self.default_source_item or not selected:
             return ''
 
         return str(selected).strip()
@@ -1269,7 +1465,7 @@ class ReValueDialog(object):
                 item.NewName = ''
                 item.tooltip = 'Counter Error: {}'.format(counter_error)
 
-            self.preview_grid.Items.Refresh()
+            self.refresh_preview_filters()
             self.update_tokenization_display()
             return
         
@@ -1307,9 +1503,11 @@ class ReValueDialog(object):
                 replace_text,
                 sequence_seeds,
                 idx,
+                match_whole_word=bool(self.chk_match_whole_word.IsChecked),
+                match_case=bool(self.chk_match_case.IsChecked),
             )
         
-        self.preview_grid.Items.Refresh()
+        self.refresh_preview_filters()
         self.update_tokenization_display()
     
     def OnModeChanged(self, sender, args):
@@ -1331,18 +1529,7 @@ class ReValueDialog(object):
 
         session_settings = load_session_settings()
 
-        # Clear and rebuild original parameter combo
-        if self.combo_orig_param:
-            self.combo_orig_param.Items.Clear()
-            self.combo_orig_param.Items.Add('')
-            for param_name in self.available_params:
-                self.combo_orig_param.Items.Add(param_name)
-
-            prev_orig = session_settings.get('orig_param', '')
-            if prev_orig and prev_orig in self.available_params:
-                self.combo_orig_param.SelectedItem = prev_orig
-            else:
-                self.combo_orig_param.SelectedIndex = 0
+        self.populate_source_parameters(session_settings.get('orig_param', ''))
         
         # Clear and rebuild parameter combos
         for i, combo in enumerate(self.param_combos):
@@ -1393,7 +1580,7 @@ class ReValueDialog(object):
 
         self._suspend_events = False
         self.persist_settings()
-        self.preview_grid.Items.Refresh()
+        self.refresh_preview_filters()
         self.update_preview()
     
     def OnSettingsChanged(self, sender, args):
@@ -1407,6 +1594,93 @@ class ReValueDialog(object):
         """Called when grid selection changes"""
         self.update_tokenization_display()
 
+    def matches_preview_filters(self, item):
+        """Match both header filters without changing preview values or counters."""
+        current_filter = self.txt_filter_current.Text.lower()
+        new_filter = self.txt_filter_new.Text.lower()
+        return (item.FilterMatch and current_filter in item.CurrentName.lower()
+                and new_filter in item.NewName.lower())
+
+    def refresh_preview_filters(self):
+        """Cache read-only parameter matches before refreshing the WPF view."""
+        self._parameter_filter_error = ''
+        try:
+            validate_expression(self.parameter_filter, self.available_params)
+        except ValueError as ex:
+            self._parameter_filter_error = str(ex)
+        invalid_values = 0
+        for item in self.preview_items:
+            item.FilterMatch = False
+            if not self._parameter_filter_error:
+                values = {}
+
+                def get_value(parameter):
+                    if parameter not in values:
+                        values[parameter] = self.get_param_value(item.Element, parameter)
+                    return values[parameter]
+
+                matched = evaluate_expression(
+                    self.parameter_filter, get_value,
+                    lambda value, node: compare_filter_rule(
+                        value, node, self._decimal_separator, self._group_separator))
+                item.FilterMatch = matched is True
+                if matched is None:
+                    invalid_values += 1
+        self.preview_view.Refresh()
+        rules = count_rules(self.parameter_filter)
+        self.txt_filter_summary.Text = (
+            '{} rule(s) - Custom grouping'.format(rules) if rules else 'No parameter filters')
+        self.txt_filter_summary.ToolTip = serialize_expression(self.parameter_filter)
+        self.btn_clear_filters.IsEnabled = self.parameter_filter is not None
+        self.btn_apply.IsEnabled = not bool(self._parameter_filter_error)
+        status = '{} of {} rows displayed.'.format(
+            self.preview_grid.Items.Count, len(self.preview_items))
+        if self._parameter_filter_error:
+            status += ' ' + self._parameter_filter_error
+        elif invalid_values:
+            status += (' {} row(s) excluded: blank/non-numeric or unsupported display '
+                       'format (use decimal project units).').format(invalid_values)
+        self.txt_filter_status.Text = status
+
+    def commit_preview_edits(self):
+        if not self.preview_grid.CommitEdit(DataGridEditingUnit.Cell, True):
+            forms.alert("Finish editing the preview cell before filtering.")
+            return False
+        if not self.preview_grid.CommitEdit(DataGridEditingUnit.Row, True):
+            forms.alert("Finish editing the preview row before filtering.")
+            return False
+        return True
+
+    def OnEditFilters(self, sender, args):
+        if not self.commit_preview_edits():
+            return
+        from filter_editor import FilterEditor
+        editor = FilterEditor(self.window, self.available_params, self.parameter_filter)
+        accepted, node = editor.show()
+        if accepted:
+            self.parameter_filter = node
+            self.refresh_preview_filters()
+
+    def OnClearFilters(self, sender, args):
+        if not self.commit_preview_edits():
+            return
+        self.parameter_filter = None
+        self.refresh_preview_filters()
+
+    def OnPreviewFilterChanged(self, sender, args):
+        if self._suspend_events:
+            return
+        if not self.commit_preview_edits():
+            return
+        self.refresh_preview_filters()
+
+    def OnMoreSettingsChanged(self, sender, args):
+        """Reclaim space when collapsed, including after dragging the divider."""
+        self.settings_row.Height = (
+            GridLength(2, GridUnitType.Star)
+            if self.more_settings.IsExpanded else GridLength.Auto)
+        self.preview_row.Height = GridLength(3, GridUnitType.Star)
+
     def OnHelp(self, sender, args):
         """Lazy-load help viewer only when Help is clicked."""
         try:
@@ -1417,6 +1691,9 @@ class ReValueDialog(object):
     
     def OnApply(self, sender, args):
         """Apply button clicked"""
+        if self._parameter_filter_error:
+            forms.alert(self._parameter_filter_error)
+            return
         self.result = True
         self.window.DialogResult = True
         self.window.Close()
@@ -1433,9 +1710,9 @@ class ReValueDialog(object):
         return self.result
     
     def get_revalue_map(self):
-        """Get dictionary mapping element to new name"""
+        """Get changes only for rows included in the filtered preview."""
         revalue_map = {}
-        for item in self.preview_items:
+        for item in self.preview_grid.Items:
             if item.NewName and item.NewName != item.CurrentName:
                 revalue_map[item.Element] = item.NewName
         return revalue_map
@@ -1445,32 +1722,34 @@ class ReValueDialog(object):
 # Main Script Logic
 # ============================================================================
 def get_selected_elements():
-    """Get elements from current selection or allow user to pick"""
+    """Preserve preselection; otherwise choose on-screen or category selection."""
     selection = uidoc.Selection.GetElementIds()
     
     elements = []
     
     if selection.Count > 0:
         for elem_id in selection:
-            try:
-                elem = doc.GetElement(elem_id)
-                if elem:
-                    elements.append(elem)
-            except:
-                pass
+            elem = doc.GetElement(elem_id)
+            if elem:
+                elements.append(elem)
     
     if len(elements) == 0:
+        choice = forms.CommandSwitchWindow.show(
+            ['Select on Screen', 'Select Categories', 'Cancel'],
+            message='Choose elements to work with')
+        if not choice or choice == 'Cancel':
+            return None
+        if choice == 'Select Categories':
+            from category_selection import select_by_categories
+            return select_by_categories(doc, doc.ActiveView)
         try:
             refs = uidoc.Selection.PickObjects(ObjectType.Element, "Select elements to re-value")
             for ref in refs:
-                try:
-                    elem = doc.GetElement(ref.ElementId)
-                    if elem and elem not in elements:
-                        elements.append(elem)
-                except:
-                    pass
-        except:
-            return []
+                elem = doc.GetElement(ref.ElementId)
+                if elem and elem not in elements:
+                    elements.append(elem)
+        except OperationCanceledException:
+            return None
     
     return elements
 
@@ -1606,6 +1885,8 @@ def _resolve_target_param_name(selected_source_name):
 # ============================================================================
 if __name__ == '__main__':
     elements = get_selected_elements()
+    if elements is None:
+        _pyscript.exit()
     
     if not elements:
         forms.alert("No elements selected.", exitscript=True)
