@@ -1,11 +1,29 @@
-# Koala ReValue
+# KW ReValue
 
-Koala ReValue renames element types or instances by combining source tokens and parameter values.
+KW ReValue renames element types or instances by combining source tokens and parameter values.
+
+## Pattern syntax
+
+A pattern combines literal text with placeholders. Token expressions read source text split by the configured token delimiters; token positions start at 1.
+
+- Single tokens: `{val1}` (first token), `{end}` (last token), `{end-1}` (second-to-last token).
+- Ranges: `{val1:4}` (tokens 1 through 4), `{val2:end}` (token 2 through last), `{val1:end-1}` (all but the last token), `{end-2:end}` (last 3 tokens), and `{end-3:end-1}` (from the fourth-to-last through the second-to-last token).
+- Relative ranges: `{val3:+2}` (token 3 and the next 2 tokens) or `{end-3:+1}` (the fourth-to-last token and the next token).
+- Add `|delimiter` to any token expression to join its selected tokens with a different delimiter: `{val1:end|space}`, `{val1:4|-}`, `{end-2:end|underscore}`, or `{val2:end|/}`. Without it, selected tokens are joined with `-`.
+- Named delimiters are `space`, `hyphen`, and `underscore`. Literal delimiters such as `-`, `/`, and `.` are also supported. Use `space` rather than a literal space.
+- `{param1}` through `{param5}` substitute the five selected parameters.
+- `{param6}` and `{count}` use the configured counter.
+- `{orig}` inserts the complete, un-tokenized source (good for find/replace).
+- `{inc:val3:1}` increments token 3 independently for each row; `{inc:param1:-1}` decrements parameter slot 1.
+- `{seq:val3:1}` starts with token 3 from the first unfiltered preview row and advances by row position.
+- Increment and sequence expressions accept a single `{valN}` or `{param1}` through `{param5}` source and a signed integer step, not a token range. Zero is allowed; `{seq:val3:-1}` counts backward from the first row's token 3. Numeric values keep their digit width (`009` plus 1 becomes `010`), alphabetic values roll over (`Z` to `AA`), and prefixed numeric values keep their prefix (`RM09` plus 1 becomes `RM10`). Negative numeric and prefixed results preserve their width (`RM01` minus 2 becomes `RM-01`). Alphabetic values cannot decrement below `A`; blank or unsupported values remain unchanged and show a preview warning.
+
+The counter is used only when the pattern contains `{count}` or `{param6}`. Its configured increment must be nonnegative.
 
 ## Workflow
 
 1. Optionally select elements in Revit.
-2. Open Koala ReValue.
+2. Open KW ReValue.
 3. Choose mode:
    - Type mode: works on element types.
    - Instance mode: works directly on selected instances.
@@ -74,22 +92,8 @@ Koala ReValue renames element types or instances by combining source tokens and 
 - Unchanged rows and blank new values are not applied. The Final checkbox still freezes a row's preview value; it does not exclude that row from Apply.
 - Pale yellow highlights differences between Current Value and New Value. The existing green New Value cell highlight still indicates a Final (frozen) row.
 
-## Pattern tokens
-
-- `{val1}`, `{val2}`, ... : token positions from tokenized source text.
-- `{param1}`, `{param2}`, ... `{param5}` : selected parameter values.
-- `{param6}` or `{count}` : generated counter value.
-- `{inc:val3:1}` : increment token 3 independently for each row.
-- `{inc:param1:-1}` : decrement selected parameter 1 independently for each row.
-- `{seq:val3:1}` : start with token 3 from the first preview row and increment by row position.
-- `{orig}` : full un-tokenized source string.
-
 ## Notes
 
-- Counter is only used if pattern contains `{count}` or `{param6}`.
-- `{inc:...}` and `{seq:...}` accept one `{valN}` or `{param1}` through `{param5}` source and a signed integer step. `{seq:...}` uses the first unfiltered preview row as its starting value.
-- Numeric and trailing-number values preserve zero padding; alphabetic values roll over (`Z` to `AA`). Negative results are supported for numeric and prefixed-number values (`RM01` with step `-2` becomes `RM-01`). Alphabetic underflow warns and keeps the source value.
-- Unsupported or blank source values remain unchanged in the output and show a warning in the preview.
 - The default `-` token delimiter still splits negative-looking source names; remove `-` from the delimiter list if a `{valN}` source must retain a leading minus sign.
 - In Instance mode, if a selected parameter is missing on instance, type fallback is attempted.
 - Preview shows final values before commit.
