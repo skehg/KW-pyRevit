@@ -49,6 +49,7 @@ _SESSION_SETTING_DEFAULTS = {
     'param4': '',
     'param5': '',
     'pattern': '{val1}',
+    'final_case': 'None',
     'counter_start': 'A',
     'counter_increment': '1',
     'find_text': '',
@@ -366,6 +367,42 @@ def _parse_progression_expression(expression):
     return operation, source_ref, increment
 
 
+CASE_MODIFIERS = ('upper', 'lower', 'title', 'sentence')
+
+
+def _split_case_modifier(expression):
+    """Split a recognized ~case suffix from a pattern placeholder."""
+    if '~' not in expression:
+        return expression, None
+    core, modifier = expression.rsplit('~', 1)
+    modifier = modifier.strip().lower()
+    if modifier in CASE_MODIFIERS:
+        return core.strip(), modifier
+    return expression, None
+
+
+def apply_case_conversion(value, case_name):
+    """Convert text to the requested case, leaving it unchanged for None."""
+    if value is None:
+        text = ''
+    elif isinstance(value, basestring):
+        text = value
+    else:
+        text = str(value)
+    if not case_name or case_name == 'None':
+        return text
+    case_key = str(case_name).strip().lower()
+    if case_key == 'upper':
+        return text.upper()
+    if case_key == 'lower':
+        return text.lower()
+    if case_key == 'title':
+        return text.title()
+    if case_key == 'sentence':
+        return text[:1].upper() + text[1:].lower()
+    return text
+
+
 def _resolve_progression_source(source_ref, tokens, param_dict):
     """Get one token or selected parameter value for an inc/seq operation."""
     if source_ref.startswith('val'):
@@ -384,7 +421,8 @@ def _sequence_source_refs(pattern):
     """Return distinct source references used by sequence expressions."""
     source_refs = []
     for match in VAL_EXPR_REGEX.finditer(pattern or ''):
-        parsed = _parse_progression_expression(match.group(1).strip())
+        expression, unused_case = _split_case_modifier(match.group(1).strip())
+        parsed = _parse_progression_expression(expression)
         if parsed and parsed[0] == 'seq' and parsed[1] not in source_refs:
             source_refs.append(parsed[1])
     return source_refs
@@ -464,8 +502,9 @@ def apply_pattern(input_text, pattern, param_dict, tokenizer_func=None,
     
     def replace_match(m):
         inner = m.group(1).strip()
+        expression, case_modifier = _split_case_modifier(inner)
 
-        progression = _parse_progression_expression(inner)
+        progression = _parse_progression_expression(expression)
         if progression:
             operation, source_ref, increment = progression
             source_value = _resolve_progression_source(
@@ -486,34 +525,34 @@ def apply_pattern(input_text, pattern, param_dict, tokenizer_func=None,
 
             if error:
                 warnings.append('{}: {}'.format(inner, error))
-            return result
+            return apply_case_conversion(result, case_modifier)
 
-        if inner.lower() == 'orig':
-            return param_dict.get('orig', '')
+        if expression.lower() == 'orig':
+            return apply_case_conversion(param_dict.get('orig', ''), case_modifier)
 
-        if inner.lower() == 'count':
-            return param_dict.get('count', '')
+        if expression.lower() == 'count':
+            return apply_case_conversion(param_dict.get('count', ''), case_modifier)
         
         # Try parameter substitution first ({paramN})
-        if inner.startswith('param'):
+        if expression.lower().startswith('param'):
             try:
-                param_num = int(inner[5:])
+                param_num = int(expression[5:])
                 key = 'param{}'.format(param_num)
                 if key in param_dict:
-                    return param_dict[key]
-                return ''
+                    return apply_case_conversion(param_dict[key], case_modifier)
+                return apply_case_conversion('', case_modifier)
             except ValueError:
                 pass
         
         # Try token extraction ({valN}, {valN:M}, etc)
-        start_idx, end_spec, delim = _parse_val_expression(inner)
+        start_idx, end_spec, delim = _parse_val_expression(expression)
 
         if start_idx is None:
             return m.group(0)
 
         window_tokens = _resolve_window(tokens, start_idx, end_spec)
         joiner = delim if delim is not None else '-'
-        return joiner.join(window_tokens)
+        return apply_case_conversion(joiner.join(window_tokens), case_modifier)
 
     result = VAL_EXPR_REGEX.sub(replace_match, pattern)
     return result
@@ -995,7 +1034,7 @@ class PreviewItem(object):
     def HasChanges(self):
         return self.NewName != self.CurrentName
     
-    def format_value(self, pattern, param_values, tokenizer_func, counter_value='', original_value='', find_text='', replace_text='', sequence_seeds=None, row_index=0, match_whole_word=False, match_case=True):
+    def format_value(self, pattern, param_values, tokenizer_func, counter_value='', original_value='', find_text='', replace_text='', sequence_seeds=None, row_index=0, match_whole_word=False, match_case=True, final_case='None'):
         """Format new name using tokenization and parameter substitution"""
         if self.final:
             return
@@ -1030,6 +1069,7 @@ class PreviewItem(object):
                 new_name = replace_final_value(
                     new_name, find_text, replace_text, match_whole_word, match_case)
 
+            new_name = apply_case_conversion(new_name, final_case)
             self.NewName = new_name
             if warnings:
                 self.tooltip = 'Warning: {}'.format('; '.join(warnings))
@@ -1080,6 +1120,7 @@ class ReValueDialog(object):
         
         # Get controls - pattern
         self.txt_pattern = self.window.FindName('txt_pattern')
+        self.combo_final_case = self.window.FindName('combo_final_case')
 
         # Get controls - optional counter
         self.txt_counter_start = self.window.FindName('txt_counter_start')
@@ -1123,6 +1164,8 @@ class ReValueDialog(object):
             self.txt_delimiters.TextChanged += self.OnSettingsChanged
         if self.combo_orig_param:
             self.combo_orig_param.SelectionChanged += self.OnSettingsChanged
+        if self.combo_final_case:
+            self.combo_final_case.SelectionChanged += self.OnSettingsChanged
         
         for combo in self.param_combos:
             combo.SelectionChanged += self.OnSettingsChanged
@@ -1175,6 +1218,14 @@ class ReValueDialog(object):
             self.txt_delimiters.Text = saved_delims if saved_delims else DEFAULT_DELIMITERS
 
         # Set counter inputs
+        if self.combo_final_case:
+            final_case = session_settings.get('final_case', 'None')
+            case_options = ['None', 'upper', 'lower', 'title', 'sentence']
+            try:
+                self.combo_final_case.SelectedIndex = case_options.index(final_case)
+            except ValueError:
+                self.combo_final_case.SelectedIndex = 0
+
         if self.txt_counter_start:
             self.txt_counter_start.Text = session_settings.get('counter_start', 'A') or 'A'
         if self.txt_counter_increment:
@@ -1287,7 +1338,9 @@ class ReValueDialog(object):
         pattern = self.txt_pattern.Text if self.txt_pattern else ''
         if not pattern:
             return False
-        return re.search(r'\{\s*(count|param6)\s*\}', pattern, re.IGNORECASE) is not None
+        return re.search(
+            r'\{\s*(count|param6)(?:\s*~\s*(?:upper|lower|title|sentence))?\s*\}',
+            pattern, re.IGNORECASE) is not None
 
     def persist_settings(self):
         """Persist current UI settings for this Revit session only."""
@@ -1301,6 +1354,7 @@ class ReValueDialog(object):
 
         pattern = self.txt_pattern.Text if self.txt_pattern else ''
         save_session_setting('pattern', pattern)
+        save_session_setting('final_case', self._selected_final_case())
 
         start_text = self.txt_counter_start.Text if self.txt_counter_start else 'A'
         increment_text = self.txt_counter_increment.Text if self.txt_counter_increment else '1'
@@ -1324,6 +1378,15 @@ class ReValueDialog(object):
         """Get tokenizer function with current delimiters"""
         delimiters = self.get_delimiters()
         return build_tokenizer(delimiters)
+
+    def _selected_final_case(self):
+        """Return the selected final-case option."""
+        if not self.combo_final_case or not self.combo_final_case.SelectedItem:
+            return 'None'
+        selected = self.combo_final_case.SelectedItem
+        if hasattr(selected, 'Content'):
+            selected = selected.Content
+        return str(selected)
     
     def get_param_value(self, element, param_name):
         """Get parameter value as string from element"""
@@ -1505,6 +1568,7 @@ class ReValueDialog(object):
                 idx,
                 match_whole_word=bool(self.chk_match_whole_word.IsChecked),
                 match_case=bool(self.chk_match_case.IsChecked),
+                final_case=self._selected_final_case(),
             )
         
         self.refresh_preview_filters()

@@ -61,8 +61,24 @@
             </StackPanel>
 
             <TextBlock Text="Pattern:" Grid.Row="1" Grid.Column="0" Margin="3,0,10,6"/>
-            <TextBox x:Name="txt_pattern" Grid.Row="1" Grid.Column="1"
-                     Height="28" FontSize="12" FontFamily="Courier New" Margin="0,0,0,6"/>
+            <Grid Grid.Row="1" Grid.Column="1" Margin="0,0,0,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="txt_pattern" Grid.Column="0"
+                         Height="28" FontSize="12" FontFamily="Courier New"/>
+                <TextBlock Text="Final Case:" Grid.Column="1" Margin="12,0,6,0"/>
+                <ComboBox x:Name="combo_final_case" Grid.Column="2" Width="105"
+                          ToolTip="Convert the complete generated value after Find/Replace.">
+                    <ComboBoxItem Content="None"/>
+                    <ComboBoxItem Content="upper"/>
+                    <ComboBoxItem Content="lower"/>
+                    <ComboBoxItem Content="title"/>
+                    <ComboBoxItem Content="sentence"/>
+                </ComboBox>
+            </Grid>
 
             <TextBlock Text="Find/Replace:" Grid.Row="2" Grid.Column="0" Margin="3,0,10,6"/>
             <Grid Grid.Row="2" Grid.Column="1" Margin="0,0,0,6">

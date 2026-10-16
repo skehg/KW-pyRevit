@@ -25,8 +25,13 @@ A pattern combines literal text with placeholders. Token expressions read the so
   - `{val1:4|-}` = tokens 1 through 4 joined with `-`
   - `{end-2:end|underscore}` = last 3 tokens joined with `_`
   - `{val2:end|/}` = token 2 through the last token joined with `/`
+  - `{val1:3|space~upper}` = tokens 1 through 3, space-separated and uppercased
+  - `{val1~lower}` = first token lowercased
+  - `{param1~title}` = parameter 1 in title case
+  - `{orig~sentence}` = source text in sentence case
 
 The default join delimiter is `-`. An optional `|delimiter` can be added to a token expression to override it, including a single-token expression. Named delimiters are `space`, `hyphen`, and `underscore`; literal delimiters such as `-`, `/`, and `.` are also supported. Use `space` rather than a literal space.
+Append `~upper`, `~lower`, `~title`, or `~sentence` to a placeholder to convert its value after token selection and joining. `sentence` uppercases the first character and lowercases the remaining characters.
 
 Other placeholders:
 
@@ -38,6 +43,7 @@ Other placeholders:
 - `{seq:val3:1}` = start with token 3 from the first unfiltered preview row, then advance by 1 per row.
 
 `{inc:...}` and `{seq:...}` accept one `{valN}` or `{param1}` through `{param5}` source and a signed integer step; ranges are not supported. A zero step is allowed. For example, `{seq:val3:-1}` counts backward from the first row's token 3. Numeric values preserve digit width (`009` plus 1 becomes `010`), alphabetic values roll over (`Z` plus 1 becomes `AA`), and prefixed numeric values preserve their prefix (`RM09` plus 1 becomes `RM10`). Negative numeric and prefixed results preserve their width (`RM01` minus 2 becomes `RM-01`). Alphabetic values cannot decrement below `A`. Blank or unsupported values remain unchanged and show a preview warning. The counter uses its configured start and nonnegative increment only when the pattern contains `{count}` or `{param6}`.
+The **Final Case** dropdown applies `None`, `upper`, `lower`, `title`, or `sentence` to the complete generated value after Find/Replace. This is independent of per-placeholder modifiers.
 
 ## Core Concepts
 

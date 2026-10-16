@@ -11,6 +11,7 @@ A pattern combines literal text with placeholders. Token expressions read source
 - Relative ranges: `{val3:+2}` (token 3 and the next 2 tokens) or `{end-3:+1}` (the fourth-to-last token and the next token).
 - Add `|delimiter` to any token expression to join its selected tokens with a different delimiter: `{val1:end|space}`, `{val1:4|-}`, `{end-2:end|underscore}`, or `{val2:end|/}`. Without it, selected tokens are joined with `-`.
 - Named delimiters are `space`, `hyphen`, and `underscore`. Literal delimiters such as `-`, `/`, and `.` are also supported. Use `space` rather than a literal space.
+- Append `~upper`, `~lower`, `~title`, or `~sentence` to a placeholder to convert its value: `{val1:3|space~upper}`, `{val1~lower}`, `{param1~title}`, or `{orig~sentence}`. Token ranges are selected and joined before conversion.
 - `{param1}` through `{param5}` substitute the five selected parameters.
 - `{param6}` and `{count}` use the configured counter.
 - `{orig}` inserts the complete, un-tokenized source (good for find/replace).
@@ -19,6 +20,7 @@ A pattern combines literal text with placeholders. Token expressions read source
 - Increment and sequence expressions accept a single `{valN}` or `{param1}` through `{param5}` source and a signed integer step, not a token range. Zero is allowed; `{seq:val3:-1}` counts backward from the first row's token 3. Numeric values keep their digit width (`009` plus 1 becomes `010`), alphabetic values roll over (`Z` to `AA`), and prefixed numeric values keep their prefix (`RM09` plus 1 becomes `RM10`). Negative numeric and prefixed results preserve their width (`RM01` minus 2 becomes `RM-01`). Alphabetic values cannot decrement below `A`; blank or unsupported values remain unchanged and show a preview warning.
 
 The counter is used only when the pattern contains `{count}` or `{param6}`. Its configured increment must be nonnegative.
+The **Final Case** dropdown converts the complete generated value, including literal text, after Find/Replace. Options are None, upper, lower, title, and sentence. It is separate from per-placeholder modifiers.
 
 ## Workflow
 

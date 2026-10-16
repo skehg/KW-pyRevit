@@ -26,7 +26,8 @@ def load_preview_classes():
                       'OnPreviewFilterChanged', 'OnMoreSettingsChanged',
                       'populate_source_parameters', 'get_original_source_text',
                       'get_selected_original_param_name', 'refresh_preview_filters',
-                      '_selected_combo_text', 'commit_preview_edits',
+                      '_selected_combo_text', '_pattern_uses_counter',
+                      'commit_preview_edits',
                       'OnClearFilters', 'OnEditFilters')
     for node in SCRIPT_TREE.body:
         if isinstance(node, ast.Assign) and any(
@@ -35,7 +36,8 @@ def load_preview_classes():
                 for target in node.targets):
             module.body.append(node)
         elif isinstance(node, ast.FunctionDef) and node.name in (
-                'replace_final_value', 'get_default_source_label',
+                'replace_final_value', 'apply_case_conversion',
+                '_split_case_modifier', 'get_default_source_label',
                 '_resolve_target_param_name', 'parse_filter_number',
                 'matches_parameter_filter', 'compare_filter_rule'):
             module.body.append(node)
@@ -62,6 +64,7 @@ def load_preview_classes():
         '_safe_type_name': lambda element: getattr(element, 'name', ''),
         '_get_element_type': lambda element: getattr(element, 'element_type', None),
         're': re,
+        'basestring': str,
         'Decimal': Decimal,
         'InvalidOperation': InvalidOperation,
         'count_rules': count_rules,
@@ -72,6 +75,41 @@ def load_preview_classes():
     }
     exec(compile(module, '<preview logic>', 'exec'), namespace)
     return namespace['PreviewItem'], namespace['ReValueDialog']
+
+
+def load_pattern_function():
+    """Load the pattern parser without importing Revit or WPF runtimes."""
+    function_names = {
+        '_alpha_to_int', '_int_to_alpha', '_increment_value',
+        '_parse_val_expression', '_resolve_window',
+        '_parse_progression_expression', '_resolve_progression_source',
+        '_split_case_modifier', 'apply_case_conversion', 'apply_pattern',
+    }
+    module = ast.Module(body=[
+        node for node in SCRIPT_TREE.body
+        if isinstance(node, ast.FunctionDef) and node.name in function_names
+    ], type_ignores=[])
+    ast.fix_missing_locations(module)
+    namespace = {
+        're': re,
+        'basestring': str,
+        'VAL_EXPR_REGEX': re.compile(r'\{([^{}]+)\}'),
+        'NUMERIC_REGEX': re.compile(r'^\d+$'),
+        'ALPHA_REGEX': re.compile(r'^[A-Za-z]+$'),
+        'MIXED_SUFFIX_NUM_REGEX': re.compile(r'^(.*?)(\d+)$'),
+        'SIGNED_NUMERIC_REGEX': re.compile(r'^-?\d+$'),
+        'SIGNED_SUFFIX_NUM_REGEX': re.compile(r'^(.*?)(-?\d+)$'),
+        'PROGRESSION_SOURCE_REGEX': re.compile(
+            r'^(val[1-9]\d*|param[1-5])$', re.IGNORECASE),
+        'NAMED_DELIMS': {
+            'space': ' ',
+            'hyphen': '-',
+            'underscore': '_',
+        },
+        'CASE_MODIFIERS': ('upper', 'lower', 'title', 'sentence'),
+    }
+    exec(compile(module, '<pattern logic>', 'exec'), namespace)
+    return namespace
 
 
 class EditingUnit(object):
@@ -389,6 +427,69 @@ class FindReplaceTests(unittest.TestCase):
         item.format_value('{orig}', [], None, find_text='door',
                           replace_text='Entry', match_case=False)
         self.assertEqual('Door', item.NewName)
+
+    def test_preview_applies_final_case_after_find_replace(self):
+        item = PreviewItem('a', 'Door')
+        item.format_value('{orig}', [], None, find_text='Door',
+                          replace_text='Entry', final_case='upper')
+        self.assertEqual('ENTRY', item.NewName)
+
+
+class CaseConversionTests(unittest.TestCase):
+    def test_case_conversion_modes(self):
+        convert_case = load_pattern_function()['apply_case_conversion']
+        cases = [
+            ('upper', 'mixed Case', 'MIXED CASE'),
+            ('lower', 'Mixed CASE', 'mixed case'),
+            ('title', 'mixed CASE name', 'Mixed Case Name'),
+            ('sentence', 'mIXED CASE. NEXT', 'Mixed case. next'),
+            ('None', 'Mixed CASE', 'Mixed CASE'),
+        ]
+        for mode, value, expected in cases:
+            with self.subTest(mode=mode):
+                self.assertEqual(expected, convert_case(value, mode))
+
+    def test_split_case_modifier_preserves_unknown_suffix(self):
+        split_modifier = load_pattern_function()['_split_case_modifier']
+        self.assertEqual(
+            ('val1:3|space', 'upper'),
+            split_modifier('val1:3|space~UPPER'))
+        self.assertEqual(
+            ('val1~unknown', None),
+            split_modifier('val1~unknown'))
+
+    def test_token_parameter_and_sequence_modifiers(self):
+        apply_pattern = load_pattern_function()['apply_pattern']
+        tokenizer = lambda value: value.split('-')
+        params = {
+            'param1': 'mIXED wIDTH',
+            'orig': 'sOURCE TEXT',
+            'count': 'AbC',
+        }
+        self.assertEqual(
+            'ONE TWO THREE',
+            apply_pattern('one-two-THREE-four',
+                          '{val1:3|space~upper}', params, tokenizer))
+        self.assertEqual(
+            'Mixed Width/Source text/abc',
+            apply_pattern('one-two', '{param1~title}/{orig~sentence}/{count~lower}',
+                          params, tokenizer))
+        self.assertEqual(
+            'C',
+            apply_pattern('a-b', '{seq:val1:1~upper}', params, tokenizer,
+                          sequence_seeds={'val1': 'A'}, row_index=2))
+
+    def test_case_modified_counter_placeholder_still_enables_counter(self):
+        dialog = ReValueDialog()
+        dialog.txt_pattern = TextBox()
+        for pattern, expected in [
+                ('{count~upper}', True),
+                ('{param6~sentence}', True),
+                ('{val1~upper}', False),
+                ('{count~unknown}', False)]:
+            with self.subTest(pattern=pattern):
+                dialog.txt_pattern.Text = pattern
+                self.assertEqual(expected, dialog._pattern_uses_counter())
 
 
 class PreviewTests(unittest.TestCase):
