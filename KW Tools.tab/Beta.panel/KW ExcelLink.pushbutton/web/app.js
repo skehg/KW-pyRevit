@@ -32,6 +32,21 @@ import * as CF from "./column_formulas.js";
   };
   var statusNode = document.getElementById("status");
   var sheetSelect = document.getElementById("sheetSelect");
+  var startupTimer = null;
+
+  function reportGridError(error) {
+    var message = error && error.message ? error.message : String(error);
+    showStatus("ExcelLink grid failed: " + message, true);
+    console.error(error);
+    post({ type: "clientError", message: message });
+  }
+
+  window.addEventListener("error", function (event) {
+    reportGridError(event.error || event.message);
+  });
+  window.addEventListener("unhandledrejection", function (event) {
+    reportGridError(event.reason);
+  });
 
   function post(message) {
     if (window.chrome && window.chrome.webview) {
@@ -1682,8 +1697,9 @@ import * as CF from "./column_formulas.js";
         updateFilterBar();
         configureFormulaBar();
       }
-    }, function () {
+    }, function (error) {
       restoringFilters = false;
+      reportGridError(error);
     });
     showStatus(sheetStatus(sheet));
   }
@@ -1898,6 +1914,9 @@ import * as CF from "./column_formulas.js";
   if (window.chrome && window.chrome.webview) {
     window.chrome.webview.addEventListener("message", function (event) {
       var message = event.data;
+      if (message.type === "workbook" || message.type === "error") {
+        clearTimeout(startupTimer);
+      }
       if (message.type === "workbook" || message.type === "wizardCancelled" || message.type === "error") {
         document.body.inert = false;
       }
@@ -1965,6 +1984,13 @@ import * as CF from "./column_formulas.js";
         if (currentSheet()) { showStatus(sheetStatus(currentSheet())); }
       }
     });
+    showStatus("Loading workbook from Revit...");
+    startupTimer = setTimeout(function () {
+      reportGridError(new Error(
+        "No workbook was received from Revit. Close this window, reload pyRevit " +
+        "to activate ExcelLink's persistent engine, and reopen the tool."
+      ));
+    }, 10000);
     window.chrome.webview.postMessage({ type: "ready" });
   } else {
     showStatus("Open this page from the KW ExcelLink Revit command.", true);

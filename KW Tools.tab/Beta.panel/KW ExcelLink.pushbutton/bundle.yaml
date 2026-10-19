@@ -2,3 +2,5 @@ title: KW ExcelLink
 tooltip: Extract Revit parameters into an editable workbook-style grid.
 author: Xrev Team
 highlight: new
+engine:
+  persistent: true

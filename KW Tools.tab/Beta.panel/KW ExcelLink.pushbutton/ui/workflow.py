@@ -5,6 +5,11 @@ from pyrevit import forms
 from core.element_refs import ReferenceCatalog
 from core.parameter_map import build_parameter_usage_map
 from core.presets import default_preset_name, find_preset, load_preset, preset_label
+from core.schedule_defaults import (
+    build_schedule_layout,
+    read_schedule_defaults,
+    schedule_parameters,
+)
 from core.selection import (
     category_options,
     elements_for_category,
@@ -51,11 +56,19 @@ def _run_import(uidoc, doc):
     return workbook, source_elements
 
 
-def _run_preset(uidoc, doc, item):
+def _run_preset(uidoc, doc, item, selection_mode=None):
     preset = load_preset(item["path"])
-    selection_mode = preset.get("selectionMode")
+    selection_mode = selection_mode or preset.get("selectionMode")
     if selection_mode not in SELECTION_MODES:
         selection_mode = "Current View"
+    dialog = ChoiceWizardWindow(
+        SELECTION_MODES, "Selection Mode - {0}".format(item["name"]),
+        [selection_mode],
+    )
+    dialog.ShowDialog()
+    if dialog.action != "next":
+        return None
+    selection_mode = dialog.selected[0]
     source_elements = resolve_source_elements(uidoc, selection_mode)
     if not source_elements:
         forms.alert(
@@ -101,6 +114,8 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
         (int(sheet["categoryId"]), sheet) for sheet in previous.get("sheets", [])
     )
     fields = dict((key, list(sheet["parameters"])) for key, sheet in old_sheets.items())
+    schedule = None
+    schedule_by_category = {}
     selected_ids = set(old_sheets)
     options = category_options(source_elements) if source_elements else []
     step = 4 if workbook is not None else 1
@@ -133,12 +148,13 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
                 continue
             if choice == LOAD_PRESET or choice.startswith(DEFAULT_PRESET_PREFIX):
                 item = choose_preset() if choice == LOAD_PRESET else default_item
-                result = _run_preset(uidoc, doc, item) if item else None
+                result = _run_preset(uidoc, doc, item, selection_mode) if item else None
                 if result is not None:
                     return result
                 continue
             selection_mode = choice
             source_elements = resolve_source_elements(uidoc, selection_mode)
+            schedule = read_schedule_defaults(uidoc, selection_mode)
             options = category_options(source_elements)
             if not options:
                 forms.alert("No categorized elements were found for this scope.", title=__title__)
@@ -184,6 +200,9 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
                 forms.alert("This category has no available parameters.", title=__title__)
                 step = 2
                 continue
+            if schedule is not None and key not in fields:
+                fields[key] = schedule_parameters(schedule, usage)
+                schedule_by_category[key] = schedule
             dialog = ParameterWizardWindow(
                 category["label"], usage, parameter_mode, fields.get(key),
                 last=category_index == len(categories) - 1,
@@ -203,6 +222,7 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
                 continue
             catalog = ReferenceCatalog(doc)
             sheets = []
+            schedule_issues = []
             for category in categories:
                 key = category["category_id"]
                 elements = elements_for_category(source_elements, key)
@@ -212,11 +232,24 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
                 )
                 if sheet is not None:
                     sheet["layout"] = old_sheets.get(key, {}).get("layout") or {}
+                    if key in schedule_by_category and key not in old_sheets:
+                        sheet["layout"], issues = build_schedule_layout(
+                            doc, schedule_by_category[key], sheet
+                        )
+                        schedule_issues.extend(issues)
                     sheets.append(sheet)
             if not sheets:
                 forms.alert("No category has rows and selected parameters.", title=__title__)
                 step = 2
                 continue
+            if schedule_issues:
+                forms.alert(
+                    "Some schedule settings could not be transferred:\n\n{0}\n\n"
+                    "These settings will not be included in saved presets.".format(
+                        "\n".join(sorted(set(schedule_issues)))
+                    ),
+                    title=__title__,
+                )
             result = {
                 "selectionMode": selection_mode,
                 "parameterMode": parameter_mode,

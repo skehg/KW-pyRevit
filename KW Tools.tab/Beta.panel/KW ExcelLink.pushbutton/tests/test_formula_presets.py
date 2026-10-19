@@ -42,6 +42,33 @@ class FormulaPresetTests(unittest.TestCase):
             "Bad rule": 1,
         }), {})
 
+    def test_schedule_column_order_filters_and_sort_survive_disk_roundtrip(self):
+        parameters = ["Door Number", "Width", "Level"]
+        filters = {"advanced": {"join": "and", "rules": [
+            {"title": "Door Number (Instance)", "op": "startsWith", "value": "D", "value2": ""},
+            {"title": "Level (Instance)", "op": "equals", "value": "Level 01", "value2": ""},
+        ]}}
+        sort = [{"title": "Door Number (Instance)", "dir": "asc"}]
+        workbook = {
+            "parameterMode": "Instances Mode",
+            "sheets": [{
+                "categoryKey": "OST_Doors", "name": "Doors",
+                "parameters": parameters,
+            }],
+        }
+        data = presets.preset_from_workbook(
+            workbook, [{"filters": filters, "sort": sort}], "Schedule", "Entire Model"
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "schedule.json")
+            presets._write_json(path, data)
+            loaded = presets.load_preset(path)
+        sheet = loaded["sheets"][0]
+        self.assertEqual(loaded["selectionMode"], "Entire Model")
+        self.assertEqual(sheet["parameters"], parameters)
+        self.assertEqual(sheet["layout"]["filters"]["advanced"], filters["advanced"])
+        self.assertEqual(sheet["layout"]["sort"], sort)
+
 
 if __name__ == "__main__":
     unittest.main()

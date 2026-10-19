@@ -49,6 +49,24 @@ User chooses:
 - Current View
 - Entire Model
 - Import edited XLSX... (see "Importing edited XLSX"; skips Steps 2–4)
+
+When **Current View** is a schedule, Step 4 preselects its supported parameter
+fields in displayed schedule order. Hidden fields needed by schedule filters
+or sorting are appended as visible, editable grid columns. Schedule filters
+load as editable AND rules in the grid's advanced filter controls; schedule
+sorting is also carried across. Numeric operands use project display units
+(the same units as grid cells), and element references use display names.
+These are initial defaults only: Back navigation and returning from the grid
+preserve the user's ordered fields and layout instead of reloading defaults.
+The existing Types/Instances Mode column rules still apply.
+
+Calculated, combined and other non-element parameter fields cannot be
+reproduced. Missing/removed fields and unsupported filters (including parameter
+existence and global-parameter association rules) are explicitly reported when
+opening the grid and are not included in saved presets. Current View still
+uses Revit's schedule-scoped element collector. Linked-file, embedded-schedule,
+filter-by-sheet, grouping and total settings are not portable grid filters.
+
 ### Step 2 — Category Selection
 
 Extract only category names (cheap operation).
@@ -148,6 +166,14 @@ isInstance: bool
 ### WebView2 Host
 
 - WPF host window
+- The modeless command requires a persistent IronPython engine (declared in
+  both the command metadata and bundle). Reload pyRevit after changing engine
+  metadata so WebView2 and ExternalEvent callbacks remain live after launch.
+- The page reports a missing startup workbook, JavaScript errors and rejected
+  grid operations visibly. Host delivery/serialization failures show a dialog
+  and a full traceback in the pyRevit output instead of leaving a blank grid.
+- Workbook messages use Unicode JSON (`ensure_ascii=False`), avoiding the
+  IronPython ASCII encoder failure on accented parameter values or names.
 - WebView2 control
 - Toolbar: Apply Changes, Reload, Sheet Selector
 - Message bridge: JS ↔ Python
@@ -275,8 +301,11 @@ Copilot must generate code that:
   folder to use when a shared folder is set.
 - Step 1 lists **Open default preset: <name>** (when a default is set),
   **Load preset...** and **Manage presets...** (set/clear default, delete,
-  set/clear shared folder, open folder). Loading a preset skips the wizard
-  and opens the grid directly (`workbook_builder.build_preset_workbook`).
+  set/clear shared folder, open folder). Loading either a named or default
+  preset first asks for a fresh selection mode, then skips Steps 2–4 and
+  opens the grid (`workbook_builder.build_preset_workbook`). Its saved
+  columns, order, filters, sorting and formulas apply to the newly collected
+  elements; the active schedule's defaults do not overwrite the preset.
 - Categories match by `BuiltInCategory` name (e.g. `OST_Doors`), falling back
   to the display name. Missing categories or parameters are skipped and
   listed in the pyRevit output window.

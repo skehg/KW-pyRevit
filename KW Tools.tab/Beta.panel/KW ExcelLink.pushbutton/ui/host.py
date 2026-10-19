@@ -258,6 +258,11 @@ class ExcelLinkHost(forms.WPFWindow):
                     "importUpdates": self.workbook.pop("importUpdates", None),
                     "importSummary": self.workbook.pop("importSummary", None),
                 })
+            elif message_type == "clientError":
+                message = request.get("message") or "Unknown grid error."
+                _LOGGER.error("KW ExcelLink web grid failed: {0}".format(message))
+                self.output.print_md("## KW ExcelLink web grid failed")
+                self.output.print_code(message)
             elif message_type == "apply":
                 self._queue_revit_request(request)
             elif message_type == "reload":
@@ -370,10 +375,21 @@ class ExcelLinkHost(forms.WPFWindow):
     def _post(self, payload):
         try:
             core = self.webView.CoreWebView2
-            if core is not None:
-                core.PostWebMessageAsJson(json.dumps(payload))
-        except Exception:
-            _LOGGER.exception("KW ExcelLink could not notify the web grid.")
+            if core is None:
+                raise RuntimeError("The ExcelLink web view is not initialized.")
+            core.PostWebMessageAsJson(json.dumps(
+                payload, ensure_ascii=False, allow_nan=False
+            ))
+        except Exception as exc:
+            details = traceback.format_exc()
+            _LOGGER.error("KW ExcelLink could not notify the web grid:\n{0}".format(details))
+            self.output.print_md("## KW ExcelLink could not load the web grid")
+            self.output.print_code(details)
+            forms.alert(
+                "ExcelLink could not send data to the grid:\n\n{0}\n\n"
+                "See the pyRevit output window for the full error.".format(exc),
+                title="KW ExcelLink",
+            )
 
     def _on_closed(self, sender, args):
         try:

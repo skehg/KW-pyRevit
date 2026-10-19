@@ -15,6 +15,7 @@ class WizardNavigationTests(unittest.TestCase):
             "core.element_refs": ["ReferenceCatalog"],
             "core.parameter_map": ["build_parameter_usage_map"],
             "core.presets": ["default_preset_name", "find_preset", "load_preset", "preset_label"],
+            "core.schedule_defaults": ["build_schedule_layout", "read_schedule_defaults", "schedule_parameters"],
             "core.selection": ["category_options", "elements_for_category", "resolve_source_elements"],
             "core.types": ["element_id_value"],
             "core.workbook_builder": ["build_import_workbook", "build_preset_workbook", "build_sheet"],
@@ -45,6 +46,7 @@ class WizardNavigationTests(unittest.TestCase):
         f.build_parameter_usage_map.return_value = {"Mark": {}, "Level": {}, "Width": {}}
         f.element_id_value.side_effect = lambda value: value
         f.find_preset.return_value = None
+        f.read_schedule_defaults.return_value = None
         f.build_sheet.side_effect = lambda doc, catalog, label, key, elements, fields, mode, usage: {
             "categoryId": key, "name": label, "parameters": fields, "rows": []
         }
@@ -125,6 +127,66 @@ class WizardNavigationTests(unittest.TestCase):
         self.actions = [(1, "next", ["Import edited XLSX..."]), (1, "cancel", [])]
         self.assertIsNone(self.flow.run_wizard(None, None))
         self.assertEqual([step for step, values in self.visits], [1, 1])
+
+    def test_schedule_defaults_seed_order_and_layout(self):
+        self.flow.read_schedule_defaults.return_value = {"schedule": True}
+        self.flow.schedule_parameters.return_value = ["Level", "Mark"]
+        layout = {"filters": {"advanced": {"join": "and", "rules": [
+            {"title": "Mark (Instance)", "op": "startsWith", "value": "D"}
+        ]}}}
+        self.flow.build_schedule_layout.return_value = (layout, [])
+        self.actions = [
+            (1, "next", ["Current View"]),
+            (2, "next", ["Doors [1]"]),
+            (3, "next", ["Instances Mode"]),
+            ("Doors [1]", "next", ["Level", "Mark"]),
+        ]
+        workbook, _ = self.flow.run_wizard(None, None)
+        self.assertIn(("Doors [1]", ["Level", "Mark"], True), self.visits)
+        self.assertEqual(workbook["sheets"][0]["layout"], layout)
+
+    def test_schedule_defaults_do_not_replace_grid_choices(self):
+        self.flow.read_schedule_defaults.return_value = {"schedule": True}
+        self.actions = [
+            ("Doors [1]", "back", ["Level", "Mark"]),
+            (3, "back", ["Instances Mode"]),
+            (2, "back", ["Doors [1]", "Walls [2]"]),
+            (1, "next", ["Current View"]),
+            (2, "next", ["Doors [1]", "Walls [2]"]),
+            (3, "next", ["Instances Mode"]),
+            ("Doors [1]", "next", ["Level", "Mark"]),
+            ("Walls [2]", "next", ["Width"]),
+        ]
+        previous = self.workbook()
+        workbook, _ = self.flow.run_wizard(None, None, previous, self.source)
+        self.flow.schedule_parameters.assert_not_called()
+        self.flow.build_schedule_layout.assert_not_called()
+        self.assertEqual(workbook["sheets"][0]["layout"], previous["sheets"][0]["layout"])
+
+    def test_loading_preset_prompts_for_new_scope(self):
+        self.flow.load_preset.return_value = {"selectionMode": "Current View"}
+        built = {"sheets": []}
+        self.flow.build_preset_workbook.return_value = (built, [])
+        self.flow.ChoiceWizardWindow.side_effect = lambda *args, **kwargs: types.SimpleNamespace(
+            action="next", selected=["Entire Model"], ShowDialog=lambda: None
+        )
+        result = self.flow._run_preset(None, None, {"path": "preset.json", "name": "Doors"})
+        self.flow.resolve_source_elements.assert_called_once_with(None, "Entire Model")
+        self.flow.build_preset_workbook.assert_called_once_with(
+            None, self.flow.load_preset.return_value, "Entire Model", self.source
+        )
+        self.assertEqual(result, (built, self.source))
+
+    def test_cancelling_preset_scope_does_not_collect_or_build(self):
+        self.flow.load_preset.return_value = {"selectionMode": "Current View"}
+        self.flow.ChoiceWizardWindow.side_effect = lambda *args, **kwargs: types.SimpleNamespace(
+            action="back", ShowDialog=lambda: None
+        )
+        self.assertIsNone(self.flow._run_preset(
+            None, None, {"path": "preset.json", "name": "Doors"}
+        ))
+        self.flow.resolve_source_elements.assert_not_called()
+        self.flow.build_preset_workbook.assert_not_called()
 
 
 if __name__ == "__main__":
