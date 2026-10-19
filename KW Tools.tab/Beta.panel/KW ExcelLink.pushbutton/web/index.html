@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KW ExcelLink</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="dist/tabulator.css">
+</head>
+<body>
+  <header class="toolbar">
+    <strong class="brand">KW ExcelLink</strong>
+    <label class="sheet-picker">
+      Sheet
+      <select id="sheetSelect" aria-label="Select workbook sheet"></select>
+    </label>
+    <span class="toolbar-spacer"></span>
+    <button id="backButton" title="Return to parameter selection to add, remove or reorder fields"><svg width="8" height="10" viewBox="0 0 8 10" aria-hidden="true"><path d="M8 0 L0 5 L8 10 Z" fill="currentColor"/></svg><span>Back</span></button>
+    <button id="applyButton" class="primary">Apply Changes</button>
+    <button id="reloadButton">Reload</button>
+    <button id="saveButton">Export XLSX</button>
+    <button id="importButton" title="Load an edited ExcelLink XLSX and highlight what it would change">Import XLSX</button>
+    <button id="presetButton" title="Save categories, parameters, mode, layout, filters and column formulas as a reusable preset">Save Preset</button>
+    <span id="changeCount" aria-live="polite">No pending changes</span>
+  </header>
+  <section class="filterbar" aria-label="Filters">
+    <input id="searchBox" type="search" placeholder="Search all columns (Ctrl+F)" aria-label="Search all columns">
+    <label class="inline-field">Show <select id="showSelect" aria-label="Show rows"></select></label>
+    <button id="advancedButton" title="Build AND/OR rules across columns">Advanced filter…</button>
+    <button id="clearFiltersButton" title="Clear every filter on this sheet" disabled>Clear all</button>
+    <span id="filterCount" aria-live="polite"></span>
+    <span class="toolbar-spacer"></span>
+    <button id="bulkButton" title="Set one value in a column for every visible row">Set value…</button>
+    <button id="selectButton" title="Select the elements in the visible rows in Revit">Select in Revit</button>
+    <button id="isolateButton" title="Temporarily isolate the visible rows' elements in the active view">Isolate in view</button>
+    <button id="resetViewButton" title="Reset temporary hide/isolate in the active view">Reset view</button>
+  </section>
+  <div id="filterChips" class="chips" aria-label="Active filters"></div>
+  <section class="formula-bar" aria-label="Column formulas">
+    <label>Formula column <select id="formulaColumn" aria-label="Formula column"></select></label>
+    <input id="columnFormula" aria-label="Column formula" placeholder="For row #1, e.g. =B1*2 or =SUM(B1:C1)">
+    <select id="formulaScope" aria-label="Formula row scope">
+      <option value="visible">Visible rows</option>
+      <option value="all">All rows</option>
+    </select>
+    <button id="formulaApply">Apply formula</button>
+    <button id="formulaRemove" title="Remove the saved formula and stop recalculation; keep the current values">Remove formula</button>
+    <span id="formulaHint">Instance parameters only. Formulas are saved with presets; Apply Changes writes to Revit.</span>
+  </section>
+  <main>
+    <div id="status" role="status"></div>
+    <div id="grid"></div>
+  </main>
+  <script
+    src="dist/app.bundle.js"
+    onerror="document.getElementById('status').textContent='ExcelLink web assets are not built. Run npm install and npm run build in the web folder.'; document.getElementById('status').className='error';">
+  </script>
+</body>
+</html>

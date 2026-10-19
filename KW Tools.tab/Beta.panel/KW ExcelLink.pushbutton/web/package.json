@@ -1,0 +1,19 @@
+{
+  "name": "kw-excel-link-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "rollup --config rollup.config.mjs"
+  },
+  "dependencies": {
+    "@formulajs/formulajs": "4.6.1",
+    "tabulator-tables": "6.6.1"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "rollup": "^4.54.0",
+    "rollup-plugin-postcss": "^4.0.2"
+  }
+}
