@@ -181,6 +181,9 @@ isInstance: bool
 ### Tabulator Grid
 
 - Dynamic columns based on wizard output
+- Default widths are 180 px from the third displayed column onward. The row
+  number column and first visible data column retain their existing sizing;
+  saved and manually resized widths take precedence over defaults.
 - Highlight type parameters
 - Disable invalid cells
 - Dual columns for mixed‑use parameters
@@ -314,6 +317,15 @@ Copilot must generate code that:
 
 ### Column formulas
 
+The toolbar groups import/export/preset actions under **File**, text and bulk
+edits under **Edit**, and visible-row selection/isolation actions under
+**Revit**. Sheet, Back, Apply Changes, Reload and Close remain immediately available.
+**Close** exits the tool, asking for confirmation before discarding unapplied
+changes. Closing is blocked while a grid edit or Revit operation is in progress.
+The **Formulas** toggle opens/closes the formula bar (collapsed on launch)
+without discarding its draft expression or saved templates. Search and filter
+controls stay in a separate compact row. Menus close on outside click/Escape.
+
 Column headers wrap to at most two text lines (with the filter row below),
 keeping formula letter badges and
 column-menu buttons visible. The sort/filter dropdown button sits at the
@@ -340,8 +352,86 @@ right-hand end of each column's filter input.
   **Apply formula** to review results. References are remapped by title if
   the column order changes; missing references report an error.
 - Expressions use project display units. XLSX export continues to write
-  calculated values, not formulas. Range selection and drag-fill are not
-  part of the column-formula workflow; **Set value...** fills literal values.
+  calculated values, not formulas. Range clipboard operations also transfer
+  values only; drag-fill is disabled. **Set value...** fills literal values.
+
+### Range selection and Excel clipboard
+
+- Drag across cells to select one rectangular range (or extend it using
+  Shift and the arrow keys). Click a row-number cell to select a whole row.
+  Double-click a cell to edit it; header sorting uses the sort icon or
+  column menu so it does not interfere with selection.
+- **Ctrl+C** copies the selected range's current values as tab-separated text,
+  without headers, formatting or formula expressions. Quoted tabs, multiline
+  text, quotes and Unicode are supported. Literal text that Excel could
+  interpret as a formula is prefixed with an apostrophe for safety.
+- **Ctrl+V** pastes an Excel block starting at the selected range's top-left
+  cell, using the visible columns and currently displayed (sorted/filtered)
+  row order. Hidden rows are not paste destinations. No rows or columns are
+  added; blocks extending past the grid fail instead of truncating or wrapping.
+- The whole block is validated before staging any edits. Locked cells,
+  including the row-number column, are skipped and counted. Editable numeric
+  values must be finite, use project display units and have no unit suffix or
+  thousands separators; Integer parameters must fit a Revit 32-bit integer.
+  ElementId values must exactly match an unambiguous dropdown name. Formula
+  expressions are rejected, including when pasted into an open cell editor.
+  Excel normally supplies calculated results on its plain-text clipboard.
+- Conflicting values for the same shared type parameter reject the entire
+  paste. Matching shared values are staged once per type; confirmation warns
+  that all instances of that type, including filtered/unselected ones, share
+  the change. Corresponding grid rows are updated consistently.
+- Pasting replaces affected cell formulas with literal values and recalculates
+  dependent grid formulas. Pasted edits use the existing pending-change
+  highlighting and **Apply Changes** pipeline; clipboard operations never
+  write directly to Revit. Native copy/paste in search/header/formula controls
+  is unchanged. Cut, drag-fill and multi-range clipboard operations are not
+  enabled.
+
+### Find/Replace and case conversion
+
+- Right-click inside a selected range to preserve it and open **Copy values**,
+  **Paste values**, **Find / Replace...** and **Change case**. Right-clicking
+  outside the range targets the clicked cell instead. Clipboard menu actions
+  use browser clipboard access; a denied/unavailable permission is reported
+  with guidance to use Ctrl+C/Ctrl+V instead.
+- **Edit > Find / Replace...** or **Ctrl+H** opens the same dialog. Default
+  scope is **Selected range**; **All visible cells (this sheet)** includes
+  only visible columns/rows after the current filters, not other sheets.
+  Both text tools also offer **Current column(s) (visible rows)**: selecting
+  AA6 targets column AA, while AA6:AC6 targets AA, AB and AC, across all rows
+  remaining after the current filters. Filtered-out rows are excluded
+  (shared-type edits still affect every instance of the type).
+  Find/replace defaults to literal text with **Match case** and **Whole cell**
+  options. It replaces every occurrence in each matching cell. An empty find
+  is invalid; an empty replacement deletes matches. With **Use regular
+  expressions (regex)** unchecked, `$` and regex characters are literal.
+  When checked, Find accepts JavaScript regex syntax without `/` delimiters;
+  replacement supports capture references such as `$1`, `$2`, `$<name>` and
+  standard JavaScript replacement tokens (`$&`, `$$`, etc.). Whole cell
+  requires the entire value to match; Match case controls case sensitivity.
+  Invalid patterns display an error and cannot be staged. Replacement
+  results are never evaluated as formulas.
+- **Change case** offers **UPPER**, **lower**, **Title** and **Sentence** for
+  the selected range or current column(s) (also accessible from
+  **Edit > Change case...**).
+  Title case lowercases each word then capitalizes its first letter, retaining
+  apostrophes inside words; it does not preserve acronyms. Sentence case
+  lowercases the text and capitalizes the first letter and the next letter
+  following each `.`, `!` or `?`; it does not infer abbreviations.
+- Both dialogs show a count and up to eight before/after examples before
+  **Stage changes** becomes available. Changing inputs invalidates the
+  preview. Case conversion previews immediately; Find/Replace uses
+  **Preview** after entering options. Cancel/Escape never stages edits.
+- Only editable String parameters and editable type names participate.
+  Locked, numeric, element-reference and null-valued cells are counted as
+  skipped. Unchanged results do not create pending edits. Blank resulting
+  type names and conflicting results for a shared type reject the plan.
+  Shared changes are deduplicated and require confirmation because every
+  instance of that type (including hidden ones) shares the result.
+- Staging uses the same pending-change pipeline as range paste. It replaces
+  affected cell formulas with literal results, recalculates dependencies,
+  and highlights edits; **Apply Changes** is still required to write to Revit.
+  Existing pending edits and their original values are retained.
 
 ### Filtering
 

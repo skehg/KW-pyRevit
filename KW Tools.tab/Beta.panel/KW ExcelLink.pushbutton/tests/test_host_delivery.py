@@ -87,6 +87,38 @@ class HostDeliveryTests(unittest.TestCase):
         self.forms.alert.assert_called_once()
         self.assertIn("delivery failed", self.forms.alert.call_args.args[0])
 
+    def dispatch_close(self, pending=None, event_pending=False):
+        with open(os.path.join(ROOT, "ui", "host.py"), encoding="utf-8") as stream:
+            tree = ast.parse(stream.read())
+        host = next(node for node in tree.body
+                    if isinstance(node, ast.ClassDef) and node.name == "ExcelLinkHost")
+        method = next(node for node in host.body
+                      if isinstance(node, ast.FunctionDef) and node.name == "_on_web_message")
+        namespace = {"json": json, "_LOGGER": Mock()}
+        exec(compile(ast.Module(body=[method], type_ignores=[]),
+                     "host._on_web_message", "exec"), namespace)
+        window = Mock()
+        window._handler.pending = pending
+        window._external_event.IsPending = event_pending
+        args = types.SimpleNamespace(WebMessageAsJson=json.dumps({"type": "close"}))
+        namespace["_on_web_message"](window, None, args)
+        return window
+
+    def test_close_message_closes_the_host_without_a_revit_request(self):
+        window = self.dispatch_close()
+        window.Close.assert_called_once_with()
+        window._queue_revit_request.assert_not_called()
+        window._post.assert_not_called()
+
+    def test_close_is_rejected_while_a_revit_operation_is_pending(self):
+        for pending, event_pending in [({"type": "apply"}, False), (None, True)]:
+            with self.subTest(pending=pending, event_pending=event_pending):
+                window = self.dispatch_close(pending, event_pending)
+                window.Close.assert_not_called()
+                response = window._post.call_args.args[0]
+                self.assertEqual(response["type"], "error")
+                self.assertIn("Wait for the current Revit operation", response["message"])
+
 
 if __name__ == "__main__":
     unittest.main()

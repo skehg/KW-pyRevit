@@ -3,6 +3,8 @@ import * as formulajs from "@formulajs/formulajs";
 import "tabulator-tables/dist/css/tabulator.min.css";
 import * as F from "./filters.js";
 import * as CF from "./column_formulas.js";
+import * as RC from "./range_clipboard.js";
+import * as TT from "./text_tools.js";
 
 (function () {
   "use strict";
@@ -533,6 +535,108 @@ import * as CF from "./column_formulas.js";
     return (sheet.columns || []).find(function (column) { return column.field === field; });
   }
 
+  var clipboardBusy = false;
+  var gridElement = document.getElementById("grid");
+
+  function rangeClipboardTarget(event) {
+    return tableReady && !clipboardBusy && !event.target.closest("input, textarea, select, [contenteditable=true]") &&
+      table.getRanges().length === 1;
+  }
+
+  function selectedRangeCells() {
+    if (!tableReady || table.getRanges().length !== 1) {
+      throw new Error("Select one range in the grid first.");
+    }
+    return table.getRanges()[0].getCells();
+  }
+
+  function copiedRangeText() {
+    return RC.copyTSV(selectedRangeCells().map(function (row) {
+      return row.map(function (cell) { return cell.getValue(); });
+    }));
+  }
+
+  function stagePlannedChanges(plan, label) {
+    if (clipboardBusy) { throw new Error("A grid edit is already in progress."); }
+    if (!plan.changes.length) {
+      showStatus("No values changed; skipped " + plan.skipped + " locked or unsupported cell(s).");
+      return Promise.resolve();
+    }
+    if (plan.types && !window.confirm(label + " changes " + plan.types +
+        " shared type(s), including instances outside the selected range or hidden by filters. Continue?")) {
+      return Promise.resolve();
+    }
+    var updates = new Map();
+    var rowsByType = new Map();
+    table.getData().forEach(function (row) {
+      var typeId = String(row.TypeElementId);
+      if (!rowsByType.has(typeId)) { rowsByType.set(typeId, []); }
+      rowsByType.get(typeId).push(row);
+    });
+    plan.changes.forEach(function (change) {
+      var column = change.column, row = change.row;
+      var key = rowChangeKey(row, column);
+      if (!originalValues.has(key)) { originalValues.set(key, row[column.field]); }
+      pendingChanges.set(key, buildChange(row, column, change.value));
+      var targets = isSharedByType(column)
+        ? rowsByType.get(String(row.TypeElementId)) : [row];
+      targets.forEach(function (item) {
+        var update = updates.get(item.UniqueId) || {UniqueId: item.UniqueId};
+        update[column.field] = change.value;
+        updates.set(item.UniqueId, update);
+        var formulaKey = item.UniqueId + "|" + column.field;
+        formulaTexts.delete(formulaKey);
+        formulaValues.delete(formulaKey);
+      });
+    });
+    clipboardBusy = true;
+    return table.updateData(Array.from(updates.values())).then(function () {
+      recalculateFormulas();
+      reportChangeCount();
+      updateFilterBar();
+      showStatus(label + ": " + plan.changes.length + " value(s) staged; skipped " + plan.skipped +
+        " locked or unsupported cell(s). Review pending changes, then Apply Changes.");
+    }).finally(function () { clipboardBusy = false; });
+  }
+
+  function pasteRangeText(text) {
+    var first = selectedRangeCells()[0][0];
+    var rows = table.getRows("active").map(function (row) { return row.getData(); });
+    var columns = [ROW_NUMBER_COLUMN].concat(visibleColumns(currentSheet()));
+    var plan = RC.planPaste(RC.parseTSV(text),
+      rows, columns, rows.indexOf(first.getRow().getData()),
+      columns.findIndex(function (column) { return column.field === first.getField(); }),
+      cellEditable, rowChangeKey);
+    return stagePlannedChanges(plan, "Paste");
+  }
+
+  gridElement.addEventListener("copy", function (event) {
+    if (!rangeClipboardTarget(event)) { return; }
+    event.preventDefault();
+    try {
+      event.clipboardData.setData("text/plain", copiedRangeText());
+      showStatus("Copied selected values (no formulas).");
+    } catch (error) { showStatus("Copy failed: " + error.message, true); }
+  });
+
+  gridElement.addEventListener("paste", function (event) {
+    if (event.target.closest(".tabulator-cell") &&
+        event.target.closest("input, textarea, [contenteditable=true]")) {
+      if (RC.formulaLike(event.clipboardData.getData("text/plain"))) {
+        event.preventDefault();
+        showStatus("Paste not applied: formulas are not accepted. Copy calculated values from Excel.", true);
+      }
+      return;
+    }
+    if (!rangeClipboardTarget(event)) { return; }
+    event.preventDefault();
+    try {
+      pasteRangeText(event.clipboardData.getData("text/plain")).catch(function (error) {
+        reportGridError(error);
+      });
+    } catch (error) { showStatus("Paste not applied: " + error.message, true); }
+  });
+
   function applyImportUpdates(nextWorkbook, updates) {
     var applied = 0;
     var perSheet = {};
@@ -653,7 +757,7 @@ import * as CF from "./column_formulas.js";
       frozen: true,
       width: 64,
       hozAlign: "right",
-      headerSort: true,
+      headerSort: false,
       sorter: "number",
       headerTooltip: "Row number used by formulas (A1 = first row). " + FILTER_HELP,
       titleFormatter: headerTitleFormatter(F.ROW_NUMBER_FIELD, ""),
@@ -711,6 +815,7 @@ import * as CF from "./column_formulas.js";
         cssClass: column.typeHighlight ? "type-column" : ""
       };
       if (widths[column.title]) { definition.width = widths[column.title]; }
+      else if (letterIndex > 1) { definition.width = 180; }
       return definition;
     }));
   }
@@ -756,11 +861,14 @@ import * as CF from "./column_formulas.js";
   // Resolves with the clicked button's value, or null for Escape. A button's
   // onClick may return false to keep the dialog open (validation).
   function showModal(title, content, buttons) {
+    closeColumnMenu();
     return new Promise(function (resolve) {
+      var previousFocus = document.activeElement;
       var backdrop = el("div", "modal-backdrop");
       var dialog = el("div", "modal");
       dialog.setAttribute("role", "dialog");
       dialog.setAttribute("aria-modal", "true");
+      dialog.setAttribute("aria-label", title);
       dialog.appendChild(el("h2", null, title));
       var body = el("div", "modal-body");
       if (typeof content === "string") { body.textContent = content; } else { body.appendChild(content); }
@@ -768,17 +876,30 @@ import * as CF from "./column_formulas.js";
       var footer = el("div", "modal-footer");
       function onKey(event) {
         if (event.key === "Escape") { event.stopPropagation(); close(null); }
+        if (event.key === "Tab") {
+          var focusable = Array.from(dialog.querySelectorAll("input, select, button, textarea"))
+            .filter(function (node) { return !node.disabled && node.getClientRects().length; });
+          var first = focusable[0], last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault(); last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault(); first.focus();
+          }
+        }
       }
       function close(value) {
         document.removeEventListener("keydown", onKey, true);
         backdrop.remove();
+        if (previousFocus && previousFocus.isConnected) { previousFocus.focus(); }
         resolve(value);
       }
       buttons.forEach(function (spec) {
-        footer.appendChild(makeButton(spec.label, function () {
+        var button = makeButton(spec.label, function () {
           if (spec.onClick && spec.onClick() === false) { return; }
           close(spec.value);
-        }, spec.primary ? "primary" : ""));
+        }, spec.primary ? "primary" : "");
+        button.disabled = !!spec.disabled;
+        footer.appendChild(button);
       });
       dialog.appendChild(footer);
       backdrop.appendChild(dialog);
@@ -787,6 +908,213 @@ import * as CF from "./column_formulas.js";
       var focus = dialog.querySelector("input, select, button.primary");
       if (focus) { focus.focus(); }
     });
+  }
+
+  // ------------------------------------------------------------- text tools
+
+  var CASE_OPTIONS = [
+    {value: "upper", label: "UPPER CASE"},
+    {value: "lower", label: "lower case"},
+    {value: "title", label: "Title Case"},
+    {value: "sentence", label: "Sentence case"}
+  ];
+
+  function textScopeCells(scope, selected) {
+    return TT.textScopeCells(scope, selected,
+      scope === "selected" ? [] : table.getRows("active").map(function (row) { return row.getData(); }),
+      visibleColumns(currentSheet()));
+  }
+
+  function openTextTool(kind, initialCase) {
+    if (!tableReady || !currentSheet() || clipboardBusy) { return; }
+    blurGridInput();
+    var sourceSheet = currentSheet();
+    var selected = [];
+    if (table.getRanges().length === 1) {
+      table.getRanges()[0].getCells().forEach(function (row) {
+        row.forEach(function (cell) {
+          selected.push({row: cell.getRow().getData(), column: columnForField(cell.getField())});
+        });
+      });
+    }
+    var form = el("div", "bulk");
+    function inputField(label, node) {
+      var holder = el("label", "field", label);
+      holder.appendChild(node);
+      form.appendChild(holder);
+      return node;
+    }
+    var scope = el("select");
+    fillOptions(scope, [
+      {value: "selected", label: "Selected range"},
+      {value: "columns", label: "Current column(s) (visible rows)"}
+    ].concat(
+      kind === "replace" ? [{value: "visible", label: "All visible cells (this sheet)"}] : []
+    ));
+    inputField("Scope", scope);
+    var find = el("input"); find.type = "text";
+    var replace = el("input"); replace.type = "text";
+    var match = el("input"); match.type = "checkbox";
+    var whole = el("input"); whole.type = "checkbox";
+    var regex = el("input"); regex.type = "checkbox";
+    var caseMode = el("select");
+    if (kind === "replace") {
+      inputField("Find", find);
+      inputField("Replace with", replace);
+      inputField("Match case", match);
+      inputField("Whole cell", whole);
+      inputField("Use regular expressions (regex)", regex);
+    } else {
+      fillOptions(caseMode, CASE_OPTIONS);
+      caseMode.value = initialCase || "upper";
+      inputField("Case", caseMode);
+    }
+    form.appendChild(el("div", "modal-hint",
+      "Only editable text cells are changed. Locked, numeric and reference cells are skipped. " +
+      "Existing cell formulas become literal values. Shared types affect every instance. " +
+      "Current column(s) includes each selected column, respecting current row filters. " +
+      (kind === "replace" ? "Find/Replace is literal unless regex is checked. Regex uses JavaScript syntax " +
+        "(without / delimiters); replacement supports $1, $2 and $<name>. Results are never evaluated as formulas." :
+        "Sentence case capitalizes after . ! or ? and lowercases the other letters.")));
+    var summary = el("div", "modal-hint");
+    summary.setAttribute("aria-live", "polite");
+    var samples = el("div");
+    var error = el("div", "modal-error");
+    error.setAttribute("role", "alert");
+    form.appendChild(summary);
+    form.appendChild(samples);
+    form.appendChild(error);
+    var plan = null;
+    // Restoring focus on close can emit a final change event and invalidate the preview.
+    var acceptedPlan = null;
+    var apply = null;
+    function invalidate() {
+      plan = null;
+      if (apply) { apply.disabled = true; }
+      samples.replaceChildren();
+      summary.textContent = "Preview to see the change count and sample results.";
+      error.textContent = "";
+    }
+    function preview() {
+      invalidate();
+      try {
+        if (currentSheet() !== sourceSheet) { throw new Error("The workbook changed. Reopen this dialog."); }
+        var transform = kind === "replace"
+          ? TT.textReplacement(find.value, replace.value, match.checked, whole.checked, regex.checked)
+          : function (value) { return TT.changeCase(value, caseMode.value); };
+        plan = TT.planTextChanges(textScopeCells(scope.value, selected), transform, cellEditable, rowChangeKey);
+        summary.textContent = plan.changes.length + " value(s) will change; " + plan.skipped +
+          " locked/non-text cell(s) skipped; " + plan.unchanged + " unchanged cell(s)." +
+          (plan.types ? " Affects " + plan.types + " shared type(s)." : "");
+        var previewTable = el("table", "text-preview");
+        var headings = el("tr");
+        ["Row / Column", "Before", "After"].forEach(function (title) {
+          headings.appendChild(el("th", null, title));
+        });
+        previewTable.appendChild(headings);
+        plan.changes.slice(0, 8).forEach(function (change) {
+          var row = el("tr");
+          row.appendChild(el("td", null, "#" + change.row[F.ROW_NUMBER_FIELD] + " / " + change.column.title));
+          row.appendChild(el("td", null, change.before));
+          row.appendChild(el("td", null, change.value));
+          previewTable.appendChild(row);
+        });
+        if (plan.changes.length) {
+          samples.appendChild(previewTable);
+          if (plan.changes.length > 8) { samples.appendChild(el("div", "modal-hint", "Showing the first 8 changes.")); }
+        }
+        apply.disabled = !plan.changes.length;
+      } catch (exc) { error.textContent = exc.message; }
+      return false;
+    }
+    form.addEventListener("input", invalidate);
+    form.addEventListener("change", invalidate);
+    var title = kind === "replace" ? "Find / Replace" : "Change case";
+    var result = showModal(title, form, [
+      {label: "Preview", value: null, onClick: preview},
+      {label: "Stage changes", value: "apply", primary: true, disabled: true, onClick: function () {
+        if (!plan) { return false; }
+        if (currentSheet() !== sourceSheet || plan.changes.some(function (change) {
+          return change.row[change.column.field] !== change.before;
+        })) {
+          invalidate();
+          error.textContent = "The grid changed. Preview again before staging.";
+          return false;
+        }
+        acceptedPlan = plan;
+      }},
+      {label: "Cancel", value: null}
+    ]);
+    apply = form.closest(".modal").querySelector(".modal-footer button.primary");
+    invalidate();
+    if (kind === "case") { preview(); }
+    else { find.focus(); }
+    result.then(function (choice) {
+      if (choice !== "apply") { return; }
+      try { stagePlannedChanges(acceptedPlan, title).catch(reportGridError); }
+      catch (exc) { showStatus(title + " not applied: " + exc.message, true); }
+    });
+  }
+
+  function openRangeMenu(event, cell) {
+    if (event.target.closest("input, textarea, select, [contenteditable=true]")) { return; }
+    event.preventDefault();
+    if (clipboardBusy) { showStatus("A grid edit is already in progress.", true); return; }
+    closeColumnMenu();
+    var selected = table.getRanges();
+    var contains = selected.length === 1 && selected[0].getCells().some(function (row) {
+      return row.some(function (item) {
+        return item.getRow().getData() === cell.getRow().getData() && item.getField() === cell.getField();
+      });
+    });
+    if (!contains) {
+      selected.forEach(function (range) { range.remove(); });
+      table.addRange(cell, cell);
+    }
+    var menu = el("div", "col-menu range-menu");
+    menu.setAttribute("aria-label", "Selected range actions");
+    menu.appendChild(el("div", "col-menu-title", "Selected range"));
+    function action(label, callback, parent) {
+      var button = makeButton(label, function () {
+        closeColumnMenu();
+        cell.getElement().focus();
+        callback();
+      });
+      (parent || menu).appendChild(button);
+    }
+    action("Copy values", function () {
+      if (!navigator.clipboard || !navigator.clipboard.writeText) {
+        showStatus("Clipboard access is unavailable. Use Ctrl+C in the grid.", true); return;
+      }
+      navigator.clipboard.writeText(copiedRangeText()).then(function () {
+        showStatus("Copied selected values (no formulas).");
+      }).catch(function (exc) { showStatus("Copy failed: " + exc.message + ". Use Ctrl+C in the grid.", true); });
+    });
+    action("Paste values", function () {
+      if (!navigator.clipboard || !navigator.clipboard.readText) {
+        showStatus("Clipboard access is unavailable. Use Ctrl+V in the grid.", true); return;
+      }
+      navigator.clipboard.readText().then(pasteRangeText).catch(function (exc) {
+        showStatus("Paste not applied: " + exc.message + ". You can use Ctrl+V in the grid.", true);
+      });
+    });
+    action("Find / Replace...", function () { openTextTool("replace"); });
+    var cases = el("details");
+    cases.appendChild(el("summary", null, "Change case"));
+    CASE_OPTIONS.forEach(function (option) {
+      action(option.label, function () { openTextTool("case", option.value); }, cases);
+    });
+    menu.appendChild(cases);
+    document.body.appendChild(menu);
+    menu.style.left = Math.max(8, Math.min(event.clientX, window.innerWidth - menu.offsetWidth - 8)) + "px";
+    menu.style.top = Math.max(8, Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 8)) + "px";
+    cases.addEventListener("toggle", function () {
+      menu.style.top = Math.max(8, Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 8)) + "px";
+    });
+    columnMenu = menu;
+    document.addEventListener("mousedown", onMenuOutside, true);
+    document.addEventListener("keydown", onMenuKey, true);
+    menu.querySelector("button").focus();
   }
 
   // ------------------------------------------------------------- filter bar
@@ -1738,7 +2066,14 @@ import * as CF from "./column_formulas.js";
         columns: [],
         index: "UniqueId",
         movableColumns: false,
-        clipboard: true,
+        clipboard: false,
+        selectableRange: 1,
+        selectableRangeColumns: false,
+        selectableRangeRows: true,
+        selectableRangeClearCells: false,
+        selectableRangeFill: false,
+        editTriggerEvent: "dblclick",
+        headerSortClickElement: "icon",
         headerFilterLiveFilterDelay: 400,
         placeholder: "No rows match. Check the filters above."
       });
@@ -1757,12 +2092,48 @@ import * as CF from "./column_formulas.js";
           layoutFor(currentSheet()).widths[column.title] = Math.round(gridColumn.getWidth());
         }
       });
+      table.on("cellContext", openRangeMenu);
     }
     openSheet(0, false);
   }
 
   // ------------------------------------------------------------ toolbar
 
+  var toolbarMenus = Array.from(document.querySelectorAll(".toolbar-menu"));
+  toolbarMenus.forEach(function (menu) {
+    menu.querySelector("summary").addEventListener("click", function () {
+      closeColumnMenu();
+      toolbarMenus.forEach(function (other) { if (other !== menu) { other.open = false; } });
+    });
+    menu.addEventListener("click", function (event) {
+      if (event.target.closest("button")) { menu.open = false; }
+    });
+  });
+  document.addEventListener("mousedown", function (event) {
+    toolbarMenus.forEach(function (menu) {
+      if (!menu.contains(event.target)) { menu.open = false; }
+    });
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      toolbarMenus.forEach(function (menu) {
+        if (menu.open) { menu.open = false; menu.querySelector("summary").focus(); }
+      });
+    }
+  });
+  document.getElementById("formulaToggle").addEventListener("click", function () {
+    var panel = document.getElementById("formulaPanel");
+    if (!panel.hidden) { blurGridInput(); }
+    panel.hidden = !panel.hidden;
+    this.setAttribute("aria-expanded", String(!panel.hidden));
+    if (tableReady) { table.redraw(); }
+  });
+  document.getElementById("findReplaceButton").addEventListener("click", function () {
+    openTextTool("replace");
+  });
+  document.getElementById("changeCaseButton").addEventListener("click", function () {
+    openTextTool("case");
+  });
   var searchTimer = null;
   searchBox.addEventListener("input", function () {
     if (searchTimer) { clearTimeout(searchTimer); }
@@ -1792,6 +2163,11 @@ import * as CF from "./column_formulas.js";
     sendRevitView("reset");
   });
   document.addEventListener("keydown", function (event) {
+    if (document.querySelector(".modal-backdrop") || document.body.inert) { return; }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "h") {
+      event.preventDefault();
+      openTextTool("replace");
+    }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
       event.preventDefault();
       searchBox.focus();
@@ -1861,6 +2237,18 @@ import * as CF from "./column_formulas.js";
   });
   var importButton = document.getElementById("importButton");
   var presetButton = document.getElementById("presetButton");
+  document.getElementById("closeButton").addEventListener("click", function () {
+    if (clipboardBusy || importButton.disabled || presetButton.disabled ||
+        (pendingChanges.size && applyButton.disabled)) {
+      showStatus("Wait for the current operation to finish before closing ExcelLink.", true);
+      return;
+    }
+    blurGridInput();
+    if (pendingChanges.size && !window.confirm(
+      "Closing ExcelLink will discard " + pendingChanges.size + " unapplied change(s). Close anyway?"
+    )) { return; }
+    post({ type: "close" });
+  });
   document.getElementById("backButton").addEventListener("click", function () {
     if (!workbook || !tableReady) { return; }
     if (importButton.disabled || presetButton.disabled ||

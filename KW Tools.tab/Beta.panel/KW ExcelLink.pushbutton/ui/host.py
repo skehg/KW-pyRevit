@@ -282,6 +282,12 @@ class ExcelLinkHost(forms.WPFWindow):
                 self._queue_revit_request(request)
             elif message_type == "back":
                 self._queue_revit_request(request)
+            elif message_type == "close":
+                if self._handler.pending is not None or self._external_event.IsPending:
+                    raise RuntimeError(
+                        "Wait for the current Revit operation to finish before closing ExcelLink."
+                    )
+                self.Close()
             else:
                 raise ValueError("Unsupported message type: {0}".format(message_type))
         except Exception as exc:

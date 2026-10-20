@@ -15,13 +15,36 @@
       Sheet
       <select id="sheetSelect" aria-label="Select workbook sheet"></select>
     </label>
+    <details class="toolbar-menu">
+      <summary>File</summary>
+      <div class="toolbar-menu-items">
+        <button id="saveButton">Export XLSX</button>
+        <button id="importButton" title="Load an edited ExcelLink XLSX and highlight what it would change">Import XLSX</button>
+        <button id="presetButton" title="Save categories, parameters, mode, layout, filters and column formulas as a reusable preset">Save Preset</button>
+      </div>
+    </details>
+    <details class="toolbar-menu">
+      <summary>Edit</summary>
+      <div class="toolbar-menu-items">
+        <button id="findReplaceButton">Find / Replace...</button>
+        <button id="changeCaseButton">Change case...</button>
+        <button id="bulkButton" title="Set one value in a column for every visible row">Set value...</button>
+      </div>
+    </details>
+    <details class="toolbar-menu">
+      <summary>Revit</summary>
+      <div class="toolbar-menu-items">
+        <button id="selectButton" title="Select the elements in the visible rows in Revit">Select in Revit</button>
+        <button id="isolateButton" title="Temporarily isolate the visible rows' elements in the active view">Isolate in view</button>
+        <button id="resetViewButton" title="Reset temporary hide/isolate in the active view">Reset view</button>
+      </div>
+    </details>
+    <button id="formulaToggle" aria-expanded="false" aria-controls="formulaPanel">Formulas</button>
     <span class="toolbar-spacer"></span>
     <button id="backButton" title="Return to parameter selection to add, remove or reorder fields"><svg width="8" height="10" viewBox="0 0 8 10" aria-hidden="true"><path d="M8 0 L0 5 L8 10 Z" fill="currentColor"/></svg><span>Back</span></button>
     <button id="applyButton" class="primary">Apply Changes</button>
     <button id="reloadButton">Reload</button>
-    <button id="saveButton">Export XLSX</button>
-    <button id="importButton" title="Load an edited ExcelLink XLSX and highlight what it would change">Import XLSX</button>
-    <button id="presetButton" title="Save categories, parameters, mode, layout, filters and column formulas as a reusable preset">Save Preset</button>
+    <button id="closeButton" title="Close ExcelLink and exit the tool">Close</button>
     <span id="changeCount" aria-live="polite">No pending changes</span>
   </header>
   <section class="filterbar" aria-label="Filters">
@@ -30,14 +53,9 @@
     <button id="advancedButton" title="Build AND/OR rules across columns">Advanced filter…</button>
     <button id="clearFiltersButton" title="Clear every filter on this sheet" disabled>Clear all</button>
     <span id="filterCount" aria-live="polite"></span>
-    <span class="toolbar-spacer"></span>
-    <button id="bulkButton" title="Set one value in a column for every visible row">Set value…</button>
-    <button id="selectButton" title="Select the elements in the visible rows in Revit">Select in Revit</button>
-    <button id="isolateButton" title="Temporarily isolate the visible rows' elements in the active view">Isolate in view</button>
-    <button id="resetViewButton" title="Reset temporary hide/isolate in the active view">Reset view</button>
   </section>
   <div id="filterChips" class="chips" aria-label="Active filters"></div>
-  <section class="formula-bar" aria-label="Column formulas">
+  <section id="formulaPanel" class="formula-bar" aria-label="Column formulas" hidden>
     <label>Formula column <select id="formulaColumn" aria-label="Formula column"></select></label>
     <input id="columnFormula" aria-label="Column formula" placeholder="For row #1, e.g. =B1*2 or =SUM(B1:C1)">
     <select id="formulaScope" aria-label="Formula row scope">
@@ -49,6 +67,7 @@
     <span id="formulaHint">Instance parameters only. Formulas are saved with presets; Apply Changes writes to Revit.</span>
   </section>
   <main>
+    <div class="clipboard-hint">Drag to select · Right-click for text tools · Ctrl+C / Ctrl+V: values only · Ctrl+H: Find / Replace · Double-click to edit</div>
     <div id="status" role="status"></div>
     <div id="grid"></div>
   </main>

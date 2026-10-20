@@ -6,6 +6,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; margin: 0; }
 body { display: flex; flex-direction: column; }
 
@@ -17,6 +18,27 @@ body { display: flex; flex-direction: column; }
   padding: 8px 14px;
   background: #fff;
   border-bottom: 1px solid #d8dee8;
+  flex-wrap: wrap;
+}
+.toolbar-menu { position: relative; font-size: 12px; }
+.toolbar-menu summary { cursor: pointer; padding: 7px 9px; border-radius: 4px; }
+.toolbar-menu summary:hover, .toolbar-menu[open] summary { background: #eef3f9; }
+.toolbar-menu-items {
+  position: absolute; top: 100%; left: 0; z-index: 1100; min-width: 190px;
+  display: flex; flex-direction: column; padding: 5px; gap: 3px;
+  border: 1px solid #c5ceda; border-radius: 5px; background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 30, 50, .18);
+}
+.toolbar-menu-items button { text-align: left; border: 0; font-size: 12px; }
+.col-menu.range-menu { width: 240px; gap: 3px; }
+.range-menu > button, .range-menu details button { text-align: left; width: 100%; border: 0; }
+.range-menu summary { cursor: pointer; padding: 7px 8px; }
+.range-menu details { border-top: 1px solid #e3e8ef; }
+.range-menu details button { padding-left: 20px; }
+.text-preview { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 8px; }
+.text-preview td, .text-preview th {
+  text-align: left; vertical-align: top; border: 1px solid #e3e8ef;
+  padding: 5px; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 
 .brand { color: #16345a; font-size: 15px; margin-right: 12px; }
@@ -37,12 +59,13 @@ button:disabled { cursor: default; opacity: .55; }
 button.primary { color: white; background: #1769aa; border-color: #1769aa; }
 button.primary:hover { background: #10588f; }
 .toolbar-spacer { flex: 1; }
-#changeCount { min-width: 118px; color: #566273; font-size: 12px; text-align: right; }
+#changeCount { min-width: 118px; margin-left: auto; color: #566273; font-size: 12px; text-align: right; }
 main { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 10px; }
 #status { color: #566273; min-height: 0; font-size: 12px; }
 #status:not(:empty) { padding: 5px 4px 9px; }
 #status.error { color: #a12622; white-space: pre-wrap; }
 #status.success { color: #237447; }
+.clipboard-hint { color: #566273; font-size: 12px; padding: 0 4px 6px; }
 #grid { flex: 1; min-height: 0; background: #fff; border: 1px solid #d8dee8; }
 .type-column { background: #e8f1fb !important; color: #153f69; }
 .disabled-cell { background: #f0f1f3 !important; color: #9298a1; }
