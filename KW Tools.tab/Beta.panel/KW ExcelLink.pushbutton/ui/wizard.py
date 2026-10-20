@@ -6,7 +6,8 @@ from pyrevit import forms
 
 
 class ChoiceWizardWindow(forms.WPFWindow):
-    def __init__(self, options, title, selected=None, multiple=False, back=True):
+    def __init__(self, options, title, selected=None, multiple=False, back=True,
+                 context_text=None):
         forms.WPFWindow.__init__(
             self, os.path.join(os.path.dirname(__file__), "choice.xaml")
         )
@@ -14,6 +15,7 @@ class ChoiceWizardWindow(forms.WPFWindow):
         from System.Windows.Controls import SelectionMode
         self.Title = title
         self.lblTitle.Text = title
+        self.lblContext.Text = context_text or ""
         self.action = "cancel"
         self.selected = []
         self._options = list(options)
@@ -76,20 +78,22 @@ class ChoiceWizardWindow(forms.WPFWindow):
 
 class ParameterWizardWindow(forms.WPFWindow):
     def __init__(self, category_label, usage_map, parameter_mode,
-                 selected=None, last=True):
+                 selected=None, last=True, context_text=None):
         xaml_path = os.path.join(os.path.dirname(__file__), "wizard.xaml")
         forms.WPFWindow.__init__(self, xaml_path)
         self.Title = "Step 4 of 5 - Parameters - {0}".format(category_label)
         self._parameter_names = sorted(
             usage_map.keys(), key=lambda value: value.lower()
         )
+        self._usage_map = usage_map
         self._display_names = {}
         self._available_displays = set()
         self.selected_parameters = None
         self.action = "cancel"
         self.btnContinue.Content = "Open Grid" if last else "Next category"
         self.lblCategory.Text = category_label
-        self.lblMode.Text = parameter_mode
+        self.lblMode.Text = context_text or parameter_mode
+        self.cboAvailability.SelectionChanged += self.on_filter_changed
 
         for name in self._parameter_names:
             usage = usage_map[name]
@@ -98,7 +102,9 @@ class ParameterWizardWindow(forms.WPFWindow):
                 labels.append("Type")
             if usage.get("isInstance"):
                 labels.append("Instance")
-            display = "{0}  [{1}]".format(name, ", ".join(labels))
+            display = "{0}  ·  {1}".format(
+                name, " + ".join(labels) if labels else "Unavailable"
+            )
             self._display_names[display] = name
             self._available_displays.add(display)
             self.lstAvailable.Items.Add(display)
@@ -109,6 +115,10 @@ class ParameterWizardWindow(forms.WPFWindow):
                 self.lstSelected.Items.Add(display)
                 self._available_displays.discard(display)
         self._refresh_available()
+
+    def on_filter_changed(self, sender, args):
+        if hasattr(self, "_usage_map"):
+            self._refresh_available()
 
     def on_search_changed(self, sender, args):
         if not hasattr(self, "_available_displays"):
@@ -159,10 +169,29 @@ class ParameterWizardWindow(forms.WPFWindow):
             str(item) for item in self.lstAvailable.SelectedItems
         )
         search_text = str(self.txtSearch.Text or "").strip().lower()
+        selected_filter = self.cboAvailability.SelectedItem
+        filter_mode = str(
+            selected_filter.Content if selected_filter is not None
+            else "All parameters"
+        )
+
+        def matches_usage(name):
+            usage = self._usage_map[name]
+            is_type = bool(usage.get("isType"))
+            is_instance = bool(usage.get("isInstance"))
+            if filter_mode == "Type parameters":
+                return is_type
+            if filter_mode == "Instance parameters":
+                return is_instance
+            if filter_mode == "Mixed-use parameters":
+                return is_type and is_instance
+            return True
+
         items = sorted(
             [
                 item for item in self._available_displays
                 if search_text in self._display_names[item].lower()
+                and matches_usage(self._display_names[item])
             ],
             key=lambda value: self._display_names[value].lower(),
         )
@@ -173,6 +202,11 @@ class ParameterWizardWindow(forms.WPFWindow):
         for item in items:
             if item in selected_items:
                 self.lstAvailable.SelectedItems.Add(item)
+        self.lblCounts.Text = (
+            "{0} shown of {1} available · {2} selected".format(
+                len(items), len(self._available_displays), self.lstSelected.Items.Count
+            )
+        )
 
     def on_move_up(self, sender, args):
         self._move_selected(-1)
@@ -211,6 +245,7 @@ class ParameterWizardWindow(forms.WPFWindow):
         list_box.SelectedItems.Clear()
         for index in sorted(selected_indexes):
             list_box.SelectedItems.Add(list_box.Items[index])
+        self._refresh_available()
 
     def on_continue(self, sender, args):
         self.selected_parameters = [

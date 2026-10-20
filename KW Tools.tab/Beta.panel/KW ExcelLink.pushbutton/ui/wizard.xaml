@@ -25,13 +25,18 @@
                        Margin="0,7,0,0"
                        FontSize="13"
                        Foreground="#4B5563"/>
+            <TextBlock x:Name="lblProgress"
+                       Margin="0,5,0,0"
+                       FontSize="12"
+                       Foreground="#1769AA"/>
             <TextBlock x:Name="lblMode"
                        Margin="0,3,0,10"
                        Foreground="#4B5563"/>
         </StackPanel>
         <TextBlock Grid.Row="1"
-                   Text="Choose the parameters for this sheet and arrange their column order."
+                   Text="Filter by usage or search by name. Select several fields and add them in one step; selected columns stay in the order shown."
                    Margin="0,0,0,8"
+                   TextWrapping="Wrap"
                    Foreground="#374151"/>
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
@@ -46,6 +51,17 @@
                            FontWeight="SemiBold"
                            Margin="0,0,0,6"
                            Foreground="#374151"/>
+                <ComboBox x:Name="cboAvailability"
+                          DockPanel.Dock="Top"
+                          MinHeight="27"
+                          Margin="0,0,0,7"
+                          SelectedIndex="0"
+                          ToolTip="Filter by whether parameters are available on types, instances, or both">
+                    <ComboBoxItem Content="All parameters"/>
+                    <ComboBoxItem Content="Type parameters"/>
+                    <ComboBoxItem Content="Instance parameters"/>
+                    <ComboBoxItem Content="Mixed-use parameters"/>
+                </ComboBox>
                 <TextBox x:Name="txtSearch"
                          DockPanel.Dock="Top"
                          MinHeight="26"
@@ -75,6 +91,11 @@
                            FontWeight="SemiBold"
                            Margin="0,0,0,6"
                            Foreground="#374151"/>
+                <TextBlock x:Name="lblCounts"
+                           DockPanel.Dock="Bottom"
+                           Margin="0,6,0,0"
+                           FontSize="12"
+                           Foreground="#566273"/>
                 <ListBox x:Name="lstSelected"
                          SelectionMode="Extended"
                          BorderBrush="#CBD5E1"

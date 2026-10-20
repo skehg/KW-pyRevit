@@ -11,7 +11,7 @@ import json
 import os
 import re
 
-PRESET_VERSION = 1
+PRESET_VERSION = 2
 SOURCE_PERSONAL = "personal"
 SOURCE_SHARED = "shared"
 _EXTENSION = ".json"
@@ -135,10 +135,17 @@ def load_preset(path):
     data = _read_json(path)
     if not isinstance(data, dict) or not isinstance(data.get("sheets"), list):
         raise ValueError("{0} is not an ExcelLink preset.".format(path))
-    if int(data.get("version") or 0) > PRESET_VERSION:
+    version = int(data.get("version") or 0)
+    if version > PRESET_VERSION:
         raise ValueError(
             "{0} was saved by a newer version of ExcelLink.".format(path)
         )
+    if version < 2 and data.get("selectionMode") == "Entire Model":
+        # Before v2, Entire Model included every unused type in the project.
+        data["selectionMode"] = "Entire Project File"
+    if data.get("selectionMode") == "Entire Project":
+        data["selectionMode"] = "Entire Project File"
+    data["version"] = PRESET_VERSION
     return data
 
 

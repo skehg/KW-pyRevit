@@ -50132,6 +50132,9 @@
 	  var formulaValues = new Map();
 	  var formulaTexts = new Map();
 	  var formulaEvaluationStack = new Set();
+	  var undoHistory = [];
+	  var redoHistory = [];
+	  var HISTORY_LIMIT = 75;
 	  var activeSheetIndex = 0;
 	  // Per-category column widths (only user-resized ones) and sorting, keyed by column title.
 	  var layoutState = new Map();
@@ -50182,10 +50185,15 @@
 	  }
 
 	  function rowChangeKey(row, column) {
+	    if (row.NewSheet) { return "createSheet|" + row.ElementId; }
 	    var id = column.target === "type"
 	      ? row.TypeElementId
 	      : (column.target === "typeName" ? row.TypeElementId : row.ElementId);
 	    return [column.target, id, column.parameterName || "__TYPE_NAME__"].join("|");
+	  }
+
+	  function cellPlanKey(row, column) {
+	    return row.NewSheet ? row.UniqueId + "|" + column.field : rowChangeKey(row, column);
 	  }
 
 	  function reportChangeCount() {
@@ -50193,7 +50201,233 @@
 	    document.getElementById("changeCount").textContent =
 	      count ? count + " pending change" + (count === 1 ? "" : "s") : "No pending changes";
 	    document.getElementById("applyButton").disabled = count === 0;
+	    updateHistoryButtons();
 	    if (tableReady) { scheduleFilterBar(); }
+	  }
+
+	  function cloneMap(map) {
+	    return new Map(map);
+	  }
+
+	  function captureEditState(targetWorkbook) {
+	    var source = targetWorkbook || workbook;
+	    if (source === workbook && tableReady && currentSheet()) {
+	      currentSheet().rows = table.getData();
+	    }
+	    var state = {
+	      pending: cloneMap(pendingChanges),
+	      original: cloneMap(originalValues),
+	      formulaTexts: cloneMap(formulaTexts),
+	      formulaValues: cloneMap(formulaValues),
+	      cells: new Map(),
+	      refs: new Map()
+	    };
+	    if (!source) { return state; }
+
+	    function addRowCell(sheetIndex, row, field, baselineKey) {
+	      var key = row.UniqueId + "|" + field;
+	      if (!state.refs.has(key)) {
+	        state.refs.set(key, { sheetIndex: sheetIndex, uniqueId: row.UniqueId,
+	          field: field, baselineKey: baselineKey });
+	      }
+	      state.cells.set(key, row[field]);
+	    }
+
+	    var formulaFieldsById = new Map();
+	    [state.formulaTexts, state.formulaValues].forEach(function (map) {
+	      map.forEach(function (value, formulaKey) {
+	        var separator = formulaKey.lastIndexOf("|");
+	        var uniqueId = formulaKey.slice(0, separator);
+	        var field = formulaKey.slice(separator + 1);
+	        if (!formulaFieldsById.has(uniqueId)) {
+	          formulaFieldsById.set(uniqueId, new Set());
+	        }
+	        formulaFieldsById.get(uniqueId).add(field);
+	      });
+	    });
+
+	    source.sheets.forEach(function (sheet, sheetIndex) {
+	      var changesByElementId = new Map();
+	      var changesByTypeId = new Map();
+	      state.pending.forEach(function (change, changeKey) {
+	        var column = sheetColumn(sheet, change.field);
+	        if (!column || column.target !== change.target) { return; }
+	        var shared = change.target === "type" || change.target === "typeName";
+	        var id = String(shared ? change.typeElementId : change.elementId);
+	        var index = shared ? changesByTypeId : changesByElementId;
+	        if (!index.has(id)) { index.set(id, []); }
+	        index.get(id).push({ field: change.field, changeKey: changeKey });
+	      });
+	      (sheet.rows || []).forEach(function (row) {
+	        if (row.NewSheet) {
+	          (sheet.columns || []).forEach(function (column) {
+	            if (column.columnType === "parameter") {
+	              addRowCell(sheetIndex, row, column.field, rowChangeKey(row, column));
+	            }
+	          });
+	        }
+	        (changesByElementId.get(String(row.ElementId)) || []).forEach(function (item) {
+	          addRowCell(sheetIndex, row, item.field, item.changeKey);
+	        });
+	        (changesByTypeId.get(String(row.TypeElementId)) || []).forEach(function (item) {
+	          addRowCell(sheetIndex, row, item.field, item.changeKey);
+	        });
+	        (formulaFieldsById.get(row.UniqueId) || []).forEach(function (field) {
+	          var column = sheetColumn(sheet, field);
+	          if (column) {
+	            addRowCell(sheetIndex, row, field, rowChangeKey(row, column));
+	          }
+	        });
+	      });
+	    });
+	    return state;
+	  }
+
+	  function completeHistoryPair(before, after) {
+	    var refs = new Map(before.refs);
+	    after.refs.forEach(function (ref, key) {
+	      if (!refs.has(key)) { refs.set(key, ref); }
+	    });
+	    refs.forEach(function (ref, key) {
+	      var baseline;
+	      if (before.original.has(ref.baselineKey)) {
+	        baseline = before.original.get(ref.baselineKey);
+	      } else if (after.original.has(ref.baselineKey)) {
+	        baseline = after.original.get(ref.baselineKey);
+	      } else if (before.cells.has(key)) {
+	        baseline = before.cells.get(key);
+	      } else {
+	        baseline = after.cells.get(key);
+	      }
+	      if (!before.cells.has(key)) { before.cells.set(key, baseline); }
+	      if (!after.cells.has(key)) { after.cells.set(key, baseline); }
+	      before.refs.set(key, ref);
+	      after.refs.set(key, ref);
+	    });
+	  }
+
+	  function mapDelta(before, after) {
+	    var delta = new Map();
+	    var keys = new Set(Array.from(before.keys()).concat(Array.from(after.keys())));
+	    keys.forEach(function (key) {
+	      var beforeHas = before.has(key);
+	      var afterHas = after.has(key);
+	      var beforeValue = before.get(key);
+	      var afterValue = after.get(key);
+	      if (beforeHas !== afterHas ||
+	          beforeValue !== afterValue) {
+	        delta.set(key, {
+	          before: { present: beforeHas, value: beforeValue },
+	          after: { present: afterHas, value: afterValue }
+	        });
+	      }
+	    });
+	    return delta;
+	  }
+
+	  function updateHistoryButtons() {
+	    var undoButton = document.getElementById("undoButton");
+	    var redoButton = document.getElementById("redoButton");
+	    if (!undoButton || !redoButton) { return; }
+	    undoButton.disabled = undoHistory.length === 0;
+	    redoButton.disabled = redoHistory.length === 0;
+	    undoButton.title = undoHistory.length
+	      ? "Undo: " + undoHistory[undoHistory.length - 1].label + " (Ctrl+Z)"
+	      : "Undo the last staged grid edit (Ctrl+Z)";
+	    redoButton.title = redoHistory.length
+	      ? "Redo: " + redoHistory[redoHistory.length - 1].label + " (Ctrl+Y)"
+	      : "Redo the last undone grid edit (Ctrl+Y)";
+	  }
+
+	  function clearEditHistory() {
+	    undoHistory = [];
+	    redoHistory = [];
+	    updateHistoryButtons();
+	  }
+
+	  function recordHistory(before, label, targetWorkbook) {
+	    var after = captureEditState(targetWorkbook);
+	    completeHistoryPair(before, after);
+	    var changes = {
+	      pending: mapDelta(before.pending, after.pending),
+	      original: mapDelta(before.original, after.original),
+	      formulaTexts: mapDelta(before.formulaTexts, after.formulaTexts),
+	      formulaValues: mapDelta(before.formulaValues, after.formulaValues),
+	      cells: mapDelta(before.cells, after.cells)
+	    };
+	    if (Object.keys(changes).every(function (key) {
+	      return changes[key].size === 0;
+	    })) { return; }
+	    var refs = new Map();
+	    changes.cells.forEach(function (change, key) {
+	      var ref = before.refs.get(key) || after.refs.get(key);
+	      if (ref) { refs.set(key, ref); }
+	    });
+	    undoHistory.push({ label: label, changes: changes, refs: refs });
+	    if (undoHistory.length > HISTORY_LIMIT) { undoHistory.shift(); }
+	    redoHistory = [];
+	    updateHistoryButtons();
+	  }
+
+	  function applyHistoryMap(map, changes, direction) {
+	    changes.forEach(function (change, key) {
+	      var state = change[direction];
+	      if (state.present) { map.set(key, state.value); }
+	      else { map.delete(key); }
+	    });
+	  }
+
+	  function applyHistoryEntry(entry, direction) {
+	    applyHistoryMap(pendingChanges, entry.changes.pending, direction);
+	    applyHistoryMap(originalValues, entry.changes.original, direction);
+	    applyHistoryMap(formulaTexts, entry.changes.formulaTexts, direction);
+	    applyHistoryMap(formulaValues, entry.changes.formulaValues, direction);
+	    formulaEvaluationStack.clear();
+	    entry.changes.cells.forEach(function (change, key) {
+	      var ref = entry.refs.get(key);
+	      var sheet = ref && workbook && workbook.sheets[ref.sheetIndex];
+	      if (!sheet) { return; }
+	      var row = (sheet.rows || []).find(function (item) {
+	        return item.UniqueId === ref.uniqueId;
+	      });
+	      if (row) { row[ref.field] = change[direction].value; }
+	    });
+	    reportChangeCount();
+	    if (tableReady && currentSheet()) {
+	      table.replaceData(currentSheet().rows).then(function () {
+	        table.refreshFilter();
+	        updateFilterBar();
+	      }).catch(reportGridError);
+	    }
+	  }
+
+	  function undoEdit() {
+	    if (historyOperationBlocked()) { return; }
+	    var entry = undoHistory.pop();
+	    if (!entry) { return; }
+	    applyHistoryEntry(entry, "before");
+	    redoHistory.push(entry);
+	    updateHistoryButtons();
+	    showStatus("Undid " + entry.label + ". Changes remain staged; Apply Changes writes them to Revit.");
+	  }
+
+	  function redoEdit() {
+	    if (historyOperationBlocked()) { return; }
+	    var entry = redoHistory.pop();
+	    if (!entry) { return; }
+	    applyHistoryEntry(entry, "after");
+	    undoHistory.push(entry);
+	    updateHistoryButtons();
+	    showStatus("Redid " + entry.label + ". Changes remain staged; Apply Changes writes them to Revit.");
+	  }
+
+	  function historyOperationBlocked() {
+	    if (clipboardBusy || document.body.inert || importButton.disabled ||
+	        (pendingChanges.size && applyButton.disabled)) {
+	      showStatus("Wait for the current operation to finish before undoing or redoing.", true);
+	      return true;
+	    }
+	    return false;
 	  }
 
 	  function findColumn(field) {
@@ -50236,6 +50470,7 @@
 	  }
 
 	  function cellEditable(column, data) {
+	    if (data.NewSheet && !pendingChanges.has(rowChangeKey(data, {}))) { return false; }
 	    return !!column.editable && !column.disabled &&
 	      !data[column.field + "__disabled"] &&
 	      (column.target !== "typeName" || data.TypeNameEditable !== false);
@@ -50502,6 +50737,9 @@
 	  }
 
 	  function buildChange(row, column, value) {
+	    if (row.NewSheet) {
+	      return { target: "createSheet", elementId: row.ElementId };
+	    }
 	    var change = {
 	      target: column.target,
 	      elementId: row.ElementId,
@@ -50557,6 +50795,15 @@
 	    if (!column || column.disabled || !column.editable ||
 	        row[cell.getField() + "__disabled"]) { return; }
 
+	    var historyBefore = captureEditState();
+	    var editedCellKey = row.UniqueId + "|" + cell.getField();
+	    historyBefore.cells.set(editedCellKey, cell.getOldValue());
+	    historyBefore.refs.set(editedCellKey, {
+	      sheetIndex: activeSheetIndex,
+	      uniqueId: row.UniqueId,
+	      field: cell.getField(),
+	      baselineKey: rowChangeKey(row, column)
+	    });
 	    var raw = cell.getValue();
 	    var value = raw;
 	    var rowIndex = cell.getRow().getPosition(true) - 1;
@@ -50599,6 +50846,7 @@
 	    recalculateFormulas();
 	    reportChangeCount();
 	    cell.getRow().reformat();
+	    recordHistory(historyBefore, "cell edit");
 	    showStatus("");
 	  }
 
@@ -50609,6 +50857,7 @@
 	  // Sets one value on every visible row where the column is editable. Shared type
 	  // values are recorded once per type and copied to all of that type's rows.
 	  function bulkSetValue(column, value) {
+	    var historyBefore = captureEditState();
 	    var edited = new Set();
 	    var typeValues = new Set();
 	    var skipped = 0;
@@ -50641,6 +50890,7 @@
 	      recalculateFormulas();
 	      reportChangeCount();
 	      updateFilterBar();
+	      recordHistory(historyBefore, "Set value");
 	      return { count: count, rows: updates.length, skipped: skipped };
 	    });
 	  }
@@ -50680,6 +50930,7 @@
 	        " shared type(s), including instances outside the selected range or hidden by filters. Continue?")) {
 	      return Promise.resolve();
 	    }
+	    var historyBefore = captureEditState();
 	    var updates = new Map();
 	    var rowsByType = new Map();
 	    table.getData().forEach(function (row) {
@@ -50708,6 +50959,7 @@
 	      recalculateFormulas();
 	      reportChangeCount();
 	      updateFilterBar();
+	      recordHistory(historyBefore, label);
 	      showStatus(label + ": " + plan.changes.length + " value(s) staged; skipped " + plan.skipped +
 	        " locked or unsupported cell(s). Review pending changes, then Apply Changes.");
 	    }).finally(function () { clipboardBusy = false; });
@@ -50720,7 +50972,7 @@
 	    var plan = planPaste(parseTSV(text),
 	      rows, columns, rows.indexOf(first.getRow().getData()),
 	      columns.findIndex(function (column) { return column.field === first.getField(); }),
-	      cellEditable, rowChangeKey);
+	      cellEditable, cellPlanKey);
 	    return stagePlannedChanges(plan, "Paste");
 	  }
 
@@ -50752,6 +51004,7 @@
 	  });
 
 	  function applyImportUpdates(nextWorkbook, updates) {
+	    var historyBefore = captureEditState(nextWorkbook);
 	    var applied = 0;
 	    var perSheet = {};
 	    (updates || []).forEach(function (update) {
@@ -50773,8 +51026,15 @@
 	      applied += 1;
 	    });
 	    nextWorkbook.sheets.forEach(function (sheet, index) {
+	      (sheet.rows || []).forEach(function (row) {
+	        if (!row.NewSheet) { return; }
+	        pendingChanges.set(rowChangeKey(row, {}), buildChange(row, {}, null));
+	        perSheet[index] = (perSheet[index] || 0) + 1;
+	        applied += 1;
+	      });
 	      sheet.pendingLabel = perSheet[index] ? " (" + perSheet[index] + " to import)" : "";
 	    });
+	    if (applied) { recordHistory(historyBefore, "Import XLSX", nextWorkbook); }
 	    return applied;
 	  }
 
@@ -51116,7 +51376,7 @@
 	        var transform = kind === "replace"
 	          ? textReplacement(find.value, replace.value, match.checked, whole.checked, regex.checked)
 	          : function (value) { return changeCase(value, caseMode.value); };
-	        plan = planTextChanges(textScopeCells$1(scope.value, selected), transform, cellEditable, rowChangeKey);
+	        plan = planTextChanges(textScopeCells$1(scope.value, selected), transform, cellEditable, cellPlanKey);
 	        summary.textContent = plan.changes.length + " value(s) will change; " + plan.skipped +
 	          " locked/non-text cell(s) skipped; " + plan.unchanged + " unchanged cell(s)." +
 	          (plan.types ? " Affects " + plan.types + " shared type(s)." : "");
@@ -51254,6 +51514,7 @@
 	  }
 
 	  function masterFilter(data) {
+	    if (data.NewSheet && !pendingChanges.has(rowChangeKey(data, {}))) { return false; }
 	    var sheet = currentSheet();
 	    if (!sheet) { return true; }
 	    return rowPasses(data, filtersFor(sheet), cachedContext(sheet), { skipHeaders: true });
@@ -51849,6 +52110,7 @@
 	    var sheet = currentSheet();
 	    var column = sheet && columnByTitle(sheet, formulaColumn.value);
 	    if (!column || !formulaEligible(column)) { return; }
+	    var historyBefore = captureEditState();
 	    var oldTexts = new Map(formulaTexts);
 	    var oldValues = new Map(formulaValues);
 	    try {
@@ -51890,7 +52152,8 @@
 	      updates.forEach(function (item) {
 	        var key = rowChangeKey(item.row, item.column);
 	        if (!originalValues.has(key)) { originalValues.set(key, item.row[item.column.field]); }
-	        if (String(originalValues.get(key) == null ? "" : originalValues.get(key)) === String(item.value)) {
+	        if (!item.row.NewSheet &&
+	            String(originalValues.get(key) == null ? "" : originalValues.get(key)) === String(item.value)) {
 	          pendingChanges.delete(key);
 	        } else {
 	          pendingChanges.set(key, buildChange(item.row, item.column, item.value));
@@ -51901,6 +52164,7 @@
 	      table.updateData(Array.from(byRow.values())).then(function () {
 	        reportChangeCount();
 	        table.refreshFilter();
+	        recordHistory(historyBefore, "Apply formula");
 	        showStatus("Formula applied to " + targets.length + " row(s); " +
 	          (rows.length - targets.length) + " read-only row(s) skipped. Review pending changes, then Apply Changes.");
 	      }).catch(function (error) { showStatus("Could not update the grid: " + error.message, true); });
@@ -52052,11 +52316,39 @@
 	  function sendApply(hiddenKeys) {
 	    var hiddenSet = new Set(hiddenKeys);
 	    carryOver = hiddenKeys.map(function (key) {
-	      return { change: pendingChanges.get(key), oldValue: originalValues.get(key) };
+	      var change = pendingChanges.get(key);
+	      var item = { change: change, oldValue: originalValues.get(key) };
+	      if (change.target === "createSheet") {
+	        workbook.sheets.some(function (sheet) {
+	          var rows = sheet === currentSheet() && tableReady ? table.getData() : sheet.rows;
+	          var row = rows.find(function (entry) { return entry.ElementId === change.elementId; });
+	          if (!row) { return false; }
+	          item.row = JSON.parse(JSON.stringify(row));
+	          item.categoryId = sheet.categoryId;
+	          return true;
+	        });
+	      }
+	      return item;
 	    });
 	    var changes = [];
 	    pendingChanges.forEach(function (change, key) {
-	      if (!hiddenSet.has(key)) { changes.push(change); }
+	      if (hiddenSet.has(key)) { return; }
+	      if (change.target !== "createSheet") { changes.push(change); return; }
+	      workbook.sheets.forEach(function (sheet) {
+	        var rows = sheet === currentSheet() && tableReady ? table.getData() : sheet.rows;
+	        var row = rows.find(function (entry) { return entry.ElementId === change.elementId; });
+	        if (!row) { return; }
+	        changes.push({
+	          target: "createSheet", elementId: row.ElementId,
+	          titleBlockId: row.NewSheet.titleBlockId,
+	          parameters: sheet.columns.filter(function (column) {
+	            return column.columnType === "parameter" && column.target === "instance" &&
+	              cellEditable(column, row) && row[column.field] != null;
+	          }).map(function (column) {
+	            return Object.assign(buildChange({}, column, row[column.field]), { unit: column.unit });
+	          })
+	        });
+	      });
 	    });
 	    post({ type: "apply", changes: changes });
 	    applyButton.disabled = true;
@@ -52065,9 +52357,21 @@
 
 	  // Re-adds changes that were held back at Apply onto the refreshed workbook.
 	  function restoreCarryOver(nextWorkbook) {
+	    var historyBefore = captureEditState(nextWorkbook);
 	    var restored = 0;
 	    carryOver.forEach(function (item) {
 	      var change = item.change;
+	      if (change.target === "createSheet") {
+	        var target = nextWorkbook.sheets.find(function (sheet) {
+	          return sheet.categoryId === item.categoryId;
+	        });
+	        if (target && item.row) {
+	          target.rows.push(item.row);
+	          pendingChanges.set(rowChangeKey(item.row, {}), change);
+	          restored += 1;
+	        }
+	        return;
+	      }
 	      nextWorkbook.sheets.some(function (sheet) {
 	        var column = sheetColumn(sheet, change.field);
 	        if (!column || column.target !== change.target) { return false; }
@@ -52087,6 +52391,7 @@
 	      });
 	    });
 	    carryOver = [];
+	    if (restored) { recordHistory(historyBefore, "Restore filtered changes", nextWorkbook); }
 	    return restored;
 	  }
 
@@ -52094,6 +52399,23 @@
 	    return Object.assign({}, workbook, {
 	      sheets: workbook.sheets.map(function (sheet, index) {
 	        return Object.assign({}, sheet, { rows: visibleRowsFor(sheet, index) });
+	      })
+	    });
+	  }
+
+	  function exportWorkbook(source) {
+	    return Object.assign({}, source, {
+	      sheets: source.sheets.map(function (sheet) {
+	        return Object.assign({}, sheet, {
+	          rows: sheet.rows.filter(function (row) {
+	            return !row.NewSheet || pendingChanges.has(rowChangeKey(row, {}));
+	          }).map(function (row) {
+	            if (!row.NewSheet) { return row; }
+	            return Object.assign({}, row, {
+	              ElementId: null, UniqueId: null, TypeElementId: null, TypeName: ""
+	            });
+	          })
+	        });
 	      })
 	    });
 	  }
@@ -52278,6 +52600,21 @@
 	  });
 	  document.addEventListener("keydown", function (event) {
 	    if (document.querySelector(".modal-backdrop") || document.body.inert) { return; }
+	    var editingControl = event.target.closest && event.target.closest(
+	      "input, textarea, select, [contenteditable=true]"
+	    );
+	    if ((event.ctrlKey || event.metaKey) && !editingControl &&
+	        event.key.toLowerCase() === "z") {
+	      event.preventDefault();
+	      if (event.shiftKey) { redoEdit(); } else { undoEdit(); }
+	      return;
+	    }
+	    if ((event.ctrlKey || event.metaKey) && !editingControl &&
+	        event.key.toLowerCase() === "y") {
+	      event.preventDefault();
+	      redoEdit();
+	      return;
+	    }
 	    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "h") {
 	      event.preventDefault();
 	      openTextTool("replace");
@@ -52292,6 +52629,8 @@
 	  sheetSelect.addEventListener("change", function () {
 	    openSheet(parseInt(sheetSelect.value, 10));
 	  });
+	  document.getElementById("undoButton").addEventListener("click", undoEdit);
+	  document.getElementById("redoButton").addEventListener("click", redoEdit);
 	  applyButton.addEventListener("click", function () {
 	    if (!pendingChanges.size) { return; }
 	    var hidden = hiddenChangeKeys();
@@ -52333,7 +52672,7 @@
 	      return hasActiveFilters(filtersFor(sheet));
 	    });
 	    if (!filtered) {
-	      post({ type: "save", workbook: workbook });
+	      post({ type: "save", workbook: exportWorkbook(workbook) });
 	      return;
 	    }
 	    showModal("Export XLSX",
@@ -52345,7 +52684,9 @@
 	        { label: "Cancel", value: null }
 	      ]).then(function (choice) {
 	      if (choice) {
-	        post({ type: "save", workbook: choice === "visible" ? visibleWorkbook() : workbook });
+	        post({ type: "save", workbook: exportWorkbook(
+	          choice === "visible" ? visibleWorkbook() : workbook
+	        ) });
 	      }
 	    });
 	  });
@@ -52425,6 +52766,7 @@
 	      if (message.type === "workbook" || message.type === "applied") {
 	        importButton.disabled = false;
 	        applyButton.disabled = false;
+	        clearEditHistory();
 	        pendingChanges.clear();
 	        originalValues.clear();
 	        formulaValues.clear();
@@ -52444,18 +52786,29 @@
 	            (summary.skipped ? ", " + summary.skipped + " skipped (see pyRevit output)" : "") +
 	            (summary.rowsUnmatched ? ", " + summary.rowsUnmatched + " row(s) not found" : "") +
 	            (message.layoutReplaced ? ", grid rebuilt to match the file's sheets and columns" : "") +
+	            (message.removedElements
+	              ? ", " + message.removedElements + " deleted element(s) removed from the grid"
+	              : "") +
 	            ". Hover a highlighted cell to compare with Revit, then Apply Changes.";
 	        }
 	        reportChangeCount();
 	        renderWorkbook(message.workbook, message.wizardRebuilt);
 	        if (message.type === "applied") {
 	          showStatus("Applied " + message.result.applied + " change(s)." +
-	            (carried ? " " + carried + " change(s) in filtered-out rows are still pending." : ""));
+	            (message.result.createdSheets
+	              ? " Created " + message.result.createdSheets + " sheet(s)." : "") +
+	            (carried ? " " + carried + " change(s) in filtered-out rows are still pending." : "") +
+	            (message.removedElements
+	              ? " " + message.removedElements + " deleted element(s) were removed from the grid."
+	              : ""));
 	        } else if (message.importUpdates) {
 	          var firstSheet = message.workbook.sheets.findIndex(function (sheet) {
 	            return !!sheet.pendingLabel;
 	          });
 	          if (firstSheet > 0) { openSheet(firstSheet, false); }
+	        } else if (message.removedElements) {
+	          showStatus("Reloaded from Revit. " + message.removedElements +
+	            " deleted element(s) were removed from the grid.");
 	        }
 	      } else if (message.type === "wizardCancelled") {
 	        showStatus("Wizard canceled. The grid and unapplied changes are unchanged.");

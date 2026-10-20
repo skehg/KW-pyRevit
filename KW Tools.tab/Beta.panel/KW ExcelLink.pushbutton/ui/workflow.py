@@ -29,6 +29,7 @@ from ui.wizard import ChoiceWizardWindow, ParameterWizardWindow
 SELECTION_MODES = (
     "Selected Elements",
     "Current View",
+    "Entire Project File",
     "Entire Model",
 )
 IMPORT_MODE = "Import edited XLSX..."
@@ -59,6 +60,8 @@ def _run_import(uidoc, doc):
 def _run_preset(uidoc, doc, item, selection_mode=None):
     preset = load_preset(item["path"])
     selection_mode = selection_mode or preset.get("selectionMode")
+    if selection_mode == "Entire Project":
+        selection_mode = "Entire Project File"
     if selection_mode not in SELECTION_MODES:
         selection_mode = "Current View"
     dialog = ChoiceWizardWindow(
@@ -105,10 +108,18 @@ def _step_one_options():
     return options, default_item
 
 
+def _scope_summary(selection_mode, source_elements):
+    return "{0} | {1} element(s) in scope".format(
+        selection_mode, len(source_elements or [])
+    )
+
+
 def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
     """Navigate without rebuilding the workbook until every step is accepted."""
     previous = workbook or {}
     selection_mode = previous.get("selectionMode") or "Current View"
+    if selection_mode == "Entire Project":
+        selection_mode = "Entire Project File"
     parameter_mode = previous.get("parameterMode") or PARAMETER_MODES[1]
     old_sheets = dict(
         (int(sheet["categoryId"]), sheet) for sheet in previous.get("sheets", [])
@@ -132,7 +143,10 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
         if step == 1:
             choices, default_item = _step_one_options()
             dialog = ChoiceWizardWindow(
-                choices, "Step 1 of 5 - Selection Mode", [selection_mode], back=False
+                choices, "Step 1 of 5 - Selection Mode", [selection_mode], back=False,
+                context_text="Entire Project File includes all project types. Entire Model "
+                "includes placed elements and only their used types. Scope and category "
+                "counts are shown before parameter selection."
             )
             dialog.ShowDialog()
             if dialog.action == "cancel":
@@ -166,6 +180,9 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
                 "Step 2 of 5 - Category Selection",
                 [item["label"] for item in options if item["category_id"] in selected_ids],
                 multiple=True,
+                context_text="{0} | {1} categories found".format(
+                    _scope_summary(selection_mode, source_elements), len(options)
+                ),
             )
             dialog.ShowDialog()
             if dialog.action == "cancel":
@@ -179,7 +196,10 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
             step = 3
         elif step == 3:
             dialog = ChoiceWizardWindow(
-                PARAMETER_MODES, "Step 3 of 5 - Parameter Mode", [parameter_mode]
+                PARAMETER_MODES, "Step 3 of 5 - Parameter Mode", [parameter_mode],
+                context_text="{0} | {1} category sheet(s) selected".format(
+                    _scope_summary(selection_mode, source_elements), len(categories)
+                )
             )
             dialog.ShowDialog()
             if dialog.action == "cancel":
@@ -206,6 +226,10 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
             dialog = ParameterWizardWindow(
                 category["label"], usage, parameter_mode, fields.get(key),
                 last=category_index == len(categories) - 1,
+                context_text="{0} | Category {1} of {2} | {3} element(s) | {4}".format(
+                    selection_mode, category_index + 1, len(categories),
+                    len(elements), parameter_mode
+                ),
             )
             dialog.ShowDialog()
             if dialog.action == "cancel":

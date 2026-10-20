@@ -87,6 +87,63 @@ class HostDeliveryTests(unittest.TestCase):
         self.forms.alert.assert_called_once()
         self.assertIn("delivery failed", self.forms.alert.call_args.args[0])
 
+    def test_refresh_resolves_saved_ids_and_drops_deleted_elements(self):
+        with open(os.path.join(ROOT, "core", "selection.py"), encoding="utf-8") as stream:
+            selection_tree = ast.parse(stream.read())
+        resolver = next(node for node in selection_tree.body
+                        if isinstance(node, ast.FunctionDef)
+                        and node.name == "resolve_elements_by_id")
+        resolver_namespace = {"make_element_id": int}
+        exec(compile(ast.Module(body=[resolver], type_ignores=[]),
+                     "selection.resolve_elements_by_id", "exec"), resolver_namespace)
+        with open(os.path.join(ROOT, "ui", "host.py"), encoding="utf-8") as stream:
+            tree = ast.parse(stream.read())
+        host_class = next(node for node in tree.body
+                          if isinstance(node, ast.ClassDef)
+                          and node.name == "_WorkbookEventHandler")
+        method = next(node for node in host_class.body
+                      if isinstance(node, ast.FunctionDef) and node.name == "_refresh")
+        kept = types.SimpleNamespace(Id=10, category_id=5)
+        received = []
+        namespace = {
+            "resolve_elements_by_id": resolver_namespace["resolve_elements_by_id"],
+            "element_id_value": lambda element_id: element_id,
+            "ReferenceCatalog": lambda doc: "catalog",
+            "elements_for_category": lambda elements, category_id: [
+                element for element in elements if element.category_id == category_id
+            ],
+            "extract_rows": lambda doc, elements, mode, parameters, catalog: (
+                received.extend(elements) or ["row"]
+            ),
+            "project_rows": lambda rows, columns, catalog: ["refreshed"],
+        }
+        exec(compile(ast.Module(body=[method], type_ignores=[]),
+                     "host._refresh", "exec"), namespace)
+        deleted_stale_reference = object()
+        handler = types.SimpleNamespace(
+            source_elements=[kept, deleted_stale_reference],
+            source_element_ids=[10, 20],
+            workbook={
+                "_sourceElementIds": [10, 20],
+                "parameterMode": "Instances Mode",
+                "sheets": [{
+                    "categoryId": 5, "parameters": ["Mark"], "columns": ["column"],
+                }],
+            },
+        )
+        document = types.SimpleNamespace(
+            GetElement=lambda element_id: {10: kept}.get(element_id)
+        )
+
+        removed = namespace["_refresh"](handler, document)
+
+        self.assertEqual(removed, 1)
+        self.assertEqual(handler.source_elements, [kept])
+        self.assertEqual(handler.source_element_ids, [10])
+        self.assertEqual(handler.workbook["_sourceElementIds"], [10])
+        self.assertEqual(received, [kept])
+        self.assertEqual(handler.workbook["sheets"][0]["rows"], ["refreshed"])
+
     def dispatch_close(self, pending=None, event_pending=False):
         with open(os.path.join(ROOT, "ui", "host.py"), encoding="utf-8") as stream:
             tree = ast.parse(stream.read())

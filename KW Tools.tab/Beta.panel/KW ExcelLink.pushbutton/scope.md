@@ -47,7 +47,13 @@ User chooses:
 
 - Selected Elements
 - Current View
+- Entire Project File (all non-type elements and all element types, including unused
+  types)
 - Entire Model
+- Entire Model includes non-type elements found in the project and only their
+  referenced element types. Unused types are excluded, so categories represented
+  only by unused types (such as unused tag types or ducts with no instances) do
+  not appear in the category picker.
 - Import edited XLSX... (see "Importing edited XLSX"; skips Steps 2–4)
 
 When **Current View** is a schedule, Step 4 preselects its supported parameter
@@ -90,6 +96,9 @@ For each selected category:
   - mixed‑use
 - User selects parameters to include by moving them from an available-parameters
   list into a selected-datagrid-columns list
+- The picker supports name search and availability filters for type, instance
+  and mixed-use parameters; rows identify their availability and show counts
+  for visible available parameters and selected columns.
 - User can remove selected columns and reorder the selected list with up/down
   controls
 - Mixed‑use parameters:
@@ -189,6 +198,15 @@ isInstance: bool
 - Dual columns for mixed‑use parameters
 - Formula engine integration
 - Change tracking array
+- Undo/redo for staged grid edits, including cell edits, formulas, bulk edits,
+  paste/text operations and XLSX imports. Undo/redo never writes to Revit;
+  Apply Changes remains the only write path.
+
+### Wizard progress
+
+- Selection, category and parameter steps show the active scope and relevant
+  element/category counts. Parameter selection identifies its position in the
+  category sequence and the selected Types/Instances mode.
 
 ============================================================
 
@@ -322,6 +340,9 @@ edits under **Edit**, and visible-row selection/isolation actions under
 **Revit**. Sheet, Back, Apply Changes, Reload and Close remain immediately available.
 **Close** exits the tool, asking for confirmation before discarding unapplied
 changes. Closing is blocked while a grid edit or Revit operation is in progress.
+Reload resolves the workbook's saved source element ids against the active
+document before rebuilding sheets. Elements deleted since the grid opened are
+omitted and reported in the grid status instead of using stale Revit objects.
 The **Formulas** toggle opens/closes the formula bar (collapsed on launch)
 without discarding its draft expression or saved templates. Search and filter
 controls stay in a separate compact row. Menus close on outside click/Escape.

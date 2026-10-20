@@ -8,7 +8,9 @@ from pyrevit import forms, script
 from core import presets
 
 TITLE = "KW ExcelLink"
-SELECTION_MODES = ("Selected Elements", "Current View", "Entire Model")
+SELECTION_MODES = (
+    "Selected Elements", "Current View", "Entire Project File", "Entire Model"
+)
 
 
 def choose_preset(title="Load preset"):
@@ -71,6 +73,8 @@ def save_from_grid(workbook, layouts):
             source = presets.SOURCE_SHARED
 
     selection_mode = workbook.get("selectionMode")
+    if selection_mode == "Entire Project":
+        selection_mode = "Entire Project File"
     if selection_mode not in SELECTION_MODES:
         selection_mode = forms.SelectFromList.show(
             list(SELECTION_MODES),

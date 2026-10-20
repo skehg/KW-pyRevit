@@ -52,18 +52,21 @@ class WizardNavigationTests(unittest.TestCase):
         }
         self.actions = []
         self.visits = []
+        self.contexts = []
 
         def choice(options, title, selected=None, **kwargs):
             step = int(title[5])
             self.visits.append((step, list(selected or [])))
+            self.contexts.append(kwargs.get("context_text", ""))
             expected, action, values = self.actions.pop(0)
             self.assertEqual(expected, step)
             return types.SimpleNamespace(
                 action=action, selected=values, ShowDialog=lambda: None
             )
 
-        def parameters(label, usage, mode, selected=None, last=True):
+        def parameters(label, usage, mode, selected=None, last=True, **kwargs):
             self.visits.append((label, list(selected or []), last))
+            self.contexts.append(kwargs.get("context_text", ""))
             expected, action, values = self.actions.pop(0)
             self.assertEqual(expected, label)
             return types.SimpleNamespace(
@@ -92,7 +95,7 @@ class WizardNavigationTests(unittest.TestCase):
             ("Doors [1]", "back", ["Level", "Mark"]),
             (3, "back", ["Types Mode"]),
             (2, "back", ["Doors [1]", "Walls [2]"]),
-            (1, "next", ["Entire Model"]),
+            (1, "next", ["Entire Project File"]),
             (2, "next", ["Doors [1]", "Walls [2]"]),
             (3, "next", ["Instances Mode"]),
             ("Doors [1]", "next", ["Level", "Mark"]),
@@ -100,11 +103,19 @@ class WizardNavigationTests(unittest.TestCase):
         ]
         workbook, source = self.flow.run_wizard(None, None)
         self.assertEqual(source, self.source)
-        self.assertEqual(workbook["selectionMode"], "Entire Model")
+        self.assertEqual(workbook["selectionMode"], "Entire Project File")
         self.assertEqual(workbook["sheets"][0]["parameters"], ["Level", "Mark"])
         self.assertIn(("Doors [1]", ["Level", "Mark"], False), self.visits)
         self.assertIn((3, ["Types Mode"]), self.visits)
+        self.assertTrue(any("2 element(s) in scope" in item for item in self.contexts))
+        self.assertTrue(any("Category 1 of 2" in item for item in self.contexts))
         self.assertEqual(self.actions, [])
+
+    def test_selection_mode_options_distinguish_project_and_used_model(self):
+        options, _ = self.flow._step_one_options()
+        self.assertIn("Entire Project File", options)
+        self.assertNotIn("Entire Project", options)
+        self.assertIn("Entire Model", options)
 
     def test_grid_resume_starts_at_active_category_and_preserves_layout(self):
         previous = self.workbook()

@@ -29,12 +29,13 @@ from core.column_builder import project_rows
 from core.element_refs import ReferenceCatalog
 from core.extract import extract_rows
 from core.revit_view import run_view_action
-from core.selection import elements_for_category
+from core.selection import elements_for_category, resolve_elements_by_id
 from core.workbook_builder import build_import_workbook
 from core.xlsx_import import diff_xlsx, read_import_plan
 from ui.import_dialogs import open_with_shell, pick_xlsx, report_import_issues
 from ui.preset_dialogs import save_from_grid
 from ui.workflow import run_wizard
+from core.types import element_id_value
 
 
 _OPEN_WINDOWS = []
@@ -63,6 +64,10 @@ class _WorkbookEventHandler(IExternalEventHandler):
         self.window = window
         self.workbook = workbook
         self.source_elements = source_elements
+        self.source_element_ids = list(
+            workbook.get("_sourceElementIds")
+            or [element_id_value(element.Id) for element in source_elements or []]
+        )
         self.document = document
         self.pending = None
 
@@ -82,11 +87,12 @@ class _WorkbookEventHandler(IExternalEventHandler):
                 )
             if request["type"] == "apply":
                 result = apply_changes(doc, request.get("changes", []))
-                self._refresh(doc)
+                removed = self._refresh(doc)
                 self.window._post({
                     "type": "applied",
                     "result": result,
                     "workbook": self.workbook,
+                    "removedElements": removed,
                 })
             elif request["type"] == "import":
                 self._import(doc, request["path"])
@@ -107,6 +113,7 @@ class _WorkbookEventHandler(IExternalEventHandler):
                     self.window._post({"type": "wizardCancelled"})
                     return
                 workbook, self.source_elements = result
+                self.source_element_ids = list(workbook.get("_sourceElementIds") or [])
                 self.workbook.clear()
                 self.workbook.update(workbook)
                 self.window._post({
@@ -131,10 +138,11 @@ class _WorkbookEventHandler(IExternalEventHandler):
                     return
                 self.window._post({"type": "revitViewDone", "message": message})
             else:
-                self._refresh(doc)
+                removed = self._refresh(doc)
                 self.window._post({
                     "type": "workbook",
                     "workbook": self.workbook,
+                    "removedElements": removed,
                 })
         except Exception as exc:
             details = traceback.format_exc()
@@ -164,8 +172,9 @@ class _WorkbookEventHandler(IExternalEventHandler):
             self.workbook.clear()
             self.workbook.update(workbook)
             self.source_elements = source_elements
+            self.source_element_ids = list(workbook.get("_sourceElementIds") or [])
         else:
-            self._refresh(doc)
+            removed = self._refresh(doc)
             diff = diff_xlsx(self.workbook, path)
             updates, summary = diff["updates"], diff["summary"]
             report_import_issues(path, plan["issues"] + diff["issues"])
@@ -176,9 +185,17 @@ class _WorkbookEventHandler(IExternalEventHandler):
             "importUpdates": updates,
             "importSummary": summary,
             "layoutReplaced": layout_replaced,
+            "removedElements": 0 if layout_replaced else removed,
         })
 
     def _refresh(self, doc):
+        self.source_elements, removed = resolve_elements_by_id(
+            doc, self.source_element_ids
+        )
+        self.source_element_ids = [
+            element_id_value(element.Id) for element in self.source_elements
+        ]
+        self.workbook["_sourceElementIds"] = list(self.source_element_ids)
         catalog = ReferenceCatalog(doc)
         for sheet in self.workbook["sheets"]:
             elements = elements_for_category(
@@ -193,6 +210,7 @@ class _WorkbookEventHandler(IExternalEventHandler):
             )
             columns = sheet["columns"]
             sheet["rows"] = project_rows(rows, columns, catalog)
+        return removed
 
 
 class ExcelLinkHost(forms.WPFWindow):

@@ -9,7 +9,11 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <TextBlock x:Name="lblTitle" FontSize="18" TextWrapping="Wrap" Margin="0,0,0,12"/>
+        <StackPanel>
+            <TextBlock x:Name="lblTitle" FontSize="18" TextWrapping="Wrap" Margin="0,0,0,4"/>
+            <TextBlock x:Name="lblContext" FontSize="12" TextWrapping="Wrap"
+                       Foreground="#566273" Margin="0,0,0,10"/>
+        </StackPanel>
         <DockPanel Grid.Row="1">
             <TextBox DockPanel.Dock="Top" x:Name="txtSearch" MinHeight="28"
                      Margin="0,0,0,8" Padding="5,2" VerticalContentAlignment="Center"

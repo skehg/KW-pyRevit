@@ -42,6 +42,29 @@ class FormulaPresetTests(unittest.TestCase):
             "Bad rule": 1,
         }), {})
 
+    def test_v1_entire_model_preset_migrates_to_entire_project(self):
+        legacy_preset = {
+            "version": 1,
+            "name": "Legacy",
+            "selectionMode": "Entire Model",
+            "sheets": [],
+        }
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "legacy.json")
+            presets._write_json(path, legacy_preset)
+            loaded = presets.load_preset(path)
+        self.assertEqual(loaded["selectionMode"], "Entire Project File")
+        self.assertEqual(loaded["version"], presets.PRESET_VERSION)
+
+    def test_previous_project_label_loads_with_new_name(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "project.json")
+            presets._write_json(path, {
+                "version": 2, "selectionMode": "Entire Project", "sheets": [],
+            })
+            loaded = presets.load_preset(path)
+        self.assertEqual(loaded["selectionMode"], "Entire Project File")
+
     def test_schedule_column_order_filters_and_sort_survive_disk_roundtrip(self):
         parameters = ["Door Number", "Width", "Level"]
         filters = {"advanced": {"join": "and", "rules": [
