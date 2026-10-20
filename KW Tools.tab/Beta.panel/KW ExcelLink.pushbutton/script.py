@@ -2,7 +2,7 @@
 __title__ = "KW ExcelLink"
 __min_revit_ver__ = 2025
 __version__ = 1.0
-__beta__ = True
+__beta__ = False
 __persistentengine__ = True
 __doc__ = "Extract, review, and batch-apply Revit parameters in a workbook-style grid."
 
