@@ -10,6 +10,7 @@ import System
 from Autodesk.Revit.DB import (
     BuiltInCategory,
     BuiltInParameter,
+    Element,
     ElementId,
     ElementType,
     FamilyInstance,
@@ -106,6 +107,9 @@ def element_type_name(type_element):
         type_name = name_parameter.AsString()
         if type_name:
             return type_name
+    type_name = Element.Name.GetValue(type_element)
+    if type_name:
+        return type_name
     raise ValueError(
         "Could not read the type name for element {0}.".format(
             element_id_value(type_element.Id)
@@ -232,6 +236,12 @@ class ReferenceCatalog(object):
             class_name = referenced.GetType().FullName
             self._class_types[class_name] = referenced.GetType()
             category_id = _category_id(referenced)
+            if class_name == "Autodesk.Revit.DB.ElementType" and category_id is None:
+                return {
+                    "key": "similarTypes|{0}".format(element_id_value(referenced.Id)),
+                    "allowNone": True,
+                    "changesType": False,
+                }
             kind = {
                 "key": "class|{0}|{1}".format(class_name, category_id),
                 "allowNone": builtin != int(BuiltInParameter.PHASE_CREATED),
@@ -261,6 +271,16 @@ class ReferenceCatalog(object):
             return []
         key = kind["key"]
         if key in self._candidates:
+            return self._candidates[key]
+        if key.startswith("similarTypes|"):
+            referenced = self.doc.GetElement(make_element_id(key.split("|", 1)[1]))
+            if referenced is None or not isinstance(referenced, ElementType):
+                raise ValueError("The reference type for '{0}' no longer exists.".format(key))
+            type_ids = [referenced.Id] + [
+                type_id for type_id in referenced.GetSimilarTypes()
+                if element_id_value(type_id) != element_id_value(referenced.Id)
+            ]
+            self._candidates[key] = [self.doc.GetElement(type_id) for type_id in type_ids]
             return self._candidates[key]
         _, class_name, category_id = key.split("|", 2)
         collector = FilteredElementCollector(self.doc)

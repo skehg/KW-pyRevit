@@ -112,7 +112,14 @@ def _client_reference_kind(kind):
     if not isinstance(kind, dict):
         return None
     key = str(kind.get("key") or "")
-    if not key.startswith("class|") or len(key.split("|", 2)) != 3:
+    similar_type = key.split("|")
+    is_similar_type = (
+        len(similar_type) == 2 and similar_type[0] == "similarTypes"
+        and similar_type[1].isdigit()
+    )
+    if not is_similar_type and (
+        not key.startswith("class|") or len(key.split("|", 2)) != 3
+    ):
         return None
     result = {"key": key, "allowNone": True, "changesType": False}
     if kind.get("noneLabel"):

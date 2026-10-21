@@ -109,6 +109,13 @@ For each selected category:
 
 Build sheets, columns, rows, highlighting, disabled cells, formula engine, change tracking.
 
+For category-less generic `ElementType` references (such as Callout Tag),
+dropdowns use Revit's `GetSimilarTypes()` plus the current reference, rather than
+all generic types in the document. This keeps unrelated arrowheads and other
+annotation definitions out of the choices. Type labels prefer the Type Name
+parameter and use the API element name when that parameter is missing or empty;
+types with neither name still report an explicit error.
+
 Browser initialization starts after the host window loads. ExcelLink creates an
 explicit WebView2 environment using the Core assembly referenced by the actual
 WPF control, avoiding the default creation-properties path that can mix Revit
