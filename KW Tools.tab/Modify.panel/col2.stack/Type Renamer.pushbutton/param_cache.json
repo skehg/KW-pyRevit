@@ -1,10 +1,10 @@
 {
-  "selections": {}, 
   "parameters": [
     "Absorptance", 
-    "Acoustic Rating", 
+    "Angled Joins", 
     "Assembly Code", 
     "Assembly Description", 
+    "Baluster Offset", 
     "Classification", 
     "Classification.OmniClass.21.Description", 
     "Classification.OmniClass.21.Number", 
@@ -37,16 +37,24 @@
     "Family Name", 
     "Function", 
     "Heat Transfer Coefficient (U)", 
+    "Height", 
     "IFCExportAs", 
     "Ifc Export As", 
     "Keynote", 
+    "Landing Height Adjustment", 
+    "Lateral Offset", 
     "Manufacturer", 
     "Model", 
     "ModifiedIssue_ANZRS", 
+    "Position", 
+    "Rail Connections", 
+    "Railing Height", 
+    "Railings-Tag-Comment", 
     "ReinforcementRateM3_WSP", 
     "ReoAdditional_WSP", 
     "ReoType", 
     "Roughness", 
+    "Tangent Joins", 
     "Thermal Mass", 
     "Thermal Resistance (R)", 
     "Type Comments", 
@@ -55,6 +63,9 @@
     "Type Mark", 
     "Type Name", 
     "URL", 
+    "Use Landing Height Adjustment", 
+    "Use Top Rail", 
     "Workset"
-  ]
+  ], 
+  "selections": {}
 }
