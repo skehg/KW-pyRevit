@@ -109,6 +109,13 @@ For each selected category:
 
 Build sheets, columns, rows, highlighting, disabled cells, formula engine, change tracking.
 
+Browser initialization starts after the host window loads. ExcelLink creates an
+explicit WebView2 environment using the Core assembly referenced by the actual
+WPF control, avoiding the default creation-properties path that can mix Revit
+2024's WebView2 SDK with a newer SDK loaded by pyRevit or another add-in. Browser
+data remains in `%LOCALAPPDATA%\KW\ExcelLink\WebView2`. Initialization failures
+are reported in full in pyRevit output before the host closes.
+
 ============================================================
 
 ## PARAMETER MODE RULES

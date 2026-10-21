@@ -7,6 +7,7 @@ import traceback
 
 import clr
 import System
+from System.Threading.Tasks import Task, TaskScheduler
 from Autodesk.Revit.UI import (
     ExternalEvent,
     ExternalEventRequest,
@@ -18,7 +19,6 @@ from pyrevit import forms, script
 try:
     clr.AddReference("Microsoft.Web.WebView2.Wpf")
     clr.AddReference("Microsoft.Web.WebView2.Core")
-    from Microsoft.Web.WebView2.Wpf import CoreWebView2CreationProperties
 except Exception as exc:
     raise RuntimeError(
         "Microsoft WebView2 WPF assemblies are not available to Revit: {0}".format(exc)
@@ -40,6 +40,19 @@ from core.types import element_id_value
 
 _OPEN_WINDOWS = []
 _LOGGER = script.get_logger()
+
+
+def _create_webview_environment(web_view, user_data_folder):
+    # Resolve Core from the actual WPF control, not a competing add-in's SDK.
+    ensure_method = next(
+        method for method in web_view.GetType().GetMethods()
+        if method.Name == "EnsureCoreWebView2Async"
+        and len(method.GetParameters()) > 0
+    )
+    environment_type = ensure_method.GetParameters()[0].ParameterType
+    return environment_type.GetMethod("CreateAsync").Invoke(
+        None, System.Array[System.Object]([None, user_data_folder, None])
+    )
 
 
 def _layout_matches(plan, workbook):
@@ -221,6 +234,7 @@ class ExcelLinkHost(forms.WPFWindow):
         self.workbook = workbook
         self.output = script.get_output()
         self._last_xlsx_path = None
+        self._closed = False
         self.Title = "KW ExcelLink - {0}".format(uidoc.Document.Title)
         self._handler = _WorkbookEventHandler(
             self, workbook, source_elements, uidoc.Document
@@ -228,21 +242,53 @@ class ExcelLinkHost(forms.WPFWindow):
         self._external_event = ExternalEvent.Create(self._handler)
         self.webView.CoreWebView2InitializationCompleted += self._on_initialized
         self.Closed += self._on_closed
-        user_data_folder = os.path.join(
-            System.Environment.GetFolderPath(
-                System.Environment.SpecialFolder.LocalApplicationData
-            ),
-            "KW",
-            "ExcelLink",
-            "WebView2",
+        self.Loaded += self._on_loaded
+
+    def _on_loaded(self, sender, args):
+        self.Loaded -= self._on_loaded
+        try:
+            user_data_folder = os.path.join(
+                System.Environment.GetFolderPath(
+                    System.Environment.SpecialFolder.LocalApplicationData
+                ),
+                "KW", "ExcelLink", "WebView2",
+            )
+            System.IO.Directory.CreateDirectory(user_data_folder)
+            self._environment_task = _create_webview_environment(
+                self.webView, user_data_folder
+            )
+            self._environment_continuation = (
+                self._environment_task.ContinueWith.Overloads[
+                    System.Action[Task], TaskScheduler
+                ](
+                    System.Action[Task](self._on_environment_created),
+                    TaskScheduler.FromCurrentSynchronizationContext(),
+                )
+            )
+        except Exception:
+            self._initialization_failed(traceback.format_exc())
+
+    def _on_environment_created(self, task):
+        try:
+            environment = task.GetAwaiter().GetResult()
+            if not self._closed:
+                self.webView.EnsureCoreWebView2Async(environment)
+        except Exception:
+            self._initialization_failed(traceback.format_exc())
+
+    def _initialization_failed(self, details):
+        _LOGGER.error("WebView2 initialization failed:\n{0}".format(details))
+        self.output.print_md("## KW ExcelLink WebView2 initialization failed")
+        self.output.print_md(
+            "The complete initialization exception is shown below and can be copied."
         )
-        System.IO.Directory.CreateDirectory(user_data_folder)
-        creation_properties = CoreWebView2CreationProperties()
-        creation_properties.UserDataFolder = user_data_folder
-        self.webView.CreationProperties = creation_properties
-        self.webView.EnsureCoreWebView2Async(None)
+        self.output.print_code(details)
+        if not self._closed:
+            self.Close()
 
     def _on_initialized(self, sender, args):
+        if self._closed:
+            return
         if not args.IsSuccess:
             exception = args.InitializationException
             details = (
@@ -250,13 +296,7 @@ class ExcelLinkHost(forms.WPFWindow):
                 if exception is not None
                 else "WebView2 initialization failed without exception details."
             )
-            _LOGGER.error("WebView2 initialization failed:\n{0}".format(details))
-            self.output.print_md("## KW ExcelLink WebView2 initialization failed")
-            self.output.print_md(
-                "The complete initialization exception is shown below and can be copied."
-            )
-            self.output.print_code(details)
-            self.Close()
+            self._initialization_failed(details)
             return
         self.webView.CoreWebView2.WebMessageReceived += self._on_web_message
         web_dir = os.path.join(os.path.dirname(__file__), "..", "web")
@@ -416,11 +456,15 @@ class ExcelLinkHost(forms.WPFWindow):
             )
 
     def _on_closed(self, sender, args):
+        self._closed = True
         try:
-            self._external_event.Dispose()
+            self.webView.Dispose()
         finally:
-            if self in _OPEN_WINDOWS:
-                _OPEN_WINDOWS.remove(self)
+            try:
+                self._external_event.Dispose()
+            finally:
+                if self in _OPEN_WINDOWS:
+                    _OPEN_WINDOWS.remove(self)
 
 
 def show_workbook(uidoc, workbook, source_elements):

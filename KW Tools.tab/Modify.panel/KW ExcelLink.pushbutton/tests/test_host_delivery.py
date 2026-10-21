@@ -10,6 +10,136 @@ from unittest.mock import Mock
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+class HostInitializationTests(unittest.TestCase):
+    def setUp(self):
+        with open(os.path.join(ROOT, "ui", "host.py"), encoding="utf-8") as stream:
+            tree = ast.parse(stream.read())
+        host = next(node for node in tree.body
+                    if isinstance(node, ast.ClassDef) and node.name == "ExcelLinkHost")
+        methods = [node for node in host.body if isinstance(node, ast.FunctionDef)
+                   and node.name in (
+                       "_on_environment_created", "_initialization_failed",
+                       "_on_initialized", "_on_closed",
+                   )]
+        helper = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                      and node.name == "_create_webview_environment")
+        self.windows = []
+        self.namespace = {
+            "_LOGGER": Mock(), "_OPEN_WINDOWS": self.windows,
+            "traceback": types.SimpleNamespace(format_exc=lambda: "test traceback"),
+            "System": types.SimpleNamespace(
+                Object=object, Array={object: list},
+            ),
+        }
+        exec(compile(ast.Module(body=[helper] + methods, type_ignores=[]),
+                     "host.initialization", "exec"), self.namespace)
+        self.host = Mock()
+        self.host._closed = False
+        self.task = Mock()
+        self.environment = object()
+        self.task.GetAwaiter.return_value.GetResult.return_value = self.environment
+
+    def test_environment_uses_core_type_from_actual_control(self):
+        unrelated_method = Mock()
+        unrelated_method.Name = "Dispose"
+        ensure_method = Mock()
+        ensure_method.Name = "EnsureCoreWebView2Async"
+        environment_type = Mock()
+        ensure_method.GetParameters.return_value = [
+            types.SimpleNamespace(ParameterType=environment_type)
+        ]
+        self.host.webView.GetType.return_value.GetMethods.return_value = [
+            unrelated_method, ensure_method
+        ]
+        task = self.namespace["_create_webview_environment"](
+            self.host.webView, "browser-data"
+        )
+        environment_type.GetMethod.assert_called_once_with("CreateAsync")
+        factory = environment_type.GetMethod.return_value
+        factory.Invoke.assert_called_once_with(None, [None, "browser-data", None])
+        self.assertIs(task, factory.Invoke.return_value)
+
+    def test_environment_is_passed_explicitly_to_control(self):
+        self.namespace["_on_environment_created"](self.host, self.task)
+        self.host.webView.EnsureCoreWebView2Async.assert_called_once_with(
+            self.environment
+        )
+        self.host._initialization_failed.assert_not_called()
+
+    def test_close_during_environment_creation_does_not_restart_browser(self):
+        self.host._closed = True
+        self.namespace["_on_environment_created"](self.host, self.task)
+        self.task.GetAwaiter.return_value.GetResult.assert_called_once_with()
+        self.host.webView.EnsureCoreWebView2Async.assert_not_called()
+
+    def test_environment_failure_is_reported(self):
+        self.task.GetAwaiter.return_value.GetResult.side_effect = RuntimeError("SDK")
+        self.namespace["_on_environment_created"](self.host, self.task)
+        self.host._initialization_failed.assert_called_once_with("test traceback")
+        self.host.webView.EnsureCoreWebView2Async.assert_not_called()
+
+    def test_synchronous_control_failure_is_reported(self):
+        self.host.webView.EnsureCoreWebView2Async.side_effect = RuntimeError("SDK")
+        self.namespace["_on_environment_created"](self.host, self.task)
+        self.host._initialization_failed.assert_called_once_with("test traceback")
+
+    def test_initialization_failure_prints_details_and_closes_once(self):
+        self.namespace["_initialization_failed"](self.host, "SDK mismatch")
+        self.host.output.print_code.assert_called_once_with("SDK mismatch")
+        self.host.Close.assert_called_once_with()
+        self.host.Close.reset_mock()
+        self.host._closed = True
+        self.namespace["_initialization_failed"](self.host, "late failure")
+        self.host.Close.assert_not_called()
+
+    def test_failed_initialization_event_reports_original_exception(self):
+        exception = Mock()
+        exception.ToString.return_value = "MissingMethodException details"
+        args = types.SimpleNamespace(IsSuccess=False, InitializationException=exception)
+        self.namespace["_on_initialized"](self.host, None, args)
+        self.host._initialization_failed.assert_called_once_with(
+            "MissingMethodException details"
+        )
+
+    def test_late_initialization_event_is_ignored_after_close(self):
+        self.host._closed = True
+        self.namespace["_on_initialized"](self.host, None, Mock())
+        self.host._initialization_failed.assert_not_called()
+        self.host.webView.CoreWebView2.Navigate.assert_not_called()
+
+    def test_close_releases_browser_event_and_window_reference(self):
+        self.windows.append(self.host)
+        self.namespace["_on_closed"](self.host, None, None)
+        self.assertTrue(self.host._closed)
+        self.host.webView.Dispose.assert_called_once_with()
+        self.host._external_event.Dispose.assert_called_once_with()
+        self.assertEqual(self.windows, [])
+
+    def test_browser_disposal_error_still_releases_event_and_reference(self):
+        self.windows.append(self.host)
+        self.host.webView.Dispose.side_effect = RuntimeError("dispose")
+        with self.assertRaisesRegex(RuntimeError, "dispose"):
+            self.namespace["_on_closed"](self.host, None, None)
+        self.host._external_event.Dispose.assert_called_once_with()
+        self.assertEqual(self.windows, [])
+
+    def test_constructor_defers_initialization_until_loaded(self):
+        with open(os.path.join(ROOT, "ui", "host.py"), encoding="utf-8") as stream:
+            tree = ast.parse(stream.read())
+        host = next(node for node in tree.body
+                    if isinstance(node, ast.ClassDef) and node.name == "ExcelLinkHost")
+        constructor = next(node for node in host.body if isinstance(node, ast.FunctionDef)
+                           and node.name == "__init__")
+        calls = [node for node in ast.walk(constructor) if isinstance(node, ast.Call)]
+        self.assertFalse(any(isinstance(node.func, ast.Attribute)
+                             and node.func.attr == "EnsureCoreWebView2Async"
+                             for node in calls))
+        self.assertTrue(any(isinstance(node, ast.AugAssign)
+                            and isinstance(node.target, ast.Attribute)
+                            and node.target.attr == "Loaded"
+                            for node in constructor.body))
+
+
 class HostDeliveryTests(unittest.TestCase):
     def setUp(self):
         with open(os.path.join(ROOT, "ui", "host.py"), encoding="utf-8") as stream:
