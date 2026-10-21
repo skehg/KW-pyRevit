@@ -9,6 +9,65 @@
     WindowStartupLocation="CenterScreen"
     ShowInTaskbar="False"
     Background="#FFF6F7F9">
+    <Window.Resources>
+        <Style x:Key="ActionArrowStyle" TargetType="Path">
+            <Setter Property="Data" Value="M0,3.5 L11,3.5 L11,0 L18,5 L11,10 L11,6.5 L0,6.5 Z"/>
+            <Setter Property="Width" Value="18"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="Fill"
+                    Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+        </Style>
+        <Style x:Key="ParameterRowStyle" TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="Foreground" Value="#202938"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}"/>
+                    <Setter Property="Background"
+                            Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <DataTemplate x:Key="ParameterRowTemplate">
+            <Grid ToolTip="{Binding Name}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding Name}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="0,0,10,0"/>
+                <Border Grid.Column="1"
+                        Background="{Binding BadgeBackground}"
+                        CornerRadius="4"
+                        Padding="6,2"
+                        VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Mode}"
+                               Foreground="{Binding BadgeForeground}"
+                               FontSize="11"/>
+                </Border>
+            </Grid>
+        </DataTemplate>
+    </Window.Resources>
     <Grid Margin="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -72,18 +131,37 @@
                          TextChanged="on_search_changed"/>
                 <ListBox x:Name="lstAvailable"
                          SelectionMode="Extended"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ItemContainerStyle="{StaticResource ParameterRowStyle}"
+                         ItemTemplate="{StaticResource ParameterRowTemplate}"
                          BorderBrush="#CBD5E1"
                          Background="White"/>
             </DockPanel>
             <StackPanel Grid.Column="1"
                         VerticalAlignment="Center"
                         Margin="12,0">
-                <Button Content="→ Add" Width="82" Height="32" Margin="0,0,0,8"
+                <Button Width="82" Height="32" Margin="0,0,0,8"
+                        AutomationProperties.Name="Add"
                         ToolTip="Add selected available parameters"
-                        Click="on_add"/>
-                <Button Content="← Remove" Width="82" Height="32"
+                        Click="on_add">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Style="{StaticResource ActionArrowStyle}" Margin="0,0,5,0"/>
+                        <TextBlock Text="Add" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button Width="82" Height="32"
+                        AutomationProperties.Name="Remove"
                         ToolTip="Remove selected datagrid parameters"
-                        Click="on_remove"/>
+                        Click="on_remove">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Style="{StaticResource ActionArrowStyle}" Margin="0,0,5,0">
+                            <Path.RenderTransform>
+                                <RotateTransform Angle="180"/>
+                            </Path.RenderTransform>
+                        </Path>
+                        <TextBlock Text="Remove" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
             </StackPanel>
             <DockPanel Grid.Column="2">
                 <TextBlock DockPanel.Dock="Top"
@@ -98,18 +176,35 @@
                            Foreground="#566273"/>
                 <ListBox x:Name="lstSelected"
                          SelectionMode="Extended"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ItemContainerStyle="{StaticResource ParameterRowStyle}"
+                         ItemTemplate="{StaticResource ParameterRowTemplate}"
                          BorderBrush="#CBD5E1"
                          Background="White"/>
             </DockPanel>
             <StackPanel Grid.Column="3"
                         VerticalAlignment="Center"
                         Margin="12,0,0,0">
-                <Button Content="↑" Width="38" Height="32" Margin="0,0,0,8"
+                <Button Width="38" Height="32" Margin="0,0,0,8"
+                        AutomationProperties.Name="Move selected columns up"
                         ToolTip="Move selected columns up"
-                        Click="on_move_up"/>
-                <Button Content="↓" Width="38" Height="32"
+                        Click="on_move_up">
+                    <Path Style="{StaticResource ActionArrowStyle}">
+                        <Path.RenderTransform>
+                            <RotateTransform Angle="-90"/>
+                        </Path.RenderTransform>
+                    </Path>
+                </Button>
+                <Button Width="38" Height="32"
+                        AutomationProperties.Name="Move selected columns down"
                         ToolTip="Move selected columns down"
-                        Click="on_move_down"/>
+                        Click="on_move_down">
+                    <Path Style="{StaticResource ActionArrowStyle}">
+                        <Path.RenderTransform>
+                            <RotateTransform Angle="90"/>
+                        </Path.RenderTransform>
+                    </Path>
+                </Button>
             </StackPanel>
         </Grid>
         <StackPanel Grid.Row="3"

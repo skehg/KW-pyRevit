@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import math
+import uuid
 
 from Autodesk.Revit.DB import (
     BuiltInParameter,
@@ -22,6 +23,7 @@ from core.element_refs import (
     make_element_id,
 )
 from core.types import TARGET_INSTANCE, TARGET_TYPE, TARGET_TYPE_NAME, element_id_value
+from core.type_names import collect_type_names, type_name_value, validate_type_renames
 
 _WALL_BASE_BUILTIN = int(BuiltInParameter.WALL_BASE_CONSTRAINT)
 _FAMILY_LEVEL_BUILTIN = int(BuiltInParameter.FAMILY_LEVEL_PARAM)
@@ -295,7 +297,7 @@ def _apply_type_changes(doc, grouped_changes, catalog):
                 raise ValueError(
                     "Type element {0} cannot be renamed.".format(element_id)
                 )
-            new_name = str(change.get("value") or "").strip()
+            new_name = type_name_value(change.get("value"))
             if not new_name:
                 raise ValueError("Type names cannot be empty.")
             element.Name = new_name
@@ -334,6 +336,13 @@ def apply_changes(doc, changes):
         return {"applied": 0, "typeChanges": 0, "instanceChanges": 0}
 
     type_changes, instance_changes = _group_changes(changes)
+    renames = dict(
+        (type_id, type_name_value(change.get("value")))
+        for (type_id, name), change in type_changes.items()
+        if name == "__TYPE_NAME__"
+    )
+    if renames:
+        validate_type_renames(collect_type_names(doc), renames)
     catalog = ReferenceCatalog(doc)
     catalog.moved_inserts = []
     transaction = Transaction(doc, "KW ExcelLink - Apply Changes")
@@ -341,6 +350,12 @@ def apply_changes(doc, changes):
         start_status = transaction.Start()
         if start_status != TransactionStatus.Started:
             raise RuntimeError("Revit could not start the ExcelLink transaction.")
+        # Free old names first so valid swaps/chains do not depend on row order.
+        for type_id in renames:
+            element = doc.GetElement(make_element_id(type_id))
+            if not element.CanBeRenamed:
+                raise ValueError("Type element {0} cannot be renamed.".format(type_id))
+            element.Name = "__ExcelLink_{0}".format(uuid.uuid4().hex)
         _apply_type_changes(doc, type_changes, catalog)
         _apply_instance_changes(doc, instance_changes, catalog)
         _check_moved_inserts(doc, catalog.moved_inserts)

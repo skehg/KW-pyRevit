@@ -1,8 +1,23 @@
+import {nameValue} from "./type_names.js";
+
+export function formulaEligible(column, parameterMode) {
+  var targetMatches = parameterMode === "Types Mode"
+    ? column.target === "type" || column.target === "typeName" : column.target === "instance";
+  return targetMatches && !!column.formulaAllowed &&
+    !!column.editable && !column.disabled && column.storageType !== "ElementId";
+}
+
+export function normalizeFormula(expression) {
+  var text = typeof expression === "string" ? expression.trim() : "";
+  if (!text || text === "=") {
+    throw new Error("Enter a formula.");
+  }
+  return text.startsWith("=") ? text : "=" + text;
+}
+
 // Templates are written for row #1; quoted strings and absolute rows stay fixed.
 export function expandFormula(expression, rowNumber, savedTitles, currentTitles) {
-  if (typeof expression !== "string" || !expression.trim().startsWith("=")) {
-    throw new Error("Start the column formula with =.");
-  }
+  expression = normalizeFormula(expression);
   function index(letters) {
     return letters.toUpperCase().split("").reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0) - 1;
   }
@@ -42,11 +57,12 @@ export function cleanFormulas(value) {
   return result;
 }
 
-export function validateResult(value, storageType) {
+export function validateResult(value, storageType, target) {
   if (value instanceof Error || value === undefined || value === null ||
       (typeof value !== "number" && typeof value !== "string" && typeof value !== "boolean")) {
     throw new Error(value instanceof Error ? value.message : "Formula must return a single value.");
   }
+  if (target === "typeName") { return nameValue(value); }
   if (storageType === "Double" || storageType === "Integer") {
     if ((typeof value === "string" && !value.trim()) || typeof value === "boolean" ||
         !Number.isFinite(Number(value)) ||

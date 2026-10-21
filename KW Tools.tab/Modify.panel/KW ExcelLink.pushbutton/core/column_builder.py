@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from core.types import MODE_INSTANCES, TARGET_INSTANCE, TARGET_TYPE
+from core.types import MODE_INSTANCES, MODE_TYPES, TARGET_INSTANCE, TARGET_TYPE
 
 
 BASE_COLUMNS = [
@@ -25,6 +25,9 @@ BASE_COLUMNS = [
 
 def build_columns(selected_parameters, usage_map, parameter_mode):
     columns = [dict(column) for column in BASE_COLUMNS]
+    for column in columns:
+        if column.get("target") == "typeName":
+            column["formulaAllowed"] = parameter_mode == MODE_TYPES
     for index, name in enumerate(selected_parameters):
         usage = usage_map.get(name, {})
         has_type = bool(usage.get("isType"))

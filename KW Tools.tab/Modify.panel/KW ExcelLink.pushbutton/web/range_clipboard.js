@@ -49,6 +49,10 @@ export function pasteValue(raw, column) {
   if (formulaLike(raw)) {
     throw new Error("Formulas are not accepted. Copy calculated values from Excel.");
   }
+  return literalValue(raw, column);
+}
+
+export function literalValue(raw, column) {
   if (column.storageType === "Double" || column.storageType === "Integer") {
     var text = raw.trim();
     if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(text)) {
@@ -66,7 +70,7 @@ export function pasteValue(raw, column) {
     var matches = (column.options || []).filter(function (value) { return value === raw; });
     if (matches.length !== 1) { throw new Error("Choose an exact, unambiguous reference name from this column's dropdown."); }
   }
-  if (column.target === "typeName" && !raw.trim()) { throw new Error("Type names cannot be blank."); }
+  if (column.target === "typeName") { return nameValue(raw); }
   return raw;
 }
 
@@ -96,3 +100,27 @@ export function planPaste(matrix, rows, columns, startRow, startColumn, editable
   });
   return {changes: Array.from(changes.values()), skipped: skipped, types: typeRows.size};
 }
+
+export function planFillDown(cells, columnForField, editable, changeKey, hasFormula) {
+  if (cells.length < 2 || !cells[0].length) {
+    throw new Error("Select the source row and at least one row below it to fill down.");
+  }
+  var changes = new Map(), types = new Set(), skipped = 0;
+  cells[0].forEach(function (source, c) {
+    var column = columnForField(source.getField());
+    if (!column) { throw new Error("The selected column is no longer available."); }
+    var value = source.getValue();
+    cells.slice(1).forEach(function (row) {
+      var cell = row[c], data = cell.getRow().getData();
+      if (!editable(column, data)) { skipped += 1; return; }
+      // Copy actual values, not clipboard text or formula expressions.
+      var validated = literalValue(value == null ? "" : String(value), column);
+      if (cell.getValue() === validated && !(hasFormula && hasFormula(data, column))) { return; }
+      var key = changeKey(data, column);
+      changes.set(key, {row: data, column: column, value: validated});
+      if (column.target === "type" || column.target === "typeName") { types.add(data.TypeElementId); }
+    });
+  });
+  return {changes: Array.from(changes.values()), skipped: skipped, types: types.size};
+}
+import {nameValue} from "./type_names.js";

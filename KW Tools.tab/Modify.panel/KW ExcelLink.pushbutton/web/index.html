@@ -59,18 +59,18 @@
   <div id="filterChips" class="chips" aria-label="Active filters"></div>
   <section id="formulaPanel" class="formula-bar" aria-label="Column formulas" hidden>
     <label>Formula column <select id="formulaColumn" aria-label="Formula column"></select></label>
-    <input id="columnFormula" aria-label="Column formula" placeholder="For row #1, e.g. =B1*2 or =SUM(B1:C1)">
+    <input id="columnFormula" aria-label="Column formula" placeholder="For row #1, e.g. B1*2 or SUM(B1:C1) (= optional)">
     <select id="formulaScope" aria-label="Formula row scope">
       <option value="visible">Visible rows</option>
       <option value="all">All rows</option>
     </select>
     <button id="formulaApply">Apply formula</button>
     <button id="formulaRemove" title="Remove the saved formula and stop recalculation; keep the current values">Remove formula</button>
-    <span id="formulaHint">Instance parameters only. Formulas are saved with presets; Apply Changes writes to Revit.</span>
+    <span id="formulaHint">Formulas are saved with presets; Apply Changes writes to Revit.</span>
   </section>
   <main>
-    <div class="clipboard-hint">Drag to select · Right-click for text tools · Ctrl+C / Ctrl+V: values only · Ctrl+H: Find / Replace · Double-click to edit</div>
-    <div id="status" role="status"></div>
+    <div class="clipboard-hint">Click to select; type to replace · F2 / double-click to edit · Enter / Tab: commit and move (Shift: reverse) · Esc: cancel · Ctrl+D: fill down values · Ctrl+C / Ctrl+V: values only · Right-click for tools</div>
+    <div id="status" role="status" tabindex="0" aria-label="Grid status messages"></div>
     <div id="grid"></div>
   </main>
   <script

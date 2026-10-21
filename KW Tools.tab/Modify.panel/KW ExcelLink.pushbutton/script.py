@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 __title__ = "KW ExcelLink"
-__min_revit_ver__ = 2021
+__min_revit_ver__ = 2022
 __version__ = 1.0
 __beta__ = False
 __persistentengine__ = True

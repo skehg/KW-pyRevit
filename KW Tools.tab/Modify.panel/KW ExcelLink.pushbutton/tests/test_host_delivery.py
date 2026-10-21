@@ -246,6 +246,7 @@ class HostDeliveryTests(unittest.TestCase):
                 received.extend(elements) or ["row"]
             ),
             "project_rows": lambda rows, columns, catalog: ["refreshed"],
+            "attach_type_names": lambda doc, rows, catalog: [],
         }
         exec(compile(ast.Module(body=[method], type_ignores=[]),
                      "host._refresh", "exec"), namespace)

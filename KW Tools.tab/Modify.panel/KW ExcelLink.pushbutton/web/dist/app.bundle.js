@@ -49869,11 +49869,60 @@
 	  return evaluateGroup(state.advanced, row, context.columnByTitle);
 	}
 
+	function nameValue(value) {
+	  var name = String(value == null ? "" : value).trim();
+	  if (!name || /[\\:{}[\]|;<>?`~\x00-\x1f]/.test(name)) {
+	    throw new Error("Type names cannot be blank or contain prohibited Revit name characters.");
+	  }
+	  return name;
+	}
+
+	function findNameConflicts(records, proposals) {
+	  var groups = new Map(), conflicts = new Map();
+	  records.forEach(function (record) {
+	    var id = String(record.id);
+	    var name = proposals.has(id) ? proposals.get(id) : record.name;
+	    var key = JSON.stringify([record.scope, String(name)]);
+	    if (!groups.has(key)) { groups.set(key, []); }
+	    groups.get(key).push({...record, name: name});
+	  });
+	  groups.forEach(function (items) {
+	    if (items.length < 2 || !items.some(item => proposals.has(String(item.id)))) { return; }
+	    items.forEach(function (item) {
+	      var others = items.filter(other => other.id !== item.id);
+	      conflicts.set(String(item.id), "Type name '" + item.name + "' conflicts with " +
+	        others.map(other => "'" + other.name + "' in " + other.family + " (type ID " + other.id + ")").join(", ") + ".");
+	    });
+	  });
+	  return conflicts;
+	}
+
+	function nameRecords(workbook) {
+	  var records = new Map();
+	  (workbook.sheets || []).forEach(function (sheet) {
+	    (sheet.typeNames || []).forEach(item => records.set(String(item.id), item));
+	  });
+	  return Array.from(records.values());
+	}
+
+	function formulaEligible(column, parameterMode) {
+	  var targetMatches = parameterMode === "Types Mode"
+	    ? column.target === "type" || column.target === "typeName" : column.target === "instance";
+	  return targetMatches && !!column.formulaAllowed &&
+	    !!column.editable && !column.disabled && column.storageType !== "ElementId";
+	}
+
+	function normalizeFormula(expression) {
+	  var text = typeof expression === "string" ? expression.trim() : "";
+	  if (!text || text === "=") {
+	    throw new Error("Enter a formula.");
+	  }
+	  return text.startsWith("=") ? text : "=" + text;
+	}
+
 	// Templates are written for row #1; quoted strings and absolute rows stay fixed.
 	function expandFormula(expression, rowNumber, savedTitles, currentTitles) {
-	  if (typeof expression !== "string" || !expression.trim().startsWith("=")) {
-	    throw new Error("Start the column formula with =.");
-	  }
+	  expression = normalizeFormula(expression);
 	  function index(letters) {
 	    return letters.toUpperCase().split("").reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0) - 1;
 	  }
@@ -49913,11 +49962,12 @@
 	  return result;
 	}
 
-	function validateResult(value, storageType) {
+	function validateResult(value, storageType, target) {
 	  if (value instanceof Error || value === undefined || value === null ||
 	      (typeof value !== "number" && typeof value !== "string" && typeof value !== "boolean")) {
 	    throw new Error(value instanceof Error ? value.message : "Formula must return a single value.");
 	  }
+	  if (target === "typeName") { return nameValue(value); }
 	  if (storageType === "Double" || storageType === "Integer") {
 	    if ((typeof value === "string" && !value.trim()) || typeof value === "boolean" ||
 	        !Number.isFinite(Number(value)) ||
@@ -49980,6 +50030,10 @@
 	  if (formulaLike(raw)) {
 	    throw new Error("Formulas are not accepted. Copy calculated values from Excel.");
 	  }
+	  return literalValue(raw, column);
+	}
+
+	function literalValue(raw, column) {
 	  if (column.storageType === "Double" || column.storageType === "Integer") {
 	    var text = raw.trim();
 	    if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(text)) {
@@ -49997,7 +50051,7 @@
 	    var matches = (column.options || []).filter(function (value) { return value === raw; });
 	    if (matches.length !== 1) { throw new Error("Choose an exact, unambiguous reference name from this column's dropdown."); }
 	  }
-	  if (column.target === "typeName" && !raw.trim()) { throw new Error("Type names cannot be blank."); }
+	  if (column.target === "typeName") { return nameValue(raw); }
 	  return raw;
 	}
 
@@ -50026,6 +50080,29 @@
 	    });
 	  });
 	  return {changes: Array.from(changes.values()), skipped: skipped, types: typeRows.size};
+	}
+
+	function planFillDown(cells, columnForField, editable, changeKey, hasFormula) {
+	  if (cells.length < 2 || !cells[0].length) {
+	    throw new Error("Select the source row and at least one row below it to fill down.");
+	  }
+	  var changes = new Map(), types = new Set(), skipped = 0;
+	  cells[0].forEach(function (source, c) {
+	    var column = columnForField(source.getField());
+	    if (!column) { throw new Error("The selected column is no longer available."); }
+	    var value = source.getValue();
+	    cells.slice(1).forEach(function (row) {
+	      var cell = row[c], data = cell.getRow().getData();
+	      if (!editable(column, data)) { skipped += 1; return; }
+	      // Copy actual values, not clipboard text or formula expressions.
+	      var validated = literalValue(value == null ? "" : String(value), column);
+	      if (cell.getValue() === validated && !(hasFormula && hasFormula(data, column))) { return; }
+	      var key = changeKey(data, column);
+	      changes.set(key, {row: data, column: column, value: validated});
+	      if (column.target === "type" || column.target === "typeName") { types.add(data.TypeElementId); }
+	    });
+	  });
+	  return {changes: Array.from(changes.values()), skipped: skipped, types: types.size};
 	}
 
 	// Pure text transforms and validation, shared by the range menu and Edit menu.
@@ -50121,6 +50198,67 @@
 	  return {changes: edited, skipped: skipped, unchanged: unchanged, types: types.size};
 	}
 
+	function editValue(raw, column) {
+	  if (raw.trim().startsWith("=")) {
+	    if (!column.formulaAllowed || column.storageType === "ElementId") {
+	      throw new Error("Formulas are disabled for this column.");
+	    }
+	    return raw;
+	  }
+	  return literalValue(raw, column);
+	}
+
+	function navigationTarget(rows, fields, rowId, field, key, backwards) {
+	  var r = rows.findIndex(row => row.getData().UniqueId === rowId);
+	  var c = fields.indexOf(field);
+	  if (r < 0 || c < 0) { return null; }
+	  var direction = backwards ? -1 : 1;
+	  if (key === "Enter") { r += direction; }
+	  else {
+	    c += direction;
+	    if (c === fields.length) { c = 0; r += 1; }
+	    if (c < 0) { c = fields.length - 1; r -= 1; }
+	  }
+	  return r >= 0 && r < rows.length ? rows[r].getCell(fields[c]) : null;
+	}
+
+	function scalarEditor(column, showError) {
+	  return function (cell, onRendered, success, cancel) {
+	    var input = document.createElement("input");
+	    input.type = "text";
+	    input.setAttribute("aria-label", column.title);
+	    input.style.cssText = "padding:4px;width:100%;height:100%;box-sizing:border-box";
+	    var original = cell.getValue();
+	    input.value = original == null ? "" : String(original);
+	    var finished = false;
+	    function commit() {
+	      if (finished) { return; }
+	      var value;
+	      try { value = editValue(input.value, column); }
+	      catch (error) {
+	        input.setAttribute("aria-invalid", "true");
+	        showError(error.message);
+	        input.focus({preventScroll: true});
+	        return;
+	      }
+	      finished = true;
+	      if (value === original) { cancel(); }
+	      else { success(value); }
+	    }
+	    onRendered(function () {
+	      input.focus({preventScroll: true});
+	      input.select();
+	    });
+	    input.addEventListener("blur", commit);
+	    input.addEventListener("keydown", function (event) {
+	      if (event.isComposing || event.keyCode === 229) { return; }
+	      if (event.key === "Enter") { commit(); }
+	      if (event.key === "Escape") { finished = true; cancel(); }
+	    });
+	    return input;
+	  };
+	}
+
 	(function () {
 
 	  var workbook = null;
@@ -50136,6 +50274,8 @@
 	  var redoHistory = [];
 	  var HISTORY_LIMIT = 75;
 	  var activeSheetIndex = 0;
+	  var typeNameConflicts = new Map();
+	  var applyingChanges = false;
 	  // Per-category column widths (only user-resized ones) and sorting, keyed by column title.
 	  var layoutState = new Map();
 	  // Header filter events fire while columns are rebuilt; ignore them until restored.
@@ -50176,6 +50316,11 @@
 	  }
 
 	  function showStatus(message, isError) {
+	    if (typeNameConflicts.size) {
+	      message = typeNameConflicts.size + " type(s) have conflicting names — resolve before applying." +
+	        (message ? " " + message : "");
+	      isError = true;
+	    }
 	    statusNode.textContent = message || "";
 	    statusNode.className = isError ? "error" : (message ? "success" : "");
 	  }
@@ -50185,24 +50330,47 @@
 	  }
 
 	  function rowChangeKey(row, column) {
-	    if (row.NewSheet) { return "createSheet|" + row.ElementId; }
 	    var id = column.target === "type"
 	      ? row.TypeElementId
 	      : (column.target === "typeName" ? row.TypeElementId : row.ElementId);
 	    return [column.target, id, column.parameterName || "__TYPE_NAME__"].join("|");
 	  }
 
-	  function cellPlanKey(row, column) {
-	    return row.NewSheet ? row.UniqueId + "|" + column.field : rowChangeKey(row, column);
-	  }
-
 	  function reportChangeCount() {
+	    refreshTypeNameConflicts();
 	    var count = pendingChanges.size;
 	    document.getElementById("changeCount").textContent =
 	      count ? count + " pending change" + (count === 1 ? "" : "s") : "No pending changes";
-	    document.getElementById("applyButton").disabled = count === 0;
+	    document.getElementById("applyButton").disabled = count === 0 || typeNameConflicts.size > 0 || applyingChanges;
 	    updateHistoryButtons();
 	    if (tableReady) { scheduleFilterBar(); }
+	  }
+
+	  function proposedTypeNames(changes) {
+	    var names = new Map();
+	    changes.forEach(function (change) {
+	      if (change.target === "typeName") { names.set(String(change.typeElementId), String(change.value).trim()); }
+	    });
+	    return names;
+	  }
+
+	  function refreshTypeNameConflicts() {
+	    var previous = typeNameConflicts.size;
+	    typeNameConflicts = workbook
+	      ? findNameConflicts(nameRecords(workbook), proposedTypeNames(pendingChanges)) : new Map();
+	    if (tableReady) {
+	      table.getRows().forEach(function (row) {
+	        row.getCells().forEach(function (cell) {
+	          var column = findColumn(cell.getField());
+	          var conflict = column && column.target === "typeName"
+	            ? typeNameConflicts.get(String(row.getData().TypeElementId)) : null;
+	          cell.getElement().classList.toggle("name-conflict-cell", !!conflict);
+	          if (conflict) { cell.getElement().setAttribute("aria-invalid", "true"); }
+	          else { cell.getElement().removeAttribute("aria-invalid"); }
+	        });
+	      });
+	    }
+	    if (typeNameConflicts.size || previous) { showStatus(""); }
 	  }
 
 	  function cloneMap(map) {
@@ -50259,13 +50427,6 @@
 	        index.get(id).push({ field: change.field, changeKey: changeKey });
 	      });
 	      (sheet.rows || []).forEach(function (row) {
-	        if (row.NewSheet) {
-	          (sheet.columns || []).forEach(function (column) {
-	            if (column.columnType === "parameter") {
-	              addRowCell(sheetIndex, row, column.field, rowChangeKey(row, column));
-	            }
-	          });
-	        }
 	        (changesByElementId.get(String(row.ElementId)) || []).forEach(function (item) {
 	          addRowCell(sheetIndex, row, item.field, item.changeKey);
 	        });
@@ -50402,7 +50563,6 @@
 	  }
 
 	  function undoEdit() {
-	    if (historyOperationBlocked()) { return; }
 	    var entry = undoHistory.pop();
 	    if (!entry) { return; }
 	    applyHistoryEntry(entry, "before");
@@ -50412,22 +50572,12 @@
 	  }
 
 	  function redoEdit() {
-	    if (historyOperationBlocked()) { return; }
 	    var entry = redoHistory.pop();
 	    if (!entry) { return; }
 	    applyHistoryEntry(entry, "after");
 	    undoHistory.push(entry);
 	    updateHistoryButtons();
 	    showStatus("Redid " + entry.label + ". Changes remain staged; Apply Changes writes them to Revit.");
-	  }
-
-	  function historyOperationBlocked() {
-	    if (clipboardBusy || document.body.inert || importButton.disabled ||
-	        (pendingChanges.size && applyButton.disabled)) {
-	      showStatus("Wait for the current operation to finish before undoing or redoing.", true);
-	      return true;
-	    }
-	    return false;
 	  }
 
 	  function findColumn(field) {
@@ -50470,7 +50620,6 @@
 	  }
 
 	  function cellEditable(column, data) {
-	    if (data.NewSheet && !pendingChanges.has(rowChangeKey(data, {}))) { return false; }
 	    return !!column.editable && !column.disabled &&
 	      !data[column.field + "__disabled"] &&
 	      (column.target !== "typeName" || data.TypeNameEditable !== false);
@@ -50737,9 +50886,6 @@
 	  }
 
 	  function buildChange(row, column, value) {
-	    if (row.NewSheet) {
-	      return { target: "createSheet", elementId: row.ElementId };
-	    }
 	    var change = {
 	      target: column.target,
 	      elementId: row.ElementId,
@@ -50768,7 +50914,7 @@
 	      if (rowIndex < 0) { return; }
 	      try {
 	        var column = findColumn(field);
-	        var value = validateResult(evaluateFormula(expression, rowIndex, field), column.storageType);
+	        var value = validateResult(evaluateFormula(expression, rowIndex, field), column.storageType, column.target);
 	        formulaValues.set(key, value);
 	        var gridRow = rows.find(function (item) {
 	          return item.getData().UniqueId === uniqueId;
@@ -50816,7 +50962,7 @@
 	      }
 	      try {
 	        formulaTexts.set(formulaKey, raw.trim());
-	        value = validateResult(evaluateFormula(raw.trim(), rowIndex, cell.getField()), column.storageType);
+	        value = validateResult(evaluateFormula(raw.trim(), rowIndex, cell.getField()), column.storageType, column.target);
 	        formulaValues.set(formulaKey, value);
 	        cell.setValue(value, true);
 	      } catch (error) {
@@ -50900,6 +51046,7 @@
 	  }
 
 	  var clipboardBusy = false;
+	  var forwardingEditorKey = false;
 	  var gridElement = document.getElementById("grid");
 
 	  function rangeClipboardTarget(event) {
@@ -50972,9 +51119,93 @@
 	    var plan = planPaste(parseTSV(text),
 	      rows, columns, rows.indexOf(first.getRow().getData()),
 	      columns.findIndex(function (column) { return column.field === first.getField(); }),
-	      cellEditable, cellPlanKey);
+	      cellEditable, rowChangeKey);
 	    return stagePlannedChanges(plan, "Paste");
 	  }
+
+	  function fillDown() {
+	    try {
+	      var plan = planFillDown(selectedRangeCells(), columnForField, cellEditable, rowChangeKey,
+	        function (row, column) { return formulaTexts.has(row.UniqueId + "|" + column.field); });
+	      return stagePlannedChanges(plan, "Fill down").catch(reportGridError);
+	    } catch (error) { showStatus("Fill down not applied: " + error.message, true); }
+	  }
+
+	  function selectGridCell(cell) {
+	    if (!cell) { return; }
+	    table.getRanges().forEach(function (range) { range.remove(); });
+	    table.addRange(cell, cell);
+	    Promise.all([
+	      cell.getRow().scrollTo("nearest", false),
+	      cell.getColumn().scrollTo("nearest", false)
+	    ]).then(function () {
+	      cell.getElement().focus({preventScroll: true});
+	    }).catch(reportGridError);
+	  }
+
+	  gridElement.addEventListener("keydown", function (event) {
+	    if (forwardingEditorKey || !tableReady || clipboardBusy || document.body.inert ||
+	        document.querySelector(".modal-backdrop") || event.isComposing || event.keyCode === 229) { return; }
+	    var editingElement = event.target.closest(".tabulator-cell.tabulator-editing");
+	    var control = event.target.closest("input, textarea, select, [contenteditable=true]");
+	    if (control && !editingElement) { return; }
+	    if (editingElement) {
+	      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
+	        event.preventDefault();
+	        event.stopImmediatePropagation();
+	        showStatus("Finish or cancel the cell edit before filling down.", true);
+	        return;
+	      }
+	      if ((event.key !== "Enter" && event.key !== "Tab") || event.ctrlKey || event.altKey || event.metaKey) { return; }
+	      event.preventDefault();
+	      event.stopImmediatePropagation();
+	      var editingCell = table.getRanges()[0] && table.getRanges()[0].getCells()[0][0];
+	      if (!editingCell) { return; }
+	      var rowId = editingCell.getRow().getData().UniqueId;
+	      var field = editingCell.getField();
+	      // Let the editor validate/commit; do not bypass dropdown selection.
+	      forwardingEditorKey = true;
+	      try {
+	        event.target.dispatchEvent(new KeyboardEvent("keydown", {key: "Enter", bubbles: false}));
+	      } finally { forwardingEditorKey = false; }
+	      if (editingElement.classList.contains("tabulator-editing")) { return; }
+	      var fields = visibleColumns(currentSheet()).map(function (column) { return column.field; });
+	      var next = navigationTarget(table.getRows("active"), fields, rowId, field, event.key, event.shiftKey);
+	      selectGridCell(next || table.getRow(rowId).getCell(field));
+	      return;
+	    }
+	    if (!event.target.closest(".tabulator-tableholder, .tabulator-cell")) { return; }
+	    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
+	      event.preventDefault();
+	      event.stopImmediatePropagation();
+	      fillDown();
+	      return;
+	    }
+	    if (event.ctrlKey || event.metaKey || event.altKey) { return; }
+	    var replace = event.key.length === 1;
+	    if (event.key !== "F2" && event.key !== "Enter" && !replace) { return; }
+	    var range = table.getRanges()[0];
+	    var cell = range && range.getCells()[0][0];
+	    if (!cell) { return; }
+	    event.preventDefault();
+	    event.stopImmediatePropagation();
+	    var column = findColumn(cell.getField());
+	    if (!column || !cellEditable(column, cell.getRow().getData())) {
+	      showStatus("This cell is read-only.", true);
+	      return;
+	    }
+	    cell.edit();
+	    var input = cell.getElement().querySelector("input");
+	    if (input) {
+	      if (replace) {
+	        input.value = event.key;
+	        input.dispatchEvent(new Event("input", {bubbles: true}));
+	        input.dispatchEvent(new KeyboardEvent("keyup", {key: event.key, bubbles: true}));
+	      } else if (input.type === "text") {
+	        input.setSelectionRange(input.value.length, input.value.length);
+	      }
+	    }
+	  }, true);
 
 	  gridElement.addEventListener("copy", function (event) {
 	    if (!rangeClipboardTarget(event)) { return; }
@@ -51026,12 +51257,6 @@
 	      applied += 1;
 	    });
 	    nextWorkbook.sheets.forEach(function (sheet, index) {
-	      (sheet.rows || []).forEach(function (row) {
-	        if (!row.NewSheet) { return; }
-	        pendingChanges.set(rowChangeKey(row, {}), buildChange(row, {}, null));
-	        perSheet[index] = (perSheet[index] || 0) + 1;
-	        applied += 1;
-	      });
 	      sheet.pendingLabel = perSheet[index] ? " (" + perSheet[index] + " to import)" : "";
 	    });
 	    if (applied) { recordHistory(historyBefore, "Import XLSX", nextWorkbook); }
@@ -51055,10 +51280,10 @@
 	        }
 	      };
 	    }
-	    if (column.storageType === "Double" || column.storageType === "Integer") {
-	      return { editor: "number", editorParams: {} };
-	    }
-	    return { editor: "input", editorParams: {} };
+	    return {
+	      editor: scalarEditor(column, function (message) { showStatus(message, true); }),
+	      editorParams: {}
+	    };
 	  }
 
 	  function displayTitle(column) {
@@ -51174,10 +51399,15 @@
 	            element.classList.add("disabled-cell");
 	          }
 	          element.classList.toggle("pending-cell", isPending(cell, column));
+	          element.classList.toggle("name-conflict-cell", column.target === "typeName" &&
+	            typeNameConflicts.has(String(cell.getRow().getData().TypeElementId)));
 	          return cell.getValue() == null ? "" : cell.getValue();
 	        },
 	        tooltip: function (event, cell) {
 	          var data = cell.getRow().getData();
+	          if (column.target === "typeName" && typeNameConflicts.has(String(data.TypeElementId))) {
+	            return typeNameConflicts.get(String(data.TypeElementId));
+	          }
 	          if (!isPending(cell, column)) {
 	            return data[column.field + "__disabled"] ? (data[column.field + "__note"] || "") : "";
 	          }
@@ -51376,7 +51606,7 @@
 	        var transform = kind === "replace"
 	          ? textReplacement(find.value, replace.value, match.checked, whole.checked, regex.checked)
 	          : function (value) { return changeCase(value, caseMode.value); };
-	        plan = planTextChanges(textScopeCells$1(scope.value, selected), transform, cellEditable, cellPlanKey);
+	        plan = planTextChanges(textScopeCells$1(scope.value, selected), transform, cellEditable, rowChangeKey);
 	        summary.textContent = plan.changes.length + " value(s) will change; " + plan.skipped +
 	          " locked/non-text cell(s) skipped; " + plan.unchanged + " unchanged cell(s)." +
 	          (plan.types ? " Affects " + plan.types + " shared type(s)." : "");
@@ -51472,6 +51702,7 @@
 	        showStatus("Paste not applied: " + exc.message + ". You can use Ctrl+V in the grid.", true);
 	      });
 	    });
+	    action("Fill down — Ctrl+D", fillDown);
 	    action("Find / Replace...", function () { openTextTool("replace"); });
 	    var cases = el("details");
 	    cases.appendChild(el("summary", null, "Change case"));
@@ -51514,7 +51745,6 @@
 	  }
 
 	  function masterFilter(data) {
-	    if (data.NewSheet && !pendingChanges.has(rowChangeKey(data, {}))) { return false; }
 	    var sheet = currentSheet();
 	    if (!sheet) { return true; }
 	    return rowPasses(data, filtersFor(sheet), cachedContext(sheet), { skipHeaders: true });
@@ -52039,9 +52269,8 @@
 	  var formulaApply = document.getElementById("formulaApply");
 	  var formulaRemove = document.getElementById("formulaRemove");
 
-	  function formulaEligible(column) {
-	    return column.target === "instance" && column.formulaAllowed &&
-	      column.editable && !column.disabled && column.storageType !== "ElementId";
+	  function formulaEligible$1(column) {
+	    return formulaEligible(column, workbook && workbook.parameterMode);
 	  }
 
 	  function loadFormulaDraft() {
@@ -52065,7 +52294,12 @@
 	    var selected = formulaColumn.value;
 	    formulaColumn.replaceChildren();
 	    var sheet = currentSheet();
-	    var columns = sheet ? visibleColumns(sheet).filter(formulaEligible) : [];
+	    document.getElementById("formulaHint").textContent =
+	      (workbook && workbook.parameterMode === "Types Mode"
+	        ? "Type formulas affect all instances of each type, including those outside this workbook. "
+	        : "Instance parameters only. ") +
+	      "The leading = is optional. Formulas are saved with presets; Apply Changes writes to Revit.";
+	    var columns = sheet ? visibleColumns(sheet).filter(formulaEligible$1) : [];
 	    columns.forEach(function (column) {
 	      var option = document.createElement("option");
 	      option.value = column.title;
@@ -52084,13 +52318,14 @@
 	    var sheet = currentSheet();
 	    if (!sheet || !formulaColumn.value || !columnFormula.value.trim()) { return; }
 	    var titles = visibleColumns(sheet).map(c => c.title);
+	    var expression = normalizeFormula(columnFormula.value);
 	    // A restored expression retains its title bindings until the user edits it.
 	    var previous = layoutFor(sheet).formulas[formulaColumn.value];
-	    var bindings = previous && previous.expression === columnFormula.value.trim()
+	    var bindings = previous && previous.expression === expression
 	      ? previous.columns : titles;
-	    expandFormula(columnFormula.value, 1, bindings, titles);
+	    expandFormula(expression, 1, bindings, titles);
 	    layoutFor(sheet).formulas[formulaColumn.value] = {
-	      expression: columnFormula.value.trim(),
+	      expression: expression,
 	      columns: bindings.slice(),
 	      scope: formulaScope.value
 	    };
@@ -52109,22 +52344,22 @@
 	  formulaApply.addEventListener("click", function () {
 	    var sheet = currentSheet();
 	    var column = sheet && columnByTitle(sheet, formulaColumn.value);
-	    if (!column || !formulaEligible(column)) { return; }
+	    if (!column || !formulaEligible$1(column)) { return; }
 	    var historyBefore = captureEditState();
 	    var oldTexts = new Map(formulaTexts);
 	    var oldValues = new Map(formulaValues);
 	    try {
-	      if (!columnFormula.value.trim()) { throw new Error("Enter a formula starting with =."); }
+	      var expression = normalizeFormula(columnFormula.value);
 	      var titles = visibleColumns(sheet).map(c => c.title);
 	      var previous = layoutFor(sheet).formulas[column.title];
-	      var bindings = previous && previous.expression === columnFormula.value.trim()
+	      var bindings = previous && previous.expression === expression
 	        ? previous.columns : titles;
 	      var rows = table.getData(formulaScope.value === "all" ? undefined : "active");
 	      var targets = rows.filter(row => cellEditable(column, row));
 	      if (!targets.length) { throw new Error("No editable rows in the selected scope."); }
 	      targets.forEach(function (row) {
 	        var key = row.UniqueId + "|" + column.field;
-	        formulaTexts.set(key, expandFormula(columnFormula.value, row.__rowNo, bindings, titles));
+	        formulaTexts.set(key, expandFormula(expression, row.__rowNo, bindings, titles));
 	        formulaValues.delete(key);
 	      });
 	      // Evaluate everything before changing any row or pending change. This
@@ -52138,7 +52373,7 @@
 	          var value;
 	          try {
 	            value = validateResult(
-	              evaluateFormula(formulaTexts.get(key), row.__rowNo - 1, item.field), item.storageType
+	              evaluateFormula(formulaTexts.get(key), row.__rowNo - 1, item.field), item.storageType, item.target
 	            );
 	          } finally {
 	            formulaEvaluationStack.delete(key);
@@ -52152,8 +52387,7 @@
 	      updates.forEach(function (item) {
 	        var key = rowChangeKey(item.row, item.column);
 	        if (!originalValues.has(key)) { originalValues.set(key, item.row[item.column.field]); }
-	        if (!item.row.NewSheet &&
-	            String(originalValues.get(key) == null ? "" : originalValues.get(key)) === String(item.value)) {
+	        if (String(originalValues.get(key) == null ? "" : originalValues.get(key)) === String(item.value)) {
 	          pendingChanges.delete(key);
 	        } else {
 	          pendingChanges.set(key, buildChange(item.row, item.column, item.value));
@@ -52314,42 +52548,23 @@
 	  // ------------------------------------------------------------ apply/save
 
 	  function sendApply(hiddenKeys) {
+	    if (typeNameConflicts.size) { showStatus(""); return; }
 	    var hiddenSet = new Set(hiddenKeys);
 	    carryOver = hiddenKeys.map(function (key) {
-	      var change = pendingChanges.get(key);
-	      var item = { change: change, oldValue: originalValues.get(key) };
-	      if (change.target === "createSheet") {
-	        workbook.sheets.some(function (sheet) {
-	          var rows = sheet === currentSheet() && tableReady ? table.getData() : sheet.rows;
-	          var row = rows.find(function (entry) { return entry.ElementId === change.elementId; });
-	          if (!row) { return false; }
-	          item.row = JSON.parse(JSON.stringify(row));
-	          item.categoryId = sheet.categoryId;
-	          return true;
-	        });
-	      }
-	      return item;
+	      return { change: pendingChanges.get(key), oldValue: originalValues.get(key) };
 	    });
 	    var changes = [];
 	    pendingChanges.forEach(function (change, key) {
-	      if (hiddenSet.has(key)) { return; }
-	      if (change.target !== "createSheet") { changes.push(change); return; }
-	      workbook.sheets.forEach(function (sheet) {
-	        var rows = sheet === currentSheet() && tableReady ? table.getData() : sheet.rows;
-	        var row = rows.find(function (entry) { return entry.ElementId === change.elementId; });
-	        if (!row) { return; }
-	        changes.push({
-	          target: "createSheet", elementId: row.ElementId,
-	          titleBlockId: row.NewSheet.titleBlockId,
-	          parameters: sheet.columns.filter(function (column) {
-	            return column.columnType === "parameter" && column.target === "instance" &&
-	              cellEditable(column, row) && row[column.field] != null;
-	          }).map(function (column) {
-	            return Object.assign(buildChange({}, column, row[column.field]), { unit: column.unit });
-	          })
-	        });
-	      });
+	      if (!hiddenSet.has(key)) { changes.push(change); }
 	    });
+	    var partialConflicts = findNameConflicts(nameRecords(workbook), proposedTypeNames(changes));
+	    if (partialConflicts.size) {
+	      carryOver = [];
+	      showStatus("The visible rename batch conflicts with names held by filtered-out types. " +
+	        "Clear the filters and apply the complete rename batch.", true);
+	      return;
+	    }
+	    applyingChanges = true;
 	    post({ type: "apply", changes: changes });
 	    applyButton.disabled = true;
 	    showStatus("Applying " + changes.length + " change(s) in Revit…");
@@ -52361,17 +52576,6 @@
 	    var restored = 0;
 	    carryOver.forEach(function (item) {
 	      var change = item.change;
-	      if (change.target === "createSheet") {
-	        var target = nextWorkbook.sheets.find(function (sheet) {
-	          return sheet.categoryId === item.categoryId;
-	        });
-	        if (target && item.row) {
-	          target.rows.push(item.row);
-	          pendingChanges.set(rowChangeKey(item.row, {}), change);
-	          restored += 1;
-	        }
-	        return;
-	      }
 	      nextWorkbook.sheets.some(function (sheet) {
 	        var column = sheetColumn(sheet, change.field);
 	        if (!column || column.target !== change.target) { return false; }
@@ -52399,23 +52603,6 @@
 	    return Object.assign({}, workbook, {
 	      sheets: workbook.sheets.map(function (sheet, index) {
 	        return Object.assign({}, sheet, { rows: visibleRowsFor(sheet, index) });
-	      })
-	    });
-	  }
-
-	  function exportWorkbook(source) {
-	    return Object.assign({}, source, {
-	      sheets: source.sheets.map(function (sheet) {
-	        return Object.assign({}, sheet, {
-	          rows: sheet.rows.filter(function (row) {
-	            return !row.NewSheet || pendingChanges.has(rowChangeKey(row, {}));
-	          }).map(function (row) {
-	            if (!row.NewSheet) { return row; }
-	            return Object.assign({}, row, {
-	              ElementId: null, UniqueId: null, TypeElementId: null, TypeName: ""
-	            });
-	          })
-	        });
 	      })
 	    });
 	  }
@@ -52632,6 +52819,7 @@
 	  document.getElementById("undoButton").addEventListener("click", undoEdit);
 	  document.getElementById("redoButton").addEventListener("click", redoEdit);
 	  applyButton.addEventListener("click", function () {
+	    if (typeNameConflicts.size) { showStatus(""); return; }
 	    if (!pendingChanges.size) { return; }
 	    var hidden = hiddenChangeKeys();
 	    if (!hidden.length) {
@@ -52672,7 +52860,7 @@
 	      return hasActiveFilters(filtersFor(sheet));
 	    });
 	    if (!filtered) {
-	      post({ type: "save", workbook: exportWorkbook(workbook) });
+	      post({ type: "save", workbook: workbook });
 	      return;
 	    }
 	    showModal("Export XLSX",
@@ -52684,9 +52872,7 @@
 	        { label: "Cancel", value: null }
 	      ]).then(function (choice) {
 	      if (choice) {
-	        post({ type: "save", workbook: exportWorkbook(
-	          choice === "visible" ? visibleWorkbook() : workbook
-	        ) });
+	        post({ type: "save", workbook: choice === "visible" ? visibleWorkbook() : workbook });
 	      }
 	    });
 	  });
@@ -52694,7 +52880,7 @@
 	  var presetButton = document.getElementById("presetButton");
 	  document.getElementById("closeButton").addEventListener("click", function () {
 	    if (clipboardBusy || importButton.disabled || presetButton.disabled ||
-	        (pendingChanges.size && applyButton.disabled)) {
+	        applyingChanges) {
 	      showStatus("Wait for the current operation to finish before closing ExcelLink.", true);
 	      return;
 	    }
@@ -52707,7 +52893,7 @@
 	  document.getElementById("backButton").addEventListener("click", function () {
 	    if (!workbook || !tableReady) { return; }
 	    if (importButton.disabled || presetButton.disabled ||
-	        (pendingChanges.size && applyButton.disabled)) {
+	        applyingChanges) {
 	      showStatus("Wait for the current operation to finish before going Back.", true);
 	      return;
 	    }
@@ -52764,6 +52950,7 @@
 	        document.body.inert = false;
 	      }
 	      if (message.type === "workbook" || message.type === "applied") {
+	        applyingChanges = false;
 	        importButton.disabled = false;
 	        applyButton.disabled = false;
 	        clearEditHistory();
@@ -52795,8 +52982,6 @@
 	        renderWorkbook(message.workbook, message.wizardRebuilt);
 	        if (message.type === "applied") {
 	          showStatus("Applied " + message.result.applied + " change(s)." +
-	            (message.result.createdSheets
-	              ? " Created " + message.result.createdSheets + " sheet(s)." : "") +
 	            (carried ? " " + carried + " change(s) in filtered-out rows are still pending." : "") +
 	            (message.removedElements
 	              ? " " + message.removedElements + " deleted element(s) were removed from the grid."
@@ -52813,8 +52998,12 @@
 	      } else if (message.type === "wizardCancelled") {
 	        showStatus("Wizard canceled. The grid and unapplied changes are unchanged.");
 	      } else if (message.type === "error") {
+	        applyingChanges = false;
 	        carryOver = [];
-	        applyButton.disabled = pendingChanges.size === 0;
+	        if (message.typeNames && workbook) {
+	          workbook.sheets.forEach(function (sheet) { sheet.typeNames = message.typeNames; });
+	        }
+	        reportChangeCount();
 	        importButton.disabled = false;
 	        presetButton.disabled = false;
 	        setRevitButtons(false);

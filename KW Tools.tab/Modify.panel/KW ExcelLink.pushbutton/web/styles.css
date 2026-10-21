@@ -61,8 +61,17 @@ button.primary:hover { background: #10588f; }
 .toolbar-spacer { flex: 1; }
 #changeCount { min-width: 118px; margin-left: auto; color: #566273; font-size: 12px; text-align: right; }
 main { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 10px; }
-#status { color: #566273; min-height: 0; font-size: 12px; }
-#status:not(:empty) { padding: 5px 4px 9px; }
+#status {
+  color: #566273;
+  flex: 0 0 46px;
+  height: 46px;
+  box-sizing: border-box;
+  padding: 5px 4px 9px;
+  font-size: 12px;
+  line-height: 16px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
 #status.error { color: #a12622; white-space: pre-wrap; }
 #status.success { color: #237447; }
 .clipboard-hint { color: #566273; font-size: 12px; padding: 0 4px 6px; }
@@ -75,6 +84,11 @@ main { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 1
   color: #7c2d12;
   font-weight: 600;
   box-shadow: inset 0 0 0 1px #f59e0b;
+}
+.tabulator-cell.name-conflict-cell {
+  background: #fde2e2 !important;
+  color: #991b1b !important;
+  box-shadow: inset 0 0 0 2px #c53030;
 }
 
 .filterbar {

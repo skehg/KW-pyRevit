@@ -36,6 +36,7 @@ from ui.import_dialogs import open_with_shell, pick_xlsx, report_import_issues
 from ui.preset_dialogs import save_from_grid
 from ui.workflow import run_wizard
 from core.types import element_id_value
+from core.type_names import attach_type_names, collect_type_names
 
 
 _OPEN_WINDOWS = []
@@ -163,10 +164,19 @@ class _WorkbookEventHandler(IExternalEventHandler):
             output = script.get_output()
             output.print_md("## KW ExcelLink {0} failed".format(request.get("type")))
             output.print_code(details)
-            self.window._post({
+            error = {
                 "type": "error",
                 "message": "{0} (full traceback in the pyRevit output window)".format(exc),
-            })
+            }
+            if request["type"] == "apply":
+                try:
+                    error["typeNames"] = collect_type_names(doc)
+                except Exception:
+                    refresh_details = traceback.format_exc()
+                    _LOGGER.error("Could not refresh type names:\n{0}".format(refresh_details))
+                    output.print_code(refresh_details)
+                    error["message"] += " Type-name checks could not be refreshed; reload the workbook."
+            self.window._post(error)
 
     def _import(self, doc, path):
         file_name = os.path.basename(path)
@@ -223,6 +233,7 @@ class _WorkbookEventHandler(IExternalEventHandler):
             )
             columns = sheet["columns"]
             sheet["rows"] = project_rows(rows, columns, catalog)
+            sheet["typeNames"] = attach_type_names(doc, rows, catalog)
         return removed
 
 

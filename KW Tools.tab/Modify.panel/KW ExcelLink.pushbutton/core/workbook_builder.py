@@ -9,6 +9,7 @@ from core.extract import extract_rows
 from core.parameter_map import build_parameter_usage_map
 from core.selection import category_key, category_options, elements_for_category
 from core.types import MODE_INSTANCES, MODE_TYPES, element_id_value
+from core.type_names import attach_type_names
 
 
 def build_sheet(doc, catalog, label, category_id, elements, parameters,
@@ -26,6 +27,7 @@ def build_sheet(doc, catalog, label, category_id, elements, parameters,
         "parameters": list(parameters),
         "columns": columns,
         "rows": project_rows(rows, columns, catalog),
+        "typeNames": attach_type_names(doc, rows, catalog),
     }
 
 

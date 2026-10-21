@@ -99,8 +99,17 @@ For each selected category:
 - The picker supports name search and availability filters for type, instance
   and mixed-use parameters; rows identify their availability and show counts
   for visible available parameters and selected columns.
+- Both lists show the parameter name separately from a smaller, right-aligned
+  availability badge: blue Type, grey Instance, or purple Type + Instance.
+  Long names are trimmed with the full name available in a tooltip.
+- In Types Mode the picker hides instance-only parameters and excludes them
+  from restored selections. Mixed-use parameters remain available for their
+  type values. Existing imported/preset workbook column rules are unchanged.
 - User can remove selected columns and reorder the selected list with up/down
   controls
+- Add, Remove, Up and Down use solid vector arrows in 18-DIP icon boxes, with
+  3-DIP shafts and 10-DIP-wide, 7-DIP-deep heads. Icons inherit button foreground;
+  existing labels, button sizes and the Back icon are retained.
 - Mixed‑use parameters:
   - Types Mode → show only type column; instance-only blank/disabled
   - Instances Mode → show two columns: “ParamName (Type)” and “ParamName (Instance)”
@@ -298,6 +307,13 @@ Copilot must generate code that:
   show the unit symbol, e.g. `Width (Type) [mm]`.
 - On apply, edited values are converted back with
   `UnitUtils.ConvertToInternalUnits` using the same project unit.
+- Genuinely unitless numeric parameters remain unchanged. Unresolved data types,
+  invalid project units/accuracy and conversion failures are errors, never a
+  fallback to internal units. Extraction stops with an error; failures during
+  Apply Changes roll back the entire batch and are reported in the grid and
+  pyRevit output.
+- Unit-symbol lookup failures are logged as warnings and use the unit's Forge
+  type ID in headers instead. Numeric conversion remains active.
 
 ### Importing edited XLSX
 
@@ -366,11 +382,35 @@ keeping formula letter badges and
 column-menu buttons visible. The sort/filter dropdown button sits at the
 right-hand end of each column's filter input.
 
-- The formula bar offers eligible instance parameter columns, an expression,
-  and **Visible rows** (default) / **All rows** scope. Type parameters and
-  ElementId references remain manual-only; read-only rows are skipped.
+- The formula bar offers eligible type parameter columns in Types Mode and
+  instance parameter columns in Instances Mode, an expression, and **Visible
+  rows** (default) / **All rows** scope. Type parameters remain manual-only in
+  Instances Mode. Type Name is also formula-enabled in Types Mode only.
+  ElementId references are excluded; read-only
+  rows are skipped.
+- In Types Mode the formula panel includes an inline reminder that type
+  changes affect all instances, including those outside the workbook.
+  Applying a type formula requires no additional confirmation dialog.
+- Type Name formulas produce trimmed, nonblank text, for example
+  `="Panel "&B1&" x "&C1`. Referencing the destination Type Name cell itself
+  (e.g. `="Prefix "&A1` in column A) is circular, not a reference to its old name.
+  Use Find/Replace for prefixing existing names instead.
+- Proposed duplicate type names stay staged for correction. Conflicting Type
+  Name cells turn red (ahead of normal yellow pending highlighting), with
+  tooltips identifying the other type and its ID. An inline conflict summary
+  blocks Apply Changes without opening a confirmation dialog. Names are checked
+  within their family/system-type scope, including document types outside the
+  workbook. This covers manual edits, formulas, paste/fill/text tools, undo/redo,
+  and imported XLSX values in both parameter modes.
+- Apply revalidates names against the current document before any writes.
+  Valid rename swaps/chains use temporary names inside the existing atomic
+  transaction; failures roll everything back. Filtered Apply cannot omit a
+  rename needed to free a name: clear the filters and apply the complete batch.
 - Write the expression for original row `#1`, e.g. `=B1*C1` or
-  `=SUM(B1:C1)`. Applying it fills the column, adjusting relative row
+  `=SUM(B1:C1)`. The leading `=` is optional in the formula bar: `B1*C1`
+  and `SUM(B1:C1)` work too. Saved templates retain the standard `=` prefix.
+  Direct cell entry still requires `=` to distinguish formulas from text.
+  Applying it fills the column, adjusting relative row
   references for each original row number, regardless of sorting/filtering.
   `$B$1` / `B$1` keep the referenced row fixed; quoted strings are unchanged.
 - **Apply formula** validates results before staging changes; circular
@@ -392,9 +432,20 @@ right-hand end of each column's filter input.
 
 ### Range selection and Excel clipboard
 
+- Status messages reserve a fixed two-line area above the grid, including when
+  empty, so appearing/clearing messages do not move or resize the grid. Longer
+  messages scroll within that area, which supports keyboard focus.
 - Drag across cells to select one rectangular range (or extend it using
   Shift and the arrow keys). Click a row-number cell to select a whole row.
-  Double-click a cell to edit it; header sorting uses the sort icon or
+  Click a cell and start typing to replace its content; F2, Enter or
+  double-click edits the existing content. Enter/Shift+Enter commits and
+  selects the row below/above; Tab/Shift+Tab commits and selects the next/
+  previous column, wrapping to the next/previous displayed row at the edge.
+  Navigation stops at the grid boundaries and may select read-only cells,
+  which cannot be edited. Escape cancels an open edit. Reference fields keep
+  validated dropdowns; numeric input accepts finite project-unit values or
+  permitted formulas, never partial/invalid numbers.
+  Header sorting uses the sort icon or
   column menu so it does not interfere with selection.
 - **Ctrl+C** copies the selected range's current values as tab-separated text,
   without headers, formatting or formula expressions. Quoted tabs, multiline
@@ -404,6 +455,16 @@ right-hand end of each column's filter input.
   cell, using the visible columns and currently displayed (sorted/filtered)
   row order. Hidden rows are not paste destinations. No rows or columns are
   added; blocks extending past the grid fail instead of truncating or wrapping.
+- **Ctrl+D** or **Fill down** in the range context menu copies each column's
+  top selected value to the selected rows below it, in displayed sorted/
+  filtered order. Select at least two rows, including the source row.
+  Finish or cancel any open cell editor first.
+  Formula sources supply calculated values, not relative formula copies.
+  Locked destinations are skipped and counted; unchanged cells are not
+  staged unless their active formula is being replaced by a literal value.
+  Validation, shared-type confirmation/propagation and pending-change
+  safeguards are the same as paste. A fill is one grid undo step and never
+  writes to Revit until Apply Changes.
 - The whole block is validated before staging any edits. Locked cells,
   including the row-number column, are skipped and counted. Editable numeric
   values must be finite, use project display units and have no unit suffix or
@@ -425,7 +486,7 @@ right-hand end of each column's filter input.
 ### Find/Replace and case conversion
 
 - Right-click inside a selected range to preserve it and open **Copy values**,
-  **Paste values**, **Find / Replace...** and **Change case**. Right-clicking
+  **Paste values**, **Fill down**, **Find / Replace...** and **Change case**. Right-clicking
   outside the range targets the clicked cell instead. Clipboard menu actions
   use browser clipboard access; a denied/unavailable permission is reported
   with guidance to use Ctrl+C/Ctrl+V instead.

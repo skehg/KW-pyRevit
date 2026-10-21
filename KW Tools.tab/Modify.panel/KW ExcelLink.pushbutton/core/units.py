@@ -4,19 +4,17 @@
 import math
 
 from Autodesk.Revit.DB import FormatOptions, LabelUtils, UnitUtils
+from pyrevit import script
 
-_DEFAULT_DECIMALS = 6
+_LOGGER = script.get_logger()
 _MAX_DECIMALS = 9
 
 
 def _decimals(accuracy):
-    try:
-        if accuracy > 0:
-            digits = int(math.ceil(-math.log10(accuracy) - 1e-9))
-            return min(max(digits, 0), _MAX_DECIMALS)
-    except Exception:
-        pass
-    return _DEFAULT_DECIMALS
+    if accuracy <= 0 or math.isnan(accuracy) or math.isinf(accuracy):
+        raise ValueError("Project unit accuracy must be a positive finite number.")
+    digits = int(math.ceil(-math.log10(accuracy) - 1e-9))
+    return min(max(digits, 0), _MAX_DECIMALS)
 
 
 def _symbol_label(format_options, unit_type_id):
@@ -43,25 +41,42 @@ class UnitConverter(object):
         """Return {'unitTypeId', 'decimals', 'symbol'} or None if not measurable."""
         try:
             spec = parameter.Definition.GetDataType()
-        except Exception:
-            return None
-        if spec is None or spec.Empty():
-            return None
-        key = spec.TypeId
-        if key in self._cache:
-            return self._cache[key]
-        info = None
+            if spec is None or spec.Empty():
+                raise ValueError("Revit returned an empty parameter data type.")
+            key = spec.TypeId
+            if key in self._cache:
+                return self._cache[key]
+            if not UnitUtils.IsMeasurableSpec(spec):
+                self._cache[key] = None
+                return None
+            options = self.units.GetFormatOptions(spec)
+            unit_type_id = options.GetUnitTypeId()
+            if (unit_type_id is None or unit_type_id.Empty()
+                    or not UnitUtils.IsValidUnit(spec, unit_type_id)):
+                raise ValueError("Revit returned an invalid project display unit.")
+            info = {
+                "unitTypeId": unit_type_id,
+                "decimals": _decimals(options.Accuracy),
+            }
+        except Exception as exc:
+            raise ValueError(
+                "Cannot resolve project units for parameter '{0}': {1}. "
+                "ExcelLink will not use raw internal units.".format(
+                    parameter.Definition.Name, exc
+                )
+            )
         try:
-            if UnitUtils.IsMeasurableSpec(spec):
-                options = self.units.GetFormatOptions(spec)
-                unit_type_id = options.GetUnitTypeId()
-                info = {
-                    "unitTypeId": unit_type_id,
-                    "decimals": _decimals(options.Accuracy),
-                    "symbol": _symbol_label(options, unit_type_id),
-                }
-        except Exception:
-            info = None
+            info["symbol"] = _symbol_label(options, unit_type_id)
+        except Exception as exc:
+            # Labels are cosmetic; retain conversion and identify the actual unit.
+            info["symbol"] = unit_type_id.TypeId
+            _LOGGER.warning(
+                "ExcelLink could not resolve the unit symbol for parameter "
+                "'{0}'; using unit ID '{1}' in headers. Numeric conversion "
+                "is unchanged. Details: {2}".format(
+                    parameter.Definition.Name, info["symbol"], exc
+                )
+            )
         self._cache[key] = info
         return info
 

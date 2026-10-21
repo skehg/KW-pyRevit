@@ -131,7 +131,7 @@ def _build_type_row(type_element, category_name, selected_names, catalog):
         "TypeElementId": type_id,
         "TypeName": _element_type_name(type_element),
         "TypeKey": str(type_id),
-        "TypeNameEditable": True,
+        "TypeNameEditable": type_element.CanBeRenamed,
         "Parameters": parameters,
     }
 
@@ -227,7 +227,7 @@ def extract_rows(doc, elements, parameter_mode, selected_parameters, catalog=Non
             "TypeElementId": type_id,
             "TypeName": instance_name,
             "TypeKey": str(type_id if type_id is not None else instance_id),
-            "TypeNameEditable": type_element is not None,
+            "TypeNameEditable": type_element is not None and type_element.CanBeRenamed,
             "Parameters": parameters,
         })
 
