@@ -336,6 +336,8 @@ class ExcelLinkHost(forms.WPFWindow):
                 self._queue_revit_request(request)
             elif message_type == "reload":
                 self._queue_revit_request({"type": "reload"})
+            elif message_type == "resetZoom":
+                self.webView.ZoomFactor = 1.0
             elif message_type == "save":
                 self._save_workbook(request.get("workbook"))
             elif message_type == "import":

@@ -50315,6 +50315,15 @@
 	    }
 	  }
 
+	  function handleZoomReset(event) {
+	    if (!event.ctrlKey || event.altKey || event.shiftKey || event.metaKey ||
+	        (event.key !== "0" && event.code !== "Numpad0")) { return; }
+	    event.preventDefault();
+	    event.stopPropagation();
+	    post({ type: "resetZoom" });
+	  }
+	  document.addEventListener("keydown", handleZoomReset, true);
+
 	  function showStatus(message, isError) {
 	    if (typeNameConflicts.size) {
 	      message = typeNameConflicts.size + " type(s) have conflicting names — resolve before applying." +

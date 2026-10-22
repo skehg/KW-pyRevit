@@ -275,7 +275,7 @@ class HostDeliveryTests(unittest.TestCase):
         self.assertEqual(received, [kept])
         self.assertEqual(handler.workbook["sheets"][0]["rows"], ["refreshed"])
 
-    def dispatch_close(self, pending=None, event_pending=False):
+    def dispatch_close(self, pending=None, event_pending=False, message_type="close"):
         with open(os.path.join(ROOT, "ui", "host.py"), encoding="utf-8") as stream:
             tree = ast.parse(stream.read())
         host = next(node for node in tree.body
@@ -288,9 +288,21 @@ class HostDeliveryTests(unittest.TestCase):
         window = Mock()
         window._handler.pending = pending
         window._external_event.IsPending = event_pending
-        args = types.SimpleNamespace(WebMessageAsJson=json.dumps({"type": "close"}))
+        args = types.SimpleNamespace(WebMessageAsJson=json.dumps({"type": message_type}))
         namespace["_on_web_message"](window, None, args)
         return window
+
+    def test_zoom_reset_only_changes_requesting_windows_zoom(self):
+        other_window = Mock()
+        other_window.webView.ZoomFactor = 1.75
+        window = self.dispatch_close(
+            pending={"type": "apply"}, event_pending=True, message_type="resetZoom"
+        )
+        self.assertEqual(window.webView.ZoomFactor, 1.0)
+        self.assertEqual(other_window.webView.ZoomFactor, 1.75)
+        window._queue_revit_request.assert_not_called()
+        window.Close.assert_not_called()
+        window._post.assert_not_called()
 
     def test_close_message_closes_the_host_without_a_revit_request(self):
         window = self.dispatch_close()
