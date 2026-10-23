@@ -39,7 +39,14 @@ def _combined_category_key(categories):
 
 
 def build_sheet(doc, catalog, label, category_id, elements, parameters,
-                parameter_mode, usage_map, categories=None):
+                parameter_mode, usage_map, categories=None, field_options=None):
+    if field_options is not None:
+        from core.optional_fields import select_usage
+        usage_map = select_usage(usage_map, field_options)
+        usage_map = dict((key, dict(value, fieldOptions=field_options))
+                         for key, value in usage_map.items())
+        parameters = [key for key in parameters if key in usage_map
+                      and (parameter_mode == MODE_INSTANCES or usage_map[key].get("isType"))]
     rows = extract_rows(
         doc, elements, parameter_mode, parameters, catalog, usage_map=usage_map
     )
@@ -65,6 +72,7 @@ def build_sheet(doc, catalog, label, category_id, elements, parameters,
         ),
         "categories": categories,
         "parameterUsage": usage_map,
+        "fieldOptions": field_options,
         "parameters": list(parameters),
         "columns": columns,
         "rows": project_rows(rows, columns, catalog),
@@ -183,6 +191,7 @@ def build_preset_workbook(doc, preset, selection_mode, source_elements):
             if grid_layout != "combined" and category_items else None,
             elements, parameters, parameter_mode, usage_map,
             categories=categories,
+            field_options=preset.get("fieldOptions"),
         )
         if sheet is None:
             issues.append({"sheet": label, "message": "No rows; sheet skipped."})
@@ -197,6 +206,7 @@ def build_preset_workbook(doc, preset, selection_mode, source_elements):
         "selectionMode": selection_mode,
         "parameterMode": parameter_mode,
         "gridLayout": grid_layout,
+        "fieldOptions": preset.get("fieldOptions"),
         "presetName": preset.get("name"),
         "sheets": sheets,
         "_sourceElementIds": [
@@ -264,6 +274,8 @@ def build_import_workbook(doc, file_path):
         )
         usage_map = build_parameter_usage_map(doc, elements)
         requested_usage = entry.get("parameterUsage") or {}
+        optional_fields = next((metadata["fieldOptions"] for metadata in requested_usage.values()
+                                if isinstance(metadata, dict) and metadata.get("fieldOptions")), None)
         for key, metadata in requested_usage.items():
             if isinstance(metadata, dict):
                 usage_map.setdefault(key, {}).update(metadata)
@@ -271,6 +283,7 @@ def build_import_workbook(doc, file_path):
         sheet = build_sheet(
             doc, catalog, label, category_id, elements, parameters,
             parameter_mode, usage_map, categories=categories,
+            field_options=optional_fields,
         )
         if sheet is not None:
             sheet["sheetKey"] = entry.get("sheetKey") or sheet.get("sheetKey")
@@ -283,6 +296,7 @@ def build_import_workbook(doc, file_path):
         "selectionMode": "Imported XLSX",
         "parameterMode": parameter_mode,
         "gridLayout": grid_layout,
+        "fieldOptions": sheets[0].get("fieldOptions"),
         "importFile": os.path.basename(file_path),
         "sheets": sheets,
         "_sourceElementIds": [

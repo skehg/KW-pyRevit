@@ -9,6 +9,8 @@ from unittest.mock import patch
 
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 
 
 class ElementType:
@@ -39,6 +41,10 @@ class ParameterMetadataTests(unittest.TestCase):
     def setUp(self):
         self.db = types.ModuleType("Autodesk.Revit.DB")
         self.db.ElementType = ElementType
+        self.db.BuiltInParameter = types.SimpleNamespace(
+            ELEM_CATEGORY_PARAM=-1140362, ELEM_CATEGORY_PARAM_MT=-1140363,
+            SYMBOL_FAMILY_NAME_PARAM=-1002002, SYMBOL_NAME_PARAM=-1002001)
+        self.db.StorageType = types.SimpleNamespace(String="String")
         self.db.ParameterElement = ParameterElement
         self.db.LabelUtils = types.SimpleNamespace(GetLabelForSpec=lambda spec: {
             "text": "Text", "length": "Length", "yesno": "Yes/No",
@@ -158,6 +164,7 @@ class ParameterMetadataTests(unittest.TestCase):
         node = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
                     and node.name == "_parameter_values")
         namespace = {
+            "ElementType": ElementType,
             "parameter_descriptor": self.metadata.parameter_descriptor,
             "_READ_ONLY_REASON": "Read-only in Revit.",
             "_read_parameter": lambda p, owner, catalog: {
@@ -169,6 +176,7 @@ class ParameterMetadataTests(unittest.TestCase):
         usage = {}
         for param in params:
             descriptor = self.metadata.parameter_descriptor(self.doc, self.owner, param)
+            descriptor["isInstance"] = True
             usage[descriptor["key"]] = descriptor
         values = namespace["_parameter_values"](
             self.owner, set(usage), types.SimpleNamespace(doc=self.doc), usage)

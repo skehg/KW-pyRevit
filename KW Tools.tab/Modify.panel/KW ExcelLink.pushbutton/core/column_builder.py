@@ -61,6 +61,7 @@ def build_columns(selected_parameters, usage_map, parameter_mode):
 
 def _parameter_column(index, name, suffix, target, disabled, formulas_allowed, usage=None):
     usage = usage or {}
+    disabled = disabled or bool(usage.get("derivedGroup"))
     is_type = target == TARGET_TYPE
     return {
         "title": "{0} ({1})".format(usage.get("displayName", name), suffix),

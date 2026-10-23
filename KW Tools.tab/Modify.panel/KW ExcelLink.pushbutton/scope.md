@@ -131,6 +131,58 @@ combined grid:
 
 ### Step 5 — Datagrid Opens
 
+#### Optional API fields and reversible false-positive filtering
+
+Step 4 has three controls:
+
+- **Offer coordinates (read-only)** is off by default. Enable it, then select
+  individual fields from the parameter list: internal-origin X/Y/Z,
+  project-base-point X/Y/Z, or shared Easting/Northing/Elevation.
+- **Offer useful API fields (read-only)** is off by default. It offers resolved
+  category/family names, host element ID, pinned state, point-location rotation,
+  and facing/hand unit-vector components. These supplement ordinary parameters;
+  existing Level, dimensions, quantities, phases and IFC parameters stay in the
+  normal parameter list.
+- **Filter known false positives** is on for new wizard sessions. Uncheck it
+  to restore raw parameter availability. Filtering targets exact built-in
+  Category identities and empty, read-only built-in Family Name/Type Name
+  records per scope. It never hides arbitrary blank editable or custom
+  parameters with those names. Shared/built-in identity handling from the
+  existing parameter catalog is retained.
+
+These options apply to the workbook and survive Back/reopening fields, presets,
+and XLSX reconstruction (through the existing hidden parameter usage metadata).
+Old presets/XLSX files without options retain their saved raw field selections.
+The new derived fields are instance-only, explicitly disabled in the grid, and
+ignored as write targets during XLSX diffing. Server-side apply also rejects
+derived identities. No model transaction or movement is performed to read them.
+
+Coordinate definitions:
+
+- **Internal origin:** `LocationPoint.Point`, internal model axes.
+- **Project base point:** the same point minus `BasePoint.Position`. Axes remain
+  parallel to internal/project-north axes; this is not a true-north rotation
+  or the base point's shared survey values.
+- **Shared:** `ActiveProjectLocation.GetProjectPosition(point)`, so translation,
+  elevation and rotation use the active shared site. Changing the active site
+  changes these values on refresh.
+
+Coordinates use project length units; rotation uses project angle units.
+Facing/hand components are dimensionless vectors in internal axes, not distances.
+Only point locations provide insertion XYZ. Curve-based and location-less
+elements show blank disabled cells with an explanatory tooltip; there is no
+implicit centroid, curve midpoint or zero-coordinate fallback. Derived fields
+are not offered in Types Mode.
+
+Values are read only for selected fields/output elements. Project-base-point
+position and unit formats are cached for an extraction/refresh, with no solid
+geometry traversal or extra whole-model collector in discovery.
+
+To roll back the optional behavior in the UI, turn off both API-field offers
+and uncheck false-positive filtering, then rebuild the grid. Removing a selected
+field through these options is reported. Code changes are uncommitted and
+separate from baseline commit `a7e1916`; no model data or parameters are added.
+
 Build sheets, columns, rows, highlighting, disabled cells, formula engine, change tracking.
 Parameter column headers show the friendly data type and project unit above the
 parameter name. In a combined grid, the Category column is visible.

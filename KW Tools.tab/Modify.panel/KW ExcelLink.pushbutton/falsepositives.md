@@ -1,5 +1,17 @@
 # ExcelLink parameter false-positive review
 
+## Implementation update (2026-10-23)
+
+The committed identity-aware catalog now distinguishes built-in ids, shared
+GUIDs and compatible data/storage types, rather than grouping solely by label.
+The subsequent optional-fields implementation adds a Step 4 opt-out for
+known-false-positive filtering, fixes Category display when raw Category
+parameters are retained, and suppresses empty read-only built-in Family
+Name/Type Name records per scope. It deliberately does not remove every blank
+or read-only parameter. See [the current feature rules](scope.md#optional-api-fields-and-reversible-false-positive-filtering).
+
+The findings below describe the earlier review baseline, not all current code.
+
 Reviewed 2026-10-22. This is a code-path review of parameter discovery,
 extraction, projection, and write-back. It does not change ExcelLink behavior.
 

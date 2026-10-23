@@ -47,6 +47,9 @@ def _group_changes(changes):
         group[key] = change
 
     for change in changes:
+        if any(str(change.get(key) or "").startswith("derived:")
+               for key in ("parameterIdentity", "parameterKey")):
+            raise ValueError("Derived API fields are read-only and cannot be applied to Revit.")
         target = change.get("target")
         parameter_name = change.get("parameterKey") or change.get("parameterName")
         if target == TARGET_TYPE_NAME:

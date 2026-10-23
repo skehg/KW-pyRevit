@@ -214,6 +214,11 @@ class ReferenceCatalog(object):
                 display = element_display_name(referenced)
         elif id_value is not None and id_value >= 0:
             display = parameter.AsValueString() or str(id_value)
+        elif builtin in (int(BuiltInParameter.ELEM_CATEGORY_PARAM),
+                         int(BuiltInParameter.ELEM_CATEGORY_PARAM_MT)):
+            display = parameter.AsValueString()
+            if not display:
+                display = owner.Category.Name if owner.Category is not None else NONE_LABEL
         elif builtin in _UNCONNECTED_BUILTINS:
             display = UNCONNECTED_LABEL
         else:

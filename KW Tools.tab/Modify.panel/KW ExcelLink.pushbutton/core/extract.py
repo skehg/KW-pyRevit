@@ -90,6 +90,10 @@ def _parameter_values(element, selected_names, catalog, usage_map=None):
             key = name
         if key not in selected_names:
             continue
+        if usage_map is not None:
+            scope = "isType" if isinstance(element, ElementType) else "isInstance"
+            if not usage_map[key].get(scope):
+                continue
         existing = result.get(key)
         # Some elements expose two parameters with one name (e.g. a read-only
         # schedule "Level" and the editable placement "Level"); keep the editable one,
@@ -103,6 +107,12 @@ def _parameter_values(element, selected_names, catalog, usage_map=None):
                 or (existing["readOnlyReason"] == _READ_ONLY_REASON
                     and record["readOnlyReason"] != _READ_ONLY_REASON)):
             result[key] = record
+    if (usage_map is not None and not isinstance(element, ElementType)
+            and any(usage_map[key].get("derivedGroup") for key in selected_names)):
+        from core.optional_fields import DerivedReader
+        if not hasattr(catalog, "derived_reader"):
+            catalog.derived_reader = DerivedReader(catalog.doc)
+        result.update(catalog.derived_reader.read(element, selected_names, usage_map))
     return result
 
 

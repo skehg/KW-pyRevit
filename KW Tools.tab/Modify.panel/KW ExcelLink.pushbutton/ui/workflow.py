@@ -161,6 +161,10 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
     if selection_mode == "Entire Project":
         selection_mode = "Entire Project File"
     parameter_mode = previous.get("parameterMode") or PARAMETER_MODES[1]
+    optional_fields = previous.get("fieldOptions")
+    if workbook is not None and optional_fields is None:
+        optional_fields = {
+            "coordinates": False, "usefulFields": False, "filterFalsePositives": False}
     old_sheet_list = list(previous.get("sheets") or [])
     old_sheets = {}
     old_layout_by_category = {}
@@ -372,10 +376,12 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
                     " ({0} categories)".format(len(categories)) if combined else "",
                     len(elements), parameter_mode
                 ),
+                field_options=optional_fields,
             )
             dialog.ShowDialog()
             if dialog.action == "cancel":
                 return None
+            optional_fields = getattr(dialog, "field_options", optional_fields)
             chosen = list(dialog.selected_parameters or [])
             if combined:
                 combined_fields = chosen
@@ -393,6 +399,7 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
             catalog = ReferenceCatalog(doc)
             sheets = []
             schedule_issues = []
+            omitted_fields = 0
             sheet_groups = (
                 [(None, "Combined categories", categories, elements, usage, combined_fields)]
                 if combined else
@@ -411,8 +418,10 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
                     doc, catalog, label, category_id, elements, params,
                     parameter_mode, usage_map,
                     categories=[_category_record(item) for item in sheet_categories],
+                    field_options=optional_fields,
                 )
                 if sheet is not None:
+                    omitted_fields += len(params) - len(sheet["parameters"])
                     if combined:
                         prior_layout = (
                             (combined_previous or {}).get("layout")
@@ -438,6 +447,12 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
                 forms.alert("No category has rows and selected parameters.", title=__title__)
                 step = 2
                 continue
+            if omitted_fields:
+                forms.alert(
+                    "{0} field selection(s) from earlier categories were omitted by the "
+                    "current workbook-wide field options. Return to Parameters to change "
+                    "the options and reselect those fields.".format(omitted_fields),
+                    title=__title__)
             if schedule_issues:
                 forms.alert(
                     "Some schedule settings could not be transferred:\n\n{0}\n\n"
@@ -450,6 +465,7 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
                 "selectionMode": selection_mode,
                 "parameterMode": parameter_mode,
                 "gridLayout": grid_layout,
+                "fieldOptions": optional_fields,
                 "sheets": sheets,
                 "_sourceElementIds": [element_id_value(e.Id) for e in source_elements],
             }

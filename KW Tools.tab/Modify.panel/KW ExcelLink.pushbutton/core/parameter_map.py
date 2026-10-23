@@ -4,6 +4,7 @@ from Autodesk.Revit.DB import ElementType
 
 from core.types import element_id_value
 from core.parameter_metadata import parameter_descriptor
+from core.optional_fields import derived_descriptors, is_false_positive
 
 
 def _parameter_names(element):
@@ -26,10 +27,14 @@ def build_parameter_usage_map(doc, elements):
                        if element.Category is not None)
 
     def descriptors(element):
-        return [parameter_descriptor(doc, element, parameter)
-                for parameter in element.Parameters
-                if parameter is not None and parameter.Definition is not None
-                and parameter.Definition.Name]
+        records = []
+        for parameter in element.Parameters:
+            if parameter is None or parameter.Definition is None or not parameter.Definition.Name:
+                continue
+            descriptor = parameter_descriptor(doc, element, parameter)
+            descriptor["useful"] = not is_false_positive(parameter)
+            records.append(descriptor)
+        return records
 
     def add(records, target, category_id):
         for descriptor in records:
@@ -40,6 +45,11 @@ def build_parameter_usage_map(doc, elements):
                                   typeCategoryIds=[], instanceCategoryIds=[])
             entry = usage[key]
             entry[target] = True
+            useful_key = "useful" + ("Type" if target == "isType" else "Instance")
+            entry[useful_key] = entry.get(useful_key, False) or descriptor.get("useful", True)
+            useful_categories = entry.setdefault(useful_key + "CategoryIds", [])
+            if descriptor.get("useful", True) and category_id is not None and category_id not in useful_categories:
+                useful_categories.append(category_id)
             if category_id is not None and category_id not in entry["categoryIds"]:
                 entry["categoryIds"].append(category_id)
             target_categories = entry["typeCategoryIds" if target == "isType" else "instanceCategoryIds"]
@@ -77,6 +87,15 @@ def build_parameter_usage_map(doc, elements):
                 entry = usage[key]
                 entry["displayName"] = "{0} [{1}; {2}]".format(
                     name, entry["dataType"], entry["identity"])
+    instance_categories = sorted(set(
+        element_id_value(element.Category.Id) for element in elements
+        if not isinstance(element, ElementType) and element.Category is not None))
+    for descriptor in derived_descriptors() if instance_categories else []:
+        usage[descriptor["key"]] = dict(
+            descriptor, isType=False, isInstance=True,
+            categoryIds=instance_categories, categoryNames=[categories[key] for key in instance_categories],
+            categoryCount=len(instance_categories), totalCategories=len(category_ids),
+            typeCategoryIds=[], instanceCategoryIds=instance_categories)
     return usage
 
 

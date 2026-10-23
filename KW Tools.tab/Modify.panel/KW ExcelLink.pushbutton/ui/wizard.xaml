@@ -97,6 +97,16 @@
             <TextBlock x:Name="lblMode"
                        Margin="0,3,0,10"
                        Foreground="#4B5563"/>
+            <WrapPanel Margin="0,0,0,8">
+                <CheckBox x:Name="chkCoordinates" Content="Offer coordinates (read-only)"
+                          Margin="0,0,16,0"
+                          ToolTip="Opt-in insertion XYZ: internal origin, project base point, and active shared site. Select individual fields below. Point locations only; unavailable on type rows."/>
+                <CheckBox x:Name="chkUsefulFields" Content="Offer useful API fields (read-only)"
+                          Margin="0,0,16,0"
+                          ToolTip="Resolved category/family, host ID, pinned state, rotation and facing/hand vectors. Select fields below."/>
+                <CheckBox x:Name="chkFalsePositives" Content="Filter known false positives"
+                          ToolTip="Uncheck to restore all raw parameters. Filters built-in Category and empty read-only built-in Family Name/Type Name copies; keeps blank editable parameters."/>
+            </WrapPanel>
         </StackPanel>
         <TextBlock Grid.Row="1"
                    Text="Filter by usage or search by name. Select several fields and add them in one step; selected columns stay in the order shown."

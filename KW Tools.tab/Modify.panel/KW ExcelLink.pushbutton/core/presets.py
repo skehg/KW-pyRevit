@@ -218,6 +218,7 @@ def preset_from_workbook(workbook, layouts, name, selection_mode):
         "selectionMode": selection_mode,
         "parameterMode": workbook.get("parameterMode"),
         "gridLayout": workbook.get("gridLayout") or "separate",
+        "fieldOptions": workbook.get("fieldOptions"),
         "sheets": sheets,
     }
 

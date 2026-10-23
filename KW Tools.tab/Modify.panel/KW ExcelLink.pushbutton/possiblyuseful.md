@@ -1,5 +1,15 @@
 # Potentially useful ExcelLink fields outside the current parameter picker
 
+## Implementation update (2026-10-23)
+
+Step 4 now offers opt-in, read-only derived fields: all three coordinate frames,
+resolved category/family, host ID, pinned state, point rotation and facing/hand
+vectors. These are instance-only fields, selected individually in the picker.
+Curve midpoint/endpoints, solid centroids, and coordinate movement are not
+implemented. See [coordinate definitions and rollback controls](scope.md#optional-api-fields-and-reversible-false-positive-filtering).
+
+The investigation below records the earlier baseline and rationale.
+
 Reviewed 2026-10-22 against the ExcelLink source and the active Revit 2024
 document (`Project1`). The Revit check read one placed door and its API
 parameters; it did not modify the model. The active Revit context had no

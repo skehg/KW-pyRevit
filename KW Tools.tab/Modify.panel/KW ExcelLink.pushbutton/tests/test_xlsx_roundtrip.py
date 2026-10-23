@@ -105,6 +105,30 @@ class XlsxRoundtripTests(unittest.TestCase):
             if os.path.exists(path):
                 os.remove(path)
 
+    def test_readonly_derived_identity_and_field_options_roundtrip(self):
+        from core.optional_fields import derived_descriptors
+        workbook = make_workbook()
+        sheet = workbook["sheets"][0]
+        descriptor = next(item for item in derived_descriptors()
+                          if item["key"] == "derived:internal_0")
+        usage = dict(PARAMETER_USAGE, **descriptor)
+        usage["fieldOptions"] = {
+            "coordinates": True, "usefulFields": False, "filterFalsePositives": False}
+        sheet["parameters"] = [descriptor["key"]]
+        sheet["parameterUsage"] = {descriptor["key"]: usage}
+        column = sheet["columns"][-1]
+        column.update(parameterKey=descriptor["key"], parameterName=descriptor["name"],
+                      parameterIdentity=descriptor["identity"], specTypeId=descriptor["specTypeId"],
+                      parameterGuid=None, disabled=True, editable=False)
+        xlsx_export.write_xlsx(workbook, self.path)
+        plan = xlsx_import.read_import_plan(self.path)
+        restored = plan["sheets"][0]["parameterUsage"][descriptor["key"]]
+        self.assertEqual(restored["fieldOptions"], usage["fieldOptions"])
+        self.assertEqual(restored["derivedGroup"], "coordinates")
+        sheet["rows"][0]["p0_instance"] += 1
+        diff = xlsx_import.diff_xlsx(workbook, self.path)
+        self.assertEqual(diff["updates"], [])
+
     def test_combined_two_row_export_plan_and_identity_based_diff(self):
         exported = make_workbook(value=12.5, title="Renamed display label")
         xlsx_export.write_xlsx(exported, self.path)

@@ -117,9 +117,14 @@ class ChoiceWizardWindow(forms.WPFWindow):
 
 class ParameterWizardWindow(forms.WPFWindow):
     def __init__(self, category_label, usage_map, parameter_mode,
-                 selected=None, last=True, context_text=None):
+                 selected=None, last=True, context_text=None, field_options=None):
+        from core.optional_fields import field_options as normalize_options, select_usage
         xaml_path = os.path.join(os.path.dirname(__file__), "wizard.xaml")
         forms.WPFWindow.__init__(self, xaml_path)
+        self._all_usage = usage_map
+        self._parameter_mode = parameter_mode
+        self.field_options = normalize_options(field_options)
+        usage_map = select_usage(usage_map, self.field_options)
         self.Title = "Step 4 of 5 - Parameters - {0}".format(category_label)
         self._parameter_names = sorted(
             (name for name, usage in usage_map.items()
@@ -148,6 +153,16 @@ class ParameterWizardWindow(forms.WPFWindow):
         self.cboAvailability.SelectionChanged += self.on_filter_changed
         if hasattr(self, "cboCoverage"):
             self.cboCoverage.SelectionChanged += self.on_filter_changed
+        for control, key in (("chkCoordinates", "coordinates"),
+                             ("chkUsefulFields", "usefulFields"),
+                             ("chkFalsePositives", "filterFalsePositives")):
+            if hasattr(self, control):
+                checkbox = getattr(self, control)
+                checkbox.IsChecked = self.field_options[key]
+                checkbox.Checked += self.on_field_options_changed
+                checkbox.Unchecked += self.on_field_options_changed
+                if key != "filterFalsePositives":
+                    checkbox.IsEnabled = parameter_mode != MODE_TYPES
 
         for name in self._parameter_names:
             self._items[name] = ParameterListItem(name, self._usage_map[name])
@@ -157,6 +172,34 @@ class ParameterWizardWindow(forms.WPFWindow):
                 self.lstSelected.Items.Add(self._items[name])
                 self._available_displays.discard(name)
         self._refresh_available()
+
+    def on_field_options_changed(self, sender, args):
+        from core.optional_fields import select_usage
+        selected = [str(item) for item in self.lstSelected.Items]
+        self.field_options = {
+            "coordinates": bool(self.chkCoordinates.IsChecked),
+            "usefulFields": bool(self.chkUsefulFields.IsChecked),
+            "filterFalsePositives": bool(self.chkFalsePositives.IsChecked),
+        }
+        self._usage_map = select_usage(self._all_usage, self.field_options)
+        self._parameter_names = [
+            key for key, usage in self._usage_map.items()
+            if self._parameter_mode != MODE_TYPES or usage.get("isType")
+        ]
+        removed = [key for key in selected if key not in self._parameter_names]
+        self._items = dict((key, ParameterListItem(key, self._usage_map[key]))
+                           for key in self._parameter_names)
+        self.lstSelected.Items.Clear()
+        for key in selected:
+            if key in self._items:
+                self.lstSelected.Items.Add(self._items[key])
+        self._available_displays = set(self._items) - set(selected)
+        self._refresh_available()
+        if removed:
+            forms.alert(
+                "{0} selected field(s) were removed by these options. "
+                "Disable filtering or re-enable API fields to make them available again."
+                .format(len(removed)), title="KW ExcelLink")
 
     def on_filter_changed(self, sender, args):
         if hasattr(self, "_usage_map"):

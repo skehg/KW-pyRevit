@@ -9,6 +9,8 @@ from unittest.mock import Mock, patch
 
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 
 
 class Collection(list):
@@ -86,6 +88,26 @@ class ParameterPickerTests(unittest.TestCase):
             self.assertEqual(window._items[name].Name, name)
             self.assertEqual(window._items[name].Mode, mode)
         self.assertEqual(len(set(item.BadgeBackground for item in window._items.values())), 3)
+
+    def test_optional_fields_toggle_rebuilds_list_and_can_restore_raw_parameters(self):
+        self.usage["Category"] = {
+            "isInstance": True, "usefulInstance": False, "name": "Category"}
+        self.usage["derived:internal_0"] = {
+            "isInstance": True, "name": "Internal X", "derivedGroup": "coordinates"}
+        window = self.window()
+        self.assertNotIn("Category", window._items)
+        self.assertNotIn("derived:internal_0", window._items)
+        window.chkCoordinates = types.SimpleNamespace(IsChecked=True)
+        window.chkUsefulFields = types.SimpleNamespace(IsChecked=False)
+        window.chkFalsePositives = types.SimpleNamespace(IsChecked=False)
+        window.on_field_options_changed(None, None)
+        self.assertIn("Category", window._items)
+        self.assertIn("derived:internal_0", window._items)
+        window.lstSelected.Items.Add(window._items["derived:internal_0"])
+        window.chkCoordinates.IsChecked = False
+        window.on_field_options_changed(None, None)
+        self.assertEqual(window.lstSelected.Items.Count, 0)
+        self.forms.alert.assert_called_once()
 
     def test_semantic_type_badges_display_names_and_category_coverage(self):
         self.usage = {
