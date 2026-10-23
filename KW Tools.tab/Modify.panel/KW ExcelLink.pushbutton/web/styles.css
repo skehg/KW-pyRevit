@@ -170,7 +170,9 @@ main { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 1
 .tabulator .tabulator-header .tabulator-col .tabulator-col-content .tabulator-col-title {
   white-space: normal;
 }
-.tabulator .col-title { display: inline-flex; align-items: center; gap: 5px; width: 100%; }
+.tabulator .col-title { display: inline-flex; flex-direction: column; align-items: stretch; gap: 3px; width: 100%; }
+.tabulator .col-data-type { color: #64748b; font-size: 10px; font-weight: normal; min-height: 13px; }
+.tabulator .col-title .col-letter { align-self: flex-start; }
 .tabulator .col-label {
   display: -webkit-box;
   -webkit-box-orient: vertical;

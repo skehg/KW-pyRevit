@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Minimal dependency-free XLSX (SpreadsheetML) writer for ExcelLink workbooks."""
 
+import json
 import re
 import zipfile
 
@@ -23,9 +24,14 @@ _STYLE_DISABLED = 3
 _INVALID_XML = re.compile(u"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 _INVALID_SHEET_CHARS = re.compile(r"[\[\]\:\*\?\/\\]")
 _META_FIELDS = (
-    "sheet", "header", "field", "columnType", "parameterName", "target",
-    "storageType", "parameterGuid", "parameterBuiltin", "categoryId",
+    "schemaVersion", "gridLayout", "parameterMode", "sheet", "sheetKey",
+    "categories", "parameterKeys", "categoryId", "categoryKey", "field", "columnType",
+    "columnIndex", "parameterKey", "parameterName", "displayName", "parameterIdentity",
+    "dataType", "specTypeId", "usage", "target", "storageType", "unit", "options",
+    "referenceKind", "parameterGuid", "parameterBuiltin", "isType",
+    "isInstance",
 )
+SCHEMA_VERSION = u"2"
 
 
 def _text(value):
@@ -88,7 +94,7 @@ def _unique_sheet_name(name, used):
     return candidate
 
 
-def _export_columns(sheet):
+def _export_columns(sheet, grid_layout):
     columns = sheet.get("columns") or []
     by_field = dict((column.get("field"), column) for column in columns)
     exported = []
@@ -96,7 +102,11 @@ def _export_columns(sheet):
         if field in by_field:
             exported.append((by_field[field], True))
     for column in columns:
-        if column.get("field") in ID_FIELDS or column.get("visible") is False:
+        is_combined_category = (
+            grid_layout == "combined" and column.get("field") == "Category"
+        )
+        if column.get("field") in ID_FIELDS or (
+                column.get("visible") is False and not is_combined_category):
             continue
         exported.append((column, False))
     return exported
@@ -111,26 +121,49 @@ def _cell_style(column, row):
 
 
 def _column_title(column):
-    title = column.get("title") or column.get("field")
+    return column.get("title") or column.get("field")
+
+
+def _header_type(column, sheet):
+    if column.get("columnType") == "parameter":
+        parameter_key = column.get("parameterKey")
+        usage = (sheet.get("parameterUsage") or {}).get(parameter_key)
+        if not parameter_key or not usage:
+            raise ValueError(
+                "Parameter column '{0}' is missing its stable parameter key or usage metadata."
+                .format(_text(column.get("field")))
+            )
+        label = usage.get("dataType") or column.get("dataType")
+        if not label:
+            raise ValueError(
+                "Parameter '{0}' is missing its data type label.".format(
+                    _text(parameter_key)
+                )
+            )
+    else:
+        label = column.get("dataType")
+        if not label:
+            label = u"Identifier" if column.get("field") in ID_FIELDS else u"Text"
     if column.get("unit"):
-        return u"{0} [{1}]".format(_text(title), _text(column.get("unit")))
-    return title
+        label = u"{0} [{1}]".format(_text(label), _text(column.get("unit")))
+    return label
 
 
-def _width(column, rows):
-    longest = len(_text(_column_title(column)))
+def _width(column, rows, sheet):
+    longest = max(len(_text(_column_title(column))),
+                  len(_text(_header_type(column, sheet))))
     field = column.get("field")
     for row in rows[:500]:
         longest = max(longest, len(_text(row.get(field))))
     return min(max(longest + 2, 8), 60)
 
 
-def _worksheet_xml(columns, rows):
+def _worksheet_xml(columns, rows, sheet):
     parts = [
         u'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
         u'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
         u'<sheetViews><sheetView workbookViewId="0">'
-        u'<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
+        u'<pane ySplit="2" topLeftCell="A3" activePane="bottomLeft" state="frozen"/>'
         u'</sheetView></sheetViews>',
         u'<sheetFormatPr defaultRowHeight="15"/>',
     ]
@@ -138,18 +171,24 @@ def _worksheet_xml(columns, rows):
         parts.append(u"<cols>")
         for index, (column, hidden) in enumerate(columns):
             parts.append(u'<col min="{0}" max="{0}" width="{1}" customWidth="1"{2}/>'.format(
-                index + 1, _width(column, rows), u' hidden="1"' if hidden else u""
+                index + 1, _width(column, rows, sheet), u' hidden="1"' if hidden else u""
             ))
         parts.append(u"</cols>")
     parts.append(u"<sheetData>")
-    header = [
-        _cell(u"{0}1".format(_column_letter(index)), _column_title(column),
+    type_header = [
+        _cell(u"{0}1".format(_column_letter(index)),
+              _header_type(column, sheet), _STYLE_HEADER)
+        for index, (column, _) in enumerate(columns)
+    ]
+    name_header = [
+        _cell(u"{0}2".format(_column_letter(index)), _column_title(column),
               _STYLE_HEADER)
         for index, (column, _) in enumerate(columns)
     ]
-    parts.append(u'<row r="1">{0}</row>'.format(u"".join(header)))
+    parts.append(u'<row r="1">{0}</row>'.format(u"".join(type_header)))
+    parts.append(u'<row r="2">{0}</row>'.format(u"".join(name_header)))
     for row_index, row in enumerate(rows):
-        number = row_index + 2
+        number = row_index + 3
         cells = [
             _cell(
                 u"{0}{1}".format(_column_letter(index), number),
@@ -161,30 +200,107 @@ def _worksheet_xml(columns, rows):
         parts.append(u'<row r="{0}">{1}</row>'.format(number, u"".join(cells)))
     parts.append(u"</sheetData>")
     if columns:
-        parts.append(u'<autoFilter ref="A1:{0}{1}"/>'.format(
-            _column_letter(len(columns) - 1), len(rows) + 1
+        parts.append(u'<autoFilter ref="A2:{0}{1}"/>'.format(
+            _column_letter(len(columns) - 1), len(rows) + 2
         ))
     parts.append(u"</worksheet>")
     return u"".join(parts)
 
 
 def _meta_rows(workbook, sheet_entries):
-    rows = [{"key": "parameterMode", "value": workbook.get("parameterMode")}]
-    header = dict((name, name) for name in _META_FIELDS)
-    rows.append(header)
+    if workbook.get("gridLayout") not in ("combined", "separate"):
+        raise ValueError("Workbook metadata must declare gridLayout as 'combined' or 'separate'.")
+    rows = []
     for sheet_name, sheet, columns in sheet_entries:
-        for column, _ in columns:
+        category_id = sheet.get("categoryId")
+        category_key = sheet.get("categoryKey")
+        if workbook["gridLayout"] == "combined":
+            if category_id is not None or not category_key:
+                raise ValueError("Combined worksheets require a categoryKey and a null categoryId.")
+        elif category_id is None or not category_key:
+            raise ValueError("Separate worksheets require a categoryId and categoryKey.")
+        categories = sheet.get("categories")
+        if not isinstance(categories, list) or not categories:
+            raise ValueError("Every worksheet must include its category metadata list.")
+        category_keys = set()
+        category_ids = set()
+        for category in categories:
+            if (not isinstance(category, dict)
+                    or category.get("categoryId") is None
+                    or not category.get("categoryKey")
+                    or not category.get("name")):
+                raise ValueError("Worksheet category metadata is incomplete.")
+            key = _text(category.get("categoryKey"))
+            category_id_value = _text(category.get("categoryId"))
+            if key in category_keys or category_id_value in category_ids:
+                raise ValueError("Worksheet category metadata contains duplicates.")
+            category_keys.add(key)
+            category_ids.add(category_id_value)
+        categories_json = json.dumps(categories, ensure_ascii=False, sort_keys=True)
+        usage_map = sheet.get("parameterUsage") or {}
+        declared_keys = sheet.get("parameters")
+        if not isinstance(declared_keys, list):
+            raise ValueError("Worksheet parameters must be the stable parameter key list.")
+        column_keys = []
+        for column_index, (column, _) in enumerate(columns):
+            key = column.get("parameterKey")
+            if column.get("columnType") == "parameter" and key not in column_keys:
+                column_keys.append(key)
+        if declared_keys != column_keys:
+            raise ValueError("Worksheet parameters do not match its parameter-key columns.")
+        if workbook["gridLayout"] == "separate":
+            if len(categories) != 1:
+                raise ValueError("Separate worksheets must describe exactly one category.")
+            category = categories[0]
+            if (str(category.get("categoryId")) != str(category_id)
+                    or category.get("categoryKey") != category_key):
+                raise ValueError("Separate worksheet category metadata is inconsistent.")
+        sheet_key = sheet.get("sheetKey") or category_key
+        if not sheet_key:
+            raise ValueError("Worksheet metadata requires a stable sheetKey.")
+        for column_index, (column, _) in enumerate(columns):
+            parameter_key = column.get("parameterKey")
+            usage = usage_map.get(parameter_key) if parameter_key else {}
+            if column.get("columnType") == "parameter":
+                if (not parameter_key or not usage
+                        or not usage.get("name") or not usage.get("displayName")
+                        or not usage.get("identity") or not usage.get("specTypeId")
+                        or not usage.get("dataType") or not usage.get("storageType")
+                        or "isType" not in usage or "isInstance" not in usage):
+                    raise ValueError("Parameter columns require stable parameter metadata.")
             rows.append({
+                "schemaVersion": SCHEMA_VERSION,
+                "gridLayout": workbook["gridLayout"],
+                "parameterMode": workbook.get("parameterMode"),
                 "sheet": sheet_name,
-                "header": _column_title(column),
+                "sheetKey": sheet_key,
+                "categories": categories_json,
+                "parameterKeys": json.dumps(declared_keys, ensure_ascii=False),
+                "categoryId": category_id,
+                "categoryKey": category_key,
                 "field": column.get("field"),
                 "columnType": column.get("columnType"),
-                "parameterName": column.get("parameterName"),
+                "columnIndex": column_index,
+                "parameterKey": parameter_key,
+                "parameterName": usage.get("name", column.get("parameterName")),
+                "displayName": usage.get("displayName"),
+                "parameterIdentity": usage.get("identity"),
+                "dataType": usage.get("dataType") or column.get("dataType"),
+                "specTypeId": usage.get("specTypeId"),
+                "usage": json.dumps(usage, ensure_ascii=False, sort_keys=True)
+                         if usage else None,
                 "target": column.get("target"),
                 "storageType": column.get("storageType"),
+                "unit": column.get("unit"),
+                "options": json.dumps(column.get("options"), ensure_ascii=False)
+                           if column.get("options") is not None else None,
+                "referenceKind": json.dumps(
+                    column.get("referenceKind"), ensure_ascii=False, sort_keys=True
+                ) if column.get("referenceKind") is not None else None,
                 "parameterGuid": column.get("parameterGuid"),
                 "parameterBuiltin": column.get("parameterBuiltin"),
-                "categoryId": sheet.get("categoryId"),
+                "isType": usage.get("isType"),
+                "isInstance": usage.get("isInstance"),
             })
     return rows
 
@@ -195,11 +311,11 @@ def _meta_sheet_xml(meta_rows):
         u'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
         u"<sheetData>",
     ]
-    first = meta_rows[0]
-    parts.append(u'<row r="1">{0}{1}</row>'.format(
-        _cell(u"A1", first["key"], 0), _cell(u"B1", first["value"], 0)
-    ))
-    for row_index, row in enumerate(meta_rows[1:]):
+    parts.append(u'<row r="1">{0}</row>'.format(u"".join(
+        _cell(u"{0}1".format(_column_letter(index)), name, 0)
+        for index, name in enumerate(_META_FIELDS)
+    )))
+    for row_index, row in enumerate(meta_rows):
         number = row_index + 2
         cells = [
             _cell(u"{0}{1}".format(_column_letter(index), number), row.get(name), 0)
@@ -303,11 +419,13 @@ _ROOT_RELS = (
 
 
 def write_xlsx(workbook, file_path):
+    if workbook.get("gridLayout") not in ("combined", "separate"):
+        raise ValueError("Workbook metadata must declare gridLayout as 'combined' or 'separate'.")
     used = set()
     entries = []
     for sheet in workbook.get("sheets") or []:
         name = _unique_sheet_name(sheet.get("name"), used)
-        entries.append((name, sheet, _export_columns(sheet)))
+        entries.append((name, sheet, _export_columns(sheet, workbook["gridLayout"])))
     if not entries:
         raise ValueError("The workbook has no sheets to export.")
 
@@ -322,7 +440,7 @@ def write_xlsx(workbook, file_path):
     for index, (_, sheet, columns) in enumerate(entries):
         parts.append((
             "xl/worksheets/sheet{0}.xml".format(index + 1),
-            _worksheet_xml(columns, sheet.get("rows") or []),
+            _worksheet_xml(columns, sheet.get("rows") or [], sheet),
         ))
     parts.append((
         "xl/worksheets/sheet{0}.xml".format(len(sheet_names)),

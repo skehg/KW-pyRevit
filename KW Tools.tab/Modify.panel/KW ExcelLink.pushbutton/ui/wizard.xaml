@@ -47,7 +47,7 @@
             </Style.Triggers>
         </Style>
         <DataTemplate x:Key="ParameterRowTemplate">
-            <Grid ToolTip="{Binding Name}">
+            <Grid ToolTip="{Binding Details}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -56,7 +56,12 @@
                            VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis"
                            Margin="0,0,10,0"/>
-                <Border Grid.Column="1"
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <TextBlock Text="{Binding Coverage}" FontSize="10" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <Border Background="#EDF0F3" CornerRadius="4" Padding="6,2" Margin="0,0,5,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding DataType}" Foreground="#465260" FontSize="11"/>
+                </Border>
+                <Border
                         Background="{Binding BadgeBackground}"
                         CornerRadius="4"
                         Padding="6,2"
@@ -65,6 +70,7 @@
                                Foreground="{Binding BadgeForeground}"
                                FontSize="11"/>
                 </Border>
+                </StackPanel>
             </Grid>
         </DataTemplate>
     </Window.Resources>
@@ -120,6 +126,12 @@
                     <ComboBoxItem Content="Type parameters"/>
                     <ComboBoxItem Content="Instance parameters"/>
                     <ComboBoxItem Content="Mixed-use parameters"/>
+                </ComboBox>
+                <ComboBox x:Name="cboCoverage" DockPanel.Dock="Top" MinHeight="27"
+                          Margin="0,0,0,7" SelectedIndex="0"
+                          ToolTip="Category coverage does not guarantee availability on every element">
+                    <ComboBoxItem Content="Available in any selected category"/>
+                    <ComboBoxItem Content="Common to all selected categories"/>
                 </ComboBox>
                 <TextBox x:Name="txtSearch"
                          DockPanel.Dock="Top"

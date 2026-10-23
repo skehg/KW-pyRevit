@@ -114,29 +114,110 @@ def _scope_summary(selection_mode, source_elements):
     )
 
 
+def _category_record(option):
+    label = option["label"]
+    name = label.rsplit(" [", 1)[0] if label.endswith("]") else label
+    key = option.get("builtin") or str(option["category_id"])
+    return {
+        "categoryId": option["category_id"],
+        "categoryKey": key,
+        "name": name,
+    }
+
+
+def _sheet_categories(sheet):
+    categories = sheet.get("categories") or []
+    if categories:
+        return categories
+    if sheet.get("categoryId") is not None:
+        return [{
+            "categoryId": sheet.get("categoryId"),
+            "categoryKey": sheet.get("categoryKey"),
+            "name": sheet.get("name"),
+        }]
+    return []
+
+
+def _elements_for_categories(elements, categories):
+    result = []
+    for category in categories:
+        result.extend(elements_for_category(elements, category["category_id"]))
+    return result
+
+
 def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
     """Navigate without rebuilding the workbook until every step is accepted."""
     previous = workbook or {}
-    selection_mode = previous.get("selectionMode") or "Current View"
+    launch_selection = (
+        resolve_source_elements(uidoc, "Selected Elements")
+        if workbook is None and uidoc is not None else []
+    )
+    launch_category_ids = set(
+        item["category_id"] for item in category_options(launch_selection)
+    ) if launch_selection else set()
+    selection_mode = previous.get("selectionMode") or (
+        "Selected Elements" if launch_selection else "Current View"
+    )
     if selection_mode == "Entire Project":
         selection_mode = "Entire Project File"
     parameter_mode = previous.get("parameterMode") or PARAMETER_MODES[1]
-    old_sheets = dict(
-        (int(sheet["categoryId"]), sheet) for sheet in previous.get("sheets", [])
+    old_sheet_list = list(previous.get("sheets") or [])
+    old_sheets = {}
+    old_layout_by_category = {}
+    combined_previous = None
+    selected_ids = set()
+    for sheet in old_sheet_list:
+        if sheet.get("categoryId") is not None:
+            try:
+                category_id = int(sheet["categoryId"])
+                old_sheets[category_id] = sheet
+                selected_ids.add(category_id)
+            except (TypeError, ValueError):
+                pass
+        for category in _sheet_categories(sheet):
+            try:
+                selected_ids.add(int(category.get("categoryId")))
+            except (TypeError, ValueError):
+                pass
+            old_layout_by_category[
+                category.get("categoryKey") or category.get("categoryId")
+            ] = sheet.get("layout") or {}
+        if previous.get("gridLayout") == "combined" or sheet.get("categoryId") is None:
+            combined_previous = sheet
+    fields = dict(
+        (key, list(sheet.get("parameters") or []))
+        for key, sheet in old_sheets.items()
     )
-    fields = dict((key, list(sheet["parameters"])) for key, sheet in old_sheets.items())
+    combined_fields = list(
+        (combined_previous or {}).get("parameters") or []
+    )
     schedule = None
-    schedule_by_category = {}
-    selected_ids = set(old_sheets)
+    schedule_layout_defaulted = set()
     options = category_options(source_elements) if source_elements else []
     step = 4 if workbook is not None else 1
-    category_index = max(0, min(sheet_index, len(old_sheets) - 1))
+    category_index = max(0, min(sheet_index, max(len(old_sheets) - 1, 0)))
     categories = []
+    grid_layout = previous.get("gridLayout")
+    category_selections = (
+        {selection_mode: set(selected_ids)} if workbook is not None else {}
+    )
+    if grid_layout not in ("combined", "separate"):
+        grid_layout = "combined" if combined_previous is not None else "separate"
     if workbook is not None:
         # Keep the workbook's sheet order when returning from the grid.
         by_id = dict((item["category_id"], item) for item in options)
-        categories = [by_id[int(s["categoryId"])] for s in previous["sheets"]
-                      if int(s["categoryId"]) in by_id]
+        ordered_ids = []
+        for sheet in old_sheet_list:
+            for category in _sheet_categories(sheet):
+                try:
+                    category_id = int(category["categoryId"])
+                except (TypeError, ValueError):
+                    continue
+                if category_id in by_id and category_id not in ordered_ids:
+                    ordered_ids.append(category_id)
+        categories = [by_id[key] for key in ordered_ids]
+        if grid_layout == "combined" and categories:
+            category_index = 0
         if not categories:
             step = 2
     while True:
@@ -173,8 +254,21 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
             if not options:
                 forms.alert("No categorized elements were found for this scope.", title=__title__)
                 continue
+            available_ids = set(item["category_id"] for item in options)
+            selected_ids = category_selections.get(selection_mode)
+            if selected_ids is None:
+                selected_ids = (
+                    available_ids if schedule is not None
+                    else launch_category_ids & available_ids
+                )
+            if workbook is None:
+                grid_layout = None
             step = 2
         elif step == 2:
+            default_layout = grid_layout or (
+                "combined" if schedule is not None and len(options) > 1
+                else "separate"
+            )
             dialog = ChoiceWizardWindow(
                 [item["label"] for item in options],
                 "Step 2 of 5 - Category Selection",
@@ -183,22 +277,45 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
                 context_text="{0} | {1} categories found".format(
                     _scope_summary(selection_mode, source_elements), len(options)
                 ),
+                grid_layout=default_layout,
             )
             dialog.ShowDialog()
             if dialog.action == "cancel":
                 return None
             selected_ids = set(item["category_id"] for item in options
                                if item["label"] in dialog.selected)
+            category_selections[selection_mode] = set(selected_ids)
             if dialog.action == "back":
+                grid_layout = getattr(dialog, "grid_layout", default_layout)
                 step = 1
                 continue
             categories = [item for item in options if item["category_id"] in selected_ids]
+            if not categories:
+                forms.alert("Choose at least one category.", title=__title__)
+                grid_layout = getattr(dialog, "grid_layout", default_layout)
+                continue
+            grid_layout = getattr(dialog, "grid_layout", default_layout)
+            if grid_layout not in ("combined", "separate"):
+                grid_layout = default_layout
+            if grid_layout == "combined":
+                if not combined_fields:
+                    combined_fields = []
+                    for category in categories:
+                        combined_fields.extend(
+                            key for key in fields.get(category["category_id"], [])
+                            if key not in combined_fields
+                        )
+            elif combined_fields:
+                for category in categories:
+                    if category["category_id"] not in fields:
+                        fields[category["category_id"]] = list(combined_fields)
             step = 3
         elif step == 3:
             dialog = ChoiceWizardWindow(
                 PARAMETER_MODES, "Step 3 of 5 - Parameter Mode", [parameter_mode],
                 context_text="{0} | {1} category sheet(s) selected".format(
-                    _scope_summary(selection_mode, source_elements), len(categories)
+                    _scope_summary(selection_mode, source_elements),
+                    1 if grid_layout == "combined" else len(categories)
                 )
             )
             dialog.ShowDialog()
@@ -212,53 +329,108 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
             category_index = 0
             step = 4
         else:
-            category = categories[category_index]
-            key = category["category_id"]
-            elements = elements_for_category(source_elements, key)
-            usage = build_parameter_usage_map(doc, elements)
+            combined = grid_layout == "combined"
+            category = categories[category_index] if categories else None
+            if combined:
+                elements = _elements_for_categories(source_elements, categories)
+                usage = build_parameter_usage_map(doc, elements)
+                selected_fields = combined_fields
+                category_label = "Combined categories"
+                step_index = 0
+                step_count = 1
+            else:
+                key = category["category_id"]
+                elements = elements_for_category(source_elements, key)
+                usage = build_parameter_usage_map(doc, elements)
+                selected_fields = fields.get(key, [])
+                category_label = category["label"]
+                step_index = category_index
+                step_count = len(categories)
             if not usage:
                 forms.alert("This category has no available parameters.", title=__title__)
                 step = 2
                 continue
-            if schedule is not None and key not in fields:
-                fields[key] = schedule_parameters(schedule, usage)
-                schedule_by_category[key] = schedule
+            field_store_key = "combined" if combined else key
+            if schedule is not None and field_store_key not in schedule_layout_defaulted:
+                if combined or key not in fields:
+                    seeded = schedule_parameters(schedule, usage)
+                    if combined:
+                        combined_fields = seeded
+                        selected_fields = combined_fields
+                    else:
+                        fields[key] = seeded
+                        selected_fields = fields[key]
+                schedule_layout_defaulted.add(field_store_key)
             dialog = ParameterWizardWindow(
-                category["label"], usage, parameter_mode, fields.get(key),
-                last=category_index == len(categories) - 1,
-                context_text="{0} | Category {1} of {2} | {3} element(s) | {4}".format(
-                    selection_mode, category_index + 1, len(categories),
+                category_label, usage, parameter_mode, list(selected_fields or []),
+                last=combined or category_index == len(categories) - 1,
+                context_text="{0} | {1}{2} | {3} element(s) | {4}".format(
+                    selection_mode,
+                    "Combined grid" if combined else "Category {0} of {1}".format(
+                        step_index + 1, step_count
+                    ),
+                    " ({0} categories)".format(len(categories)) if combined else "",
                     len(elements), parameter_mode
                 ),
             )
             dialog.ShowDialog()
             if dialog.action == "cancel":
                 return None
-            fields[key] = list(dialog.selected_parameters)
+            chosen = list(dialog.selected_parameters or [])
+            if combined:
+                combined_fields = chosen
+            else:
+                fields[key] = chosen
             if dialog.action == "back":
-                if category_index:
+                if not combined and category_index:
                     category_index -= 1
                 else:
                     step = 3
                 continue
-            if category_index < len(categories) - 1:
+            if not combined and category_index < len(categories) - 1:
                 category_index += 1
                 continue
             catalog = ReferenceCatalog(doc)
             sheets = []
             schedule_issues = []
-            for category in categories:
-                key = category["category_id"]
-                elements = elements_for_category(source_elements, key)
+            sheet_groups = (
+                [(None, "Combined categories", categories, elements, usage, combined_fields)]
+                if combined else
+                [
+                    (
+                        item["category_id"], item["label"], [item],
+                        elements_for_category(source_elements, item["category_id"]),
+                        None, fields.get(item["category_id"], [])
+                    )
+                    for item in categories
+                ]
+            )
+            for category_id, label, sheet_categories, elements, known_usage, params in sheet_groups:
+                usage_map = known_usage or build_parameter_usage_map(doc, elements)
                 sheet = build_sheet(
-                    doc, catalog, category["label"], key, elements, fields[key],
-                    parameter_mode, build_parameter_usage_map(doc, elements),
+                    doc, catalog, label, category_id, elements, params,
+                    parameter_mode, usage_map,
+                    categories=[_category_record(item) for item in sheet_categories],
                 )
                 if sheet is not None:
-                    sheet["layout"] = old_sheets.get(key, {}).get("layout") or {}
-                    if key in schedule_by_category and key not in old_sheets:
+                    if combined:
+                        prior_layout = (
+                            (combined_previous or {}).get("layout")
+                            if previous.get("gridLayout") == "combined" else None
+                        )
+                        sheet["layout"] = prior_layout or {}
+                    else:
+                        category_key = sheet.get("categoryKey") or _category_record(
+                            sheet_categories[0]
+                        )["categoryKey"]
+                        sheet["layout"] = (
+                            old_sheets.get(category_id, {}).get("layout")
+                            or old_layout_by_category.get(category_key)
+                            or {}
+                        )
+                    if schedule is not None and not sheet.get("layout"):
                         sheet["layout"], issues = build_schedule_layout(
-                            doc, schedule_by_category[key], sheet
+                            doc, schedule, sheet
                         )
                         schedule_issues.extend(issues)
                     sheets.append(sheet)
@@ -277,6 +449,7 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
             result = {
                 "selectionMode": selection_mode,
                 "parameterMode": parameter_mode,
+                "gridLayout": grid_layout,
                 "sheets": sheets,
                 "_sourceElementIds": [element_id_value(e.Id) for e in source_elements],
             }

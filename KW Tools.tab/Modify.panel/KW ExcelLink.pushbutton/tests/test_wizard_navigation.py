@@ -47,8 +47,9 @@ class WizardNavigationTests(unittest.TestCase):
         f.element_id_value.side_effect = lambda value: value
         f.find_preset.return_value = None
         f.read_schedule_defaults.return_value = None
-        f.build_sheet.side_effect = lambda doc, catalog, label, key, elements, fields, mode, usage: {
-            "categoryId": key, "name": label, "parameters": fields, "rows": []
+        f.build_sheet.side_effect = lambda doc, catalog, label, key, elements, fields, mode, usage, **kwargs: {
+            "categoryId": key, "name": label, "parameters": fields, "rows": [],
+            "categories": kwargs.get("categories", []),
         }
         self.actions = []
         self.visits = []
@@ -58,10 +59,14 @@ class WizardNavigationTests(unittest.TestCase):
             step = int(title[5])
             self.visits.append((step, list(selected or [])))
             self.contexts.append(kwargs.get("context_text", ""))
-            expected, action, values = self.actions.pop(0)
+            item = self.actions.pop(0)
+            expected, action, values = item[:3]
+            layout = item[3] if len(item) > 3 else kwargs.get("grid_layout")
             self.assertEqual(expected, step)
             return types.SimpleNamespace(
-                action=action, selected=values, ShowDialog=lambda: None
+                action=action, selected=values,
+                grid_layout=layout,
+                ShowDialog=lambda: None
             )
 
         def parameters(label, usage, mode, selected=None, last=True, **kwargs):
@@ -117,6 +122,95 @@ class WizardNavigationTests(unittest.TestCase):
         self.assertNotIn("Entire Project", options)
         self.assertIn("Entire Model", options)
 
+    def launch_with_selection(self, category_ids):
+        selected = [types.SimpleNamespace(Id=key) for key in category_ids]
+        self.flow.resolve_source_elements.side_effect = (
+            lambda uidoc, mode: selected if mode == "Selected Elements" else self.source
+        )
+        self.flow.category_options.side_effect = (
+            lambda elements: [
+                item for item in self.categories
+                if any(element.Id == item["category_id"] for element in elements)
+            ]
+        )
+        return types.SimpleNamespace()
+
+    def test_launch_selection_preselects_mode_and_all_selected_categories(self):
+        uidoc = self.launch_with_selection([1, 2])
+        self.actions = [(1, "next", ["Selected Elements"]), (2, "cancel", [])]
+        self.assertIsNone(self.flow.run_wizard(uidoc, None))
+        self.assertEqual(self.visits, [
+            (1, ["Selected Elements"]), (2, ["Doors [1]", "Walls [2]"]),
+        ])
+
+    def test_no_launch_selection_keeps_current_view_and_no_category_defaults(self):
+        uidoc = self.launch_with_selection([])
+        self.actions = [(1, "next", ["Current View"]), (2, "cancel", [])]
+        self.assertIsNone(self.flow.run_wizard(uidoc, None))
+        self.assertEqual(self.visits, [(1, ["Current View"]), (2, [])])
+
+    def test_selected_categories_seed_broader_scope_only_where_available(self):
+        uidoc = self.launch_with_selection([1, 99])
+        self.actions = [(1, "next", ["Entire Model"]), (2, "cancel", [])]
+        self.assertIsNone(self.flow.run_wizard(uidoc, None))
+        self.assertEqual(self.visits[-1], (2, ["Doors [1]"]))
+
+    def test_schedule_preselects_all_scope_categories_over_launch_selection(self):
+        uidoc = self.launch_with_selection([1])
+        self.flow.read_schedule_defaults.return_value = {"schedule": True}
+        self.actions = [(1, "next", ["Current View"]), (2, "cancel", [])]
+        self.assertIsNone(self.flow.run_wizard(uidoc, None))
+        self.assertEqual(self.visits[-1], (2, ["Doors [1]", "Walls [2]"]))
+
+    def test_back_keeps_explicitly_empty_category_selection(self):
+        uidoc = self.launch_with_selection([1])
+        self.actions = [
+            (1, "next", ["Selected Elements"]),
+            (2, "back", []),
+            (1, "next", ["Selected Elements"]),
+            (2, "cancel", []),
+        ]
+        self.assertIsNone(self.flow.run_wizard(uidoc, None))
+        self.assertEqual(self.visits[-1], (2, []))
+
+    def test_scope_switch_restores_user_category_choices_not_schedule_defaults(self):
+        uidoc = self.launch_with_selection([1])
+        self.flow.read_schedule_defaults.side_effect = (
+            lambda uidoc, mode: {"schedule": True} if mode == "Current View" else None
+        )
+        self.actions = [
+            (1, "next", ["Current View"]),
+            (2, "back", ["Walls [2]"]),
+            (1, "next", ["Selected Elements"]),
+            (2, "back", ["Doors [1]"]),
+            (1, "next", ["Current View"]),
+            (2, "cancel", []),
+        ]
+        self.assertIsNone(self.flow.run_wizard(uidoc, None))
+        self.assertEqual(self.visits[-1], (2, ["Walls [2]"]))
+
+    def test_grid_resume_does_not_read_or_apply_launch_selection(self):
+        self.actions = [("Walls [2]", "cancel", [])]
+        self.assertIsNone(self.flow.run_wizard(
+            types.SimpleNamespace(), None, self.workbook(), self.source, 1))
+        self.flow.resolve_source_elements.assert_not_called()
+        self.assertEqual(self.visits[0], ("Walls [2]", ["Width"], True))
+
+    def test_combined_layout_uses_one_shared_parameter_picker_and_sheet(self):
+        self.actions = [
+            (1, "next", ["Current View"]),
+            (2, "next", ["Doors [1]", "Walls [2]"], "combined"),
+            (3, "next", ["Instances Mode"]),
+            ("Combined categories", "next", ["Mark", "Level"]),
+        ]
+        workbook, _ = self.flow.run_wizard(None, None)
+        self.assertEqual(workbook["gridLayout"], "combined")
+        self.assertEqual(len(workbook["sheets"]), 1)
+        self.assertIsNone(workbook["sheets"][0]["categoryId"])
+        self.assertEqual(workbook["sheets"][0]["parameters"], ["Mark", "Level"])
+        self.assertEqual(len(workbook["sheets"][0]["categories"]), 2)
+        self.assertIn(("Combined categories", [], True), self.visits)
+
     def test_grid_resume_starts_at_active_category_and_preserves_layout(self):
         previous = self.workbook()
         self.actions = [("Walls [2]", "next", ["Width", "Level"])]
@@ -150,11 +244,12 @@ class WizardNavigationTests(unittest.TestCase):
             (1, "next", ["Current View"]),
             (2, "next", ["Doors [1]"]),
             (3, "next", ["Instances Mode"]),
-            ("Doors [1]", "next", ["Level", "Mark"]),
+            ("Combined categories", "next", ["Level", "Mark"]),
         ]
         workbook, _ = self.flow.run_wizard(None, None)
-        self.assertIn(("Doors [1]", ["Level", "Mark"], True), self.visits)
+        self.assertIn(("Combined categories", ["Level", "Mark"], True), self.visits)
         self.assertEqual(workbook["sheets"][0]["layout"], layout)
+        self.assertEqual(workbook["gridLayout"], "combined")
 
     def test_schedule_defaults_do_not_replace_grid_choices(self):
         self.flow.read_schedule_defaults.return_value = {"schedule": True}

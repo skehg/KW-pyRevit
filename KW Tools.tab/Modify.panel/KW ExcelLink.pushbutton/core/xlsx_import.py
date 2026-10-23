@@ -5,12 +5,16 @@ No Revit API calls are made here; the result is a list of grid updates that
 the web grid turns into pending changes for the user to review and apply.
 """
 
+import json
 import posixpath
 import re
 import zipfile
 import xml.etree.ElementTree as ET
 
-from core.xlsx_export import META_SHEET_NAME, _column_title, _unique_sheet_name
+from core.xlsx_export import (
+    ID_FIELDS, META_SHEET_NAME, SCHEMA_VERSION, _META_FIELDS,
+    _column_title, _header_type, _unique_sheet_name,
+)
 
 _NONE_LABEL = u"<None>"
 _UNIQUE_ID_HEADER = u"unique id"
@@ -175,34 +179,192 @@ class _XlsxReader(object):
 
 
 def _read_meta(reader, sheets):
-    """Return {'parameterMode', 'sheets': {xlsx_name: {'categoryId', 'parameters'}}}."""
-    meta = {"parameterMode": None, "sheets": {}}
+    """Read and validate the authoritative version-2 hidden schema."""
+    meta = {"parameterMode": None, "gridLayout": None, "sheets": {}}
+    found = False
     for name, part in sheets:
         if name != META_SHEET_NAME:
             continue
-        header = None
-        for row in reader.rows(part):
-            if header is None:
-                if _text(row.get(0)) == u"parameterMode":
-                    meta["parameterMode"] = _text(row.get(1)) or None
-                elif _text(row.get(0)) == u"sheet":
-                    header = dict((_text(v), k) for k, v in row.items())
-                continue
-            sheet_name = _text(row.get(header.get(u"sheet")))
-            if not sheet_name:
-                continue
-            entry = meta["sheets"].setdefault(
-                sheet_name, {"categoryId": None, "parameters": []}
+        if found:
+            raise ValueError("The workbook contains duplicate ExcelLink metadata sheets.")
+        found = True
+        rows = reader.rows(part)
+        header = rows[0] if rows else {}
+        actual_fields = dict((_text(value), index) for index, value in header.items())
+        if set(actual_fields) != set(_META_FIELDS):
+            raise ValueError("ExcelLink metadata has an unsupported or malformed schema.")
+        if len(actual_fields) != len(_META_FIELDS):
+            raise ValueError("ExcelLink metadata contains duplicate field names.")
+        for values in rows[1:]:
+            record = dict(
+                (field, values.get(actual_fields[field]))
+                for field in _META_FIELDS
             )
-            category_id = row.get(header.get(u"categoryId"))
-            if entry["categoryId"] is None and category_id is not None:
-                entry["categoryId"] = category_id
-            parameter_name = _text(row.get(header.get(u"parameterName")))
-            column_type = _text(row.get(header.get(u"columnType")))
-            if (column_type == u"parameter" and parameter_name
-                    and parameter_name not in entry["parameters"]):
-                entry["parameters"].append(parameter_name)
+            if _text(record.get("schemaVersion")) != SCHEMA_VERSION:
+                raise ValueError("Unsupported ExcelLink XLSX schema version.")
+            layout = _text(record.get("gridLayout"))
+            if layout not in (u"combined", u"separate"):
+                raise ValueError("ExcelLink metadata has an invalid gridLayout.")
+            if meta["gridLayout"] is not None and meta["gridLayout"] != layout:
+                raise ValueError("ExcelLink metadata has conflicting gridLayout values.")
+            meta["gridLayout"] = layout
+            mode = _text(record.get("parameterMode")) or None
+            if meta["parameterMode"] is not None and meta["parameterMode"] != mode:
+                raise ValueError("ExcelLink metadata has conflicting parameter modes.")
+            meta["parameterMode"] = mode
+            sheet_name = _text(record.get("sheet"))
+            sheet_key = _text(record.get("sheetKey"))
+            if not sheet_name or not sheet_key:
+                raise ValueError("ExcelLink worksheet metadata is missing its sheet identity.")
+            entry = meta["sheets"].get(sheet_name)
+            if entry is None:
+                try:
+                    categories = json.loads(_text(record.get("categories")))
+                    declared_parameter_keys = json.loads(
+                        _text(record.get("parameterKeys"))
+                    )
+                except (TypeError, ValueError):
+                    raise ValueError("ExcelLink worksheet metadata is malformed.")
+                if not isinstance(categories, list) or not categories:
+                    raise ValueError("ExcelLink worksheet category metadata is empty.")
+                if (not isinstance(declared_parameter_keys, list)
+                        or any(not isinstance(key, basestring) or not key
+                               for key in declared_parameter_keys)):
+                    raise ValueError("ExcelLink parameter-key metadata is malformed.")
+                category_keys = set()
+                category_ids = set()
+                for category in categories:
+                    if (not isinstance(category, dict)
+                            or category.get("categoryId") is None
+                            or not category.get("categoryKey")
+                            or not category.get("name")):
+                        raise ValueError("ExcelLink category metadata is incomplete.")
+                    category_key = _text(category.get("categoryKey"))
+                    category_id = _text(category.get("categoryId"))
+                    if category_key in category_keys or category_id in category_ids:
+                        raise ValueError("ExcelLink category metadata contains duplicates.")
+                    category_keys.add(category_key)
+                    category_ids.add(category_id)
+                entry = {
+                    "xlsxName": sheet_name, "sheetName": sheet_name,
+                    "sheetKey": sheet_key,
+                    "gridLayout": layout, "categoryId": record.get("categoryId"),
+                    "categoryKey": _text(record.get("categoryKey")) or None,
+                    "categories": categories, "parameterKeys": [],
+                    "declaredParameterKeys": declared_parameter_keys,
+                    "parameters": [], "parameterUsage": {}, "columns": [],
+                }
+                meta["sheets"][sheet_name] = entry
+            else:
+                try:
+                    current_categories = json.loads(_text(record.get("categories")))
+                    current_keys = json.loads(_text(record.get("parameterKeys")))
+                except (TypeError, ValueError):
+                    raise ValueError("ExcelLink worksheet metadata is malformed.")
+                if (entry["sheetKey"] != sheet_key or entry["gridLayout"] != layout
+                        or entry["categories"] != current_categories
+                        or entry["declaredParameterKeys"] != current_keys):
+                    raise ValueError("ExcelLink worksheet metadata is inconsistent.")
+            record["parameterKey"] = _text(record.get("parameterKey")) or None
+            record["parameterName"] = _text(record.get("parameterName")) or None
+            record["parameterIdentity"] = _text(record.get("parameterIdentity")) or None
+            record["specTypeId"] = _text(record.get("specTypeId")) or None
+            for json_key in ("options", "referenceKind"):
+                raw_json = record.get(json_key)
+                if raw_json in (None, u""):
+                    record[json_key] = None
+                else:
+                    try:
+                        record[json_key] = json.loads(_text(raw_json))
+                    except (TypeError, ValueError):
+                        raise ValueError(
+                            "ExcelLink column metadata '{0}' is malformed.".format(json_key)
+                        )
+            if record.get("columnType") == u"parameter":
+                key = record["parameterKey"]
+                if not key or not record["parameterName"] or not record["parameterIdentity"] \
+                        or not record["specTypeId"]:
+                    raise ValueError("ExcelLink parameter metadata is missing its stable identity.")
+                try:
+                    usage = json.loads(_text(record.get("usage")))
+                except (TypeError, ValueError):
+                    raise ValueError("ExcelLink parameter usage metadata is malformed.")
+                if not isinstance(usage, dict):
+                    raise ValueError("ExcelLink parameter usage metadata is malformed.")
+                for required in ("name", "displayName", "identity", "specTypeId",
+                                 "dataType", "storageType", "isType", "isInstance"):
+                    if required not in usage:
+                        raise ValueError(
+                            "ExcelLink parameter usage is missing '{0}'.".format(required)
+                        )
+                if (usage.get("name") != record["parameterName"]
+                        or usage.get("identity") != record["parameterIdentity"]
+                        or usage.get("specTypeId") != record["specTypeId"]
+                        or usage.get("storageType") != _text(record.get("storageType"))):
+                    raise ValueError("ExcelLink parameter usage identity is inconsistent.")
+                if _as_bool(usage.get("isType")) != _as_bool(record.get("isType")) \
+                        or _as_bool(usage.get("isInstance")) != _as_bool(record.get("isInstance")):
+                    raise ValueError("ExcelLink parameter usage flags are inconsistent.")
+                previous = entry["parameterUsage"].get(key)
+                if previous is not None and previous != usage:
+                    raise ValueError("ExcelLink metadata has conflicting parameter identities.")
+                if previous is None:
+                    entry["parameterKeys"].append(key)
+                    entry["parameters"].append(usage["name"])
+                    entry["parameterUsage"][key] = usage
+            field = _text(record.get("field"))
+            if not field:
+                raise ValueError("ExcelLink column metadata is missing its field identity.")
+            record["field"] = field
+            try:
+                record["columnIndex"] = int(record.get("columnIndex"))
+            except (TypeError, ValueError):
+                raise ValueError("ExcelLink column metadata is missing its column index.")
+            record["target"] = _text(record.get("target")) or None
+            entry["columns"].append(record)
+    if not found or not meta["sheets"]:
+        raise ValueError("The workbook has no valid hidden '{0}' schema.".format(META_SHEET_NAME))
+    for entry in meta["sheets"].values():
+        entry["columns"].sort(key=lambda column: column["columnIndex"])
+        if [column["columnIndex"] for column in entry["columns"]] != list(
+                range(len(entry["columns"]))):
+            raise ValueError("ExcelLink column metadata has duplicate or missing indices.")
+        fields = set()
+        parameter_targets = set()
+        for column in entry["columns"]:
+            if column["field"] in fields:
+                raise ValueError("ExcelLink column metadata contains duplicate fields.")
+            fields.add(column["field"])
+            if column.get("columnType") == u"parameter":
+                key_target = (column.get("parameterKey"), column.get("target"))
+                if not key_target[0] or key_target[1] not in ("type", "instance"):
+                    raise ValueError("ExcelLink parameter column identity is invalid.")
+                if key_target in parameter_targets:
+                    raise ValueError(
+                        "ExcelLink metadata contains duplicate parameter key/target columns."
+                    )
+                parameter_targets.add(key_target)
+        if entry["parameterKeys"] != entry["declaredParameterKeys"]:
+            raise ValueError("ExcelLink parameter keys do not match the hidden worksheet schema.")
+        if entry["gridLayout"] == "combined":
+            if entry["categoryId"] not in (None, u"") or not entry["categoryKey"]:
+                raise ValueError("Combined worksheet category metadata is invalid.")
+        elif entry["gridLayout"] == "separate":
+            if len(entry["categories"]) != 1:
+                raise ValueError("Separate worksheets must declare exactly one category.")
+            category = entry["categories"][0]
+            if (str(entry["categoryId"]) != str(category.get("categoryId"))
+                    or entry["categoryKey"] != category.get("categoryKey")):
+                raise ValueError("Separate worksheet category metadata is inconsistent.")
     return meta
+
+
+def _as_bool(value):
+    if value in (True, 1, u"1", u"true", u"True"):
+        return True
+    if value in (False, 0, u"0", u"false", u"False", None, u""):
+        return False
+    raise ValueError("ExcelLink metadata contains an invalid boolean value.")
 
 
 def _id_columns(header_row):
@@ -222,56 +384,89 @@ def _id_text(value):
     return _text(value).strip()
 
 
+def _validate_worksheet_headers(rows, metadata_columns, sheet_name):
+    if len(rows) < 2:
+        raise ValueError(
+            "Worksheet '{0}' does not contain both header rows.".format(sheet_name)
+        )
+    expected_columns = len(metadata_columns)
+    for header in rows[:2]:
+        if set(header) != set(range(expected_columns)):
+            raise ValueError(
+                "Worksheet '{0}' has malformed or incomplete two-row headers."
+                .format(sheet_name)
+            )
+    for index, column in enumerate(metadata_columns):
+        label = _text(column.get("dataType")).strip()
+        if not label:
+            label = u"Identifier" if column.get("field") in ID_FIELDS else u"Text"
+        unit = _text(column.get("unit")).strip()
+        expected = u"{0} [{1}]".format(label, unit) if unit else label
+        actual = _text(rows[0].get(index)).strip()
+        if actual != expected:
+            raise ValueError(
+                "Worksheet '{0}' has an invalid data type/unit header in column {1}."
+                .format(sheet_name, index + 1)
+            )
+
+
 def read_import_plan(file_path):
     """Describe what an ExcelLink XLSX contains so the grid can be rebuilt.
 
-    Returns {'parameterMode', 'sheets': [{'xlsxName', 'categoryId',
-    'parameters', 'uniqueIds', 'elementIds'}], 'issues': [...]}.
+    Returns the declared grid layout, stable category/parameter identities,
+    and element IDs. Visible headers are never used to infer parameter identity.
     """
     reader = _XlsxReader(file_path)
     try:
         xlsx_sheets = reader.sheets()
         meta = _read_meta(reader, xlsx_sheets)
-        if not meta["sheets"]:
-            raise ValueError(
-                "This file has no hidden '{0}' sheet. Only workbooks saved from "
-                "KW ExcelLink can be imported.".format(META_SHEET_NAME)
-            )
-        plan = {"parameterMode": meta["parameterMode"], "sheets": [], "issues": []}
+        plan = {
+            "parameterMode": meta["parameterMode"],
+            "gridLayout": meta["gridLayout"], "sheets": [], "issues": [],
+        }
         for name, part in xlsx_sheets:
             if name == META_SHEET_NAME:
                 continue
             entry = meta["sheets"].get(name)
-            if entry is None or entry["categoryId"] is None:
-                plan["issues"].append({
-                    "sheet": name, "row": None, "column": None,
-                    "message": u"Worksheet is not described in the ExcelLink metadata "
-                               u"(was the tab renamed?); skipped.",
-                })
-                continue
+            if entry is None:
+                raise ValueError(
+                    "Worksheet '{0}' is not described by the authoritative ExcelLink metadata."
+                    .format(name)
+                )
             rows = reader.rows(part)
-            ids = _id_columns(rows[0]) if rows else {}
+            _validate_worksheet_headers(rows, entry["columns"], name)
+            ids = {}
+            for index, column in enumerate(entry["columns"]):
+                if column["field"] == "UniqueId":
+                    ids["UniqueId"] = index
+                elif column["field"] == "ElementId":
+                    ids["ElementId"] = index
             if not ids:
-                plan["issues"].append({
-                    "sheet": name, "row": 1, "column": None,
-                    "message": u"No 'Unique ID' or 'Element ID' column; worksheet skipped.",
-                })
-                continue
+                raise ValueError("Worksheet '{0}' has no stable element ID column.".format(name))
             unique_ids = []
             element_ids = []
-            for values in rows[1:]:
+            for values in rows[2:]:
                 unique_id = _id_text(values.get(ids.get("UniqueId")))
                 element_id = _id_text(values.get(ids.get("ElementId")))
                 if unique_id or element_id:
                     unique_ids.append(unique_id)
                     element_ids.append(element_id)
-            plan["sheets"].append({
-                "xlsxName": name,
-                "categoryId": int(entry["categoryId"]),
-                "parameters": list(entry["parameters"]),
-                "uniqueIds": unique_ids,
-                "elementIds": element_ids,
-            })
+            if entry["gridLayout"] == "combined":
+                if entry["categoryId"] not in (None, u""):
+                    raise ValueError("Combined worksheet metadata must have a null categoryId.")
+            else:
+                if entry["categoryId"] in (None, u""):
+                    raise ValueError("Separate worksheet metadata requires a categoryId.")
+                entry["categoryId"] = int(entry["categoryId"])
+            plan_entry = dict(
+                (key, entry[key]) for key in (
+                    "xlsxName", "sheetName", "sheetKey", "gridLayout", "categoryId",
+                    "categoryKey", "categories", "parameterKeys", "parameters",
+                    "parameterUsage",
+                )
+            )
+            plan_entry.update({"uniqueIds": unique_ids, "elementIds": element_ids})
+            plan["sheets"].append(plan_entry)
         return plan
     finally:
         reader.close()
@@ -279,78 +474,92 @@ def read_import_plan(file_path):
 
 def _match_sheets(workbook, xlsx_sheets, meta):
     targets = workbook.get("sheets") or []
-    used = set()
-    export_names = {}
+    by_key = {}
     for index, sheet in enumerate(targets):
-        export_names[_unique_sheet_name(sheet.get("name"), used).lower()] = index
-    by_category = {}
-    for index, sheet in enumerate(targets):
-        by_category.setdefault(str(sheet.get("categoryId")), []).append(index)
+        key = sheet.get("sheetKey") or sheet.get("categoryKey")
+        if key:
+            if key in by_key:
+                raise ValueError("The current workbook has duplicate stable sheet identities.")
+            by_key[key] = index
+    if workbook.get("gridLayout") != meta.get("gridLayout"):
+        raise ValueError("The XLSX grid layout does not match the current workbook.")
 
     matches = []
     unmatched = []
     data_sheets = [(name, part) for name, part in xlsx_sheets if name != META_SHEET_NAME]
     for name, part in data_sheets:
-        index = export_names.get(name.lower())
-        if index is None:
-            for sheet_index, sheet in enumerate(targets):
-                if _norm(sheet.get("name")) == _norm(name):
-                    index = sheet_index
-                    break
-        if index is None and name in meta["sheets"]:
-            candidates = by_category.get(str(meta["sheets"][name]["categoryId"]), [])
-            if len(candidates) == 1:
-                index = candidates[0]
-        if index is None and len(data_sheets) == 1 and len(targets) == 1:
-            index = 0
+        entry = meta["sheets"].get(name)
+        if entry is None:
+            raise ValueError("Worksheet '{0}' has no authoritative metadata.".format(name))
+        index = by_key.get(entry["sheetKey"])
         if index is None:
             unmatched.append(name)
         else:
+            if targets[index].get("gridLayout", meta["gridLayout"]) != meta["gridLayout"]:
+                raise ValueError("Worksheet '{0}' has an incompatible grid layout.".format(name))
             matches.append((name, part, index))
     return matches, unmatched
 
 
-def _map_headers(header_row, sheet):
-    """Return ({column_index: column}, id_columns, issues)."""
-    columns = [column for column in sheet.get("columns") or []]
-    by_title = {}
-    by_base = {}
-    for column in columns:
-        by_title[_norm(_column_title(column))] = column
-        by_base.setdefault(_norm(column.get("title") or column.get("field")), column)
-
+def _map_headers(header_row, sheet, metadata_columns):
+    """Map XLSX columns only through hidden stable IDs, never visible labels."""
     mapped = {}
     ids = {}
     issues = []
-    for index, header in header_row.items():
-        text = _text(header).strip()
-        if not text:
+    current_columns = sheet.get("columns") or []
+    by_parameter = {}
+    for column in current_columns:
+        if column.get("columnType") == "parameter":
+            key = (column.get("parameterKey"), column.get("target"))
+            if key in by_parameter:
+                raise ValueError("The current grid has duplicate parameter key/target columns.")
+            by_parameter[key] = column
+    current_usage = sheet.get("parameterUsage") or {}
+
+    for index, metadata in enumerate(metadata_columns):
+        field = metadata.get("field")
+        if field in ("UniqueId", "ElementId"):
+            ids[field] = index
             continue
-        key = _norm(text)
-        if key == _UNIQUE_ID_HEADER:
-            ids["UniqueId"] = index
-            continue
-        if key == _ELEMENT_ID_HEADER:
-            ids["ElementId"] = index
-            continue
-        column = by_title.get(key)
-        if column is None:
-            match = _UNIT_SUFFIX.match(text)
-            base = _norm(match.group(1)) if match else key
-            unit = match.group(2).strip() if match else u""
-            column = by_base.get(base)
-            if column is not None and _text(column.get("unit")) != unit:
+        if metadata.get("columnType") == "parameter":
+            parameter_key = metadata.get("parameterKey")
+            target = metadata.get("target")
+            column = by_parameter.get((parameter_key, target))
+            if column is None:
                 issues.append(
-                    u"Column '{0}' was saved in [{1}] but the project now uses [{2}]; "
-                    u"column skipped.".format(text, unit, _text(column.get("unit")))
+                    u"Parameter key '{0}' ({1}) is not present in the current grid; column skipped."
+                    .format(_text(parameter_key), _text(target))
                 )
                 continue
-        if column is None:
-            if key not in (u"category", u"is type row", u"type element id", u"type key"):
-                issues.append(u"Column '{0}' does not match any grid column; skipped.".format(text))
-            continue
-        if column.get("columnType") in ("parameter", "typeName"):
+            usage = current_usage.get(parameter_key) or {}
+            current_identity = (column.get("parameterIdentity")
+                                or usage.get("identity"))
+            current_spec = column.get("specTypeId") or usage.get("specTypeId")
+            if (current_identity != metadata.get("parameterIdentity")
+                    or current_spec != metadata.get("specTypeId")):
+                issues.append(
+                    u"Parameter key '{0}' no longer has the exported identity/specification; "
+                    u"column skipped.".format(_text(parameter_key))
+                )
+                continue
+            if column.get("storageType") != metadata.get("storageType"):
+                issues.append(
+                    u"Parameter key '{0}' has a different storage type; column skipped."
+                    .format(_text(parameter_key))
+                )
+                continue
+            if column.get("unit") != metadata.get("unit"):
+                issues.append(
+                    u"Parameter key '{0}' has a different display unit; column skipped."
+                    .format(_text(parameter_key))
+                )
+                continue
             mapped[index] = column
+        elif metadata.get("columnType") == "typeName":
+            column = next((item for item in current_columns
+                           if item.get("columnType") == "typeName"), None)
+            if column is not None:
+                mapped[index] = column
     return mapped, ids, issues
 
 
@@ -464,6 +673,37 @@ def _cell_editable(column, row):
     return not row.get(u"{0}__disabled".format(column.get("field")))
 
 
+def _change_metadata(column, row):
+    if column.get("columnType") == "typeName":
+        return {
+            "target": "typeName",
+            "parameterName": column.get("parameterName") or "Type Name",
+        }
+    field = column.get("field")
+    metadata = row.get(u"{0}__metadata".format(field))
+    if not isinstance(metadata, dict):
+        raise ValueError("The row is missing authoritative parameter metadata.")
+    for key in ("parameterIdentity", "specTypeId", "storageType"):
+        if not metadata.get(key):
+            raise ValueError("The row parameter metadata is missing '{0}'.".format(key))
+    target = column.get("target")
+    if target not in ("type", "instance"):
+        raise ValueError("The row parameter metadata has an unsupported target.")
+    return {
+        "target": target,
+        "parameterName": column.get("parameterName"),
+        "parameterKey": column.get("parameterKey"),
+        "parameterIdentity": metadata.get("parameterIdentity"),
+        "specTypeId": metadata.get("specTypeId"),
+        "storageType": metadata.get("storageType"),
+        "parameterGuid": metadata.get("parameterGuid"),
+        "parameterBuiltin": metadata.get("parameterBuiltin"),
+        "referenceKind": metadata.get("referenceKind"),
+        "options": metadata.get("options"),
+        "unit": metadata.get("unit"),
+    }
+
+
 def diff_xlsx(workbook, file_path):
     """Compare an XLSX against the workbook; return {'updates', 'summary', 'issues'}."""
     reader = _XlsxReader(file_path)
@@ -487,7 +727,11 @@ def diff_xlsx(workbook, file_path):
             if not rows:
                 continue
             summary["sheets"] += 1
-            mapped, ids, header_issues = _map_headers(rows[0], sheet)
+            metadata_columns = meta["sheets"][xlsx_name]["columns"]
+            _validate_worksheet_headers(rows, metadata_columns, xlsx_name)
+            mapped, ids, header_issues = _map_headers(
+                rows[1], sheet, metadata_columns
+            )
             for message in header_issues:
                 issues.append({"sheet": xlsx_name, "row": 1, "column": None, "message": message})
             if "UniqueId" not in ids and "ElementId" not in ids:
@@ -501,10 +745,10 @@ def diff_xlsx(workbook, file_path):
                 by_unique[_text(row.get("UniqueId"))] = row
                 by_element[_text(row.get("ElementId"))] = row
 
-            # (field, typeElementId) -> {"column", "row", "current", "values": [(value, xlsx_row)]}
+            # (field, typeElementId) -> {"column", "row", "values": [...]}
             type_groups = {}
-            for row_offset, values in enumerate(rows[1:]):
-                xlsx_row = row_offset + 2
+            for row_offset, values in enumerate(rows[2:]):
+                xlsx_row = row_offset + 3
                 if not any(not _is_blank(v) for v in values.values()):
                     continue
                 summary["rowsRead"] += 1
@@ -549,22 +793,38 @@ def diff_xlsx(workbook, file_path):
                         issues.append({"sheet": xlsx_name, "row": xlsx_row, "column": title,
                                        "message": error})
                         continue
+                    try:
+                        change_metadata = _change_metadata(column, grid_row)
+                    except ValueError as exc:
+                        summary["skipped"] += 1
+                        issues.append({"sheet": xlsx_name, "row": xlsx_row,
+                                       "column": title, "message": _text(exc)})
+                        continue
                     if column.get("target") in ("type", "typeName"):
                         key = (field, _text(grid_row.get("TypeElementId")))
                         group = type_groups.setdefault(key, {
                             "column": column, "row": grid_row, "storage": storage,
-                            "values": [],
+                            "values": [], "metadata": change_metadata,
                         })
+                        if group["metadata"] != change_metadata:
+                            summary["skipped"] += 1
+                            issues.append({
+                                "sheet": xlsx_name, "row": xlsx_row, "column": title,
+                                "message": u"Rows sharing a type have inconsistent parameter identity metadata.",
+                            })
+                            continue
                         group["values"].append((value, xlsx_row))
                         continue
-                    updates.append({
+                    update = {
                         "sheetIndex": sheet_index,
                         "field": field,
                         "uniqueId": grid_row.get("UniqueId"),
                         "typeElementId": grid_row.get("TypeElementId"),
                         "value": value,
                         "oldValue": current,
-                    })
+                    }
+                    update.update(change_metadata)
+                    updates.append(update)
 
             for (field, _), group in type_groups.items():
                 distinct = []
@@ -581,14 +841,16 @@ def diff_xlsx(workbook, file_path):
                                    u"type change ignored.".format(_text(group["row"].get("TypeName"))),
                     })
                     continue
-                updates.append({
+                update = {
                     "sheetIndex": sheet_index,
                     "field": field,
                     "uniqueId": group["row"].get("UniqueId"),
                     "typeElementId": group["row"].get("TypeElementId"),
                     "value": distinct[0],
                     "oldValue": group["row"].get(field),
-                })
+                }
+                update.update(group["metadata"])
+                updates.append(update)
 
         summary["changed"] = len(updates)
         return {"updates": updates, "summary": summary, "issues": issues}

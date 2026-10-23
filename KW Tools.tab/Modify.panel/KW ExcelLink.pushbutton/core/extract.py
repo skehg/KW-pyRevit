@@ -11,6 +11,7 @@ from core.element_refs import (
     locked_reason,
 )
 from core.types import MODE_INSTANCES, element_id_value
+from core.parameter_metadata import parameter_descriptor
 
 
 _READ_ONLY_REASON = "Read-only in Revit."
@@ -69,27 +70,39 @@ def _read_parameter(parameter, owner, catalog):
     }
 
 
-def _parameter_values(element, selected_names, catalog):
+def _parameter_values(element, selected_names, catalog, usage_map=None):
     result = {}
     if element is None:
         return result
+    wanted_names = (set(usage_map[key].get("name", key) for key in selected_names)
+                    if usage_map is not None else selected_names)
     for parameter in element.Parameters:
         if parameter is None or parameter.Definition is None:
             continue
         name = parameter.Definition.Name
-        if name not in selected_names:
+        if name not in wanted_names:
             continue
-        existing = result.get(name)
+        if usage_map is not None:
+            descriptor = parameter_descriptor(catalog.doc, element, parameter)
+            key = descriptor["key"]
+        else:
+            descriptor = None
+            key = name
+        if key not in selected_names:
+            continue
+        existing = result.get(key)
         # Some elements expose two parameters with one name (e.g. a read-only
         # schedule "Level" and the editable placement "Level"); keep the editable one,
         # otherwise the one whose lock reason is more specific than plain read-only.
         if existing is not None and not existing["isReadOnly"]:
             continue
         record = _read_parameter(parameter, element, catalog)
+        if descriptor is not None:
+            record.update(descriptor)
         if (existing is None or not record["isReadOnly"]
                 or (existing["readOnlyReason"] == _READ_ONLY_REASON
                     and record["readOnlyReason"] != _READ_ONLY_REASON)):
-            result[name] = record
+            result[key] = record
     return result
 
 
@@ -101,13 +114,15 @@ def _element_type_name(type_element):
     return element_type_name(type_element)
 
 
-def _build_type_row(type_element, category_name, selected_names, catalog):
+def _build_type_row(type_element, category_name, selected_names, catalog, usage_map=None):
     type_id = element_id_value(type_element.Id)
-    type_parameters = _parameter_values(type_element, selected_names, catalog)
+    type_parameters = _parameter_values(type_element, selected_names, catalog, usage_map)
     parameters = {}
     for name in selected_names:
         record = type_parameters.get(name)
         parameters[name] = {
+            "typeRecord": record,
+            "instanceRecord": None,
             "value": record.get("value") if record else None,
             "typeValue": record.get("value") if record else None,
             "instanceValue": None,
@@ -136,7 +151,7 @@ def _build_type_row(type_element, category_name, selected_names, catalog):
     }
 
 
-def extract_rows(doc, elements, parameter_mode, selected_parameters, catalog=None):
+def extract_rows(doc, elements, parameter_mode, selected_parameters, catalog=None, usage_map=None):
     if catalog is None:
         catalog = ReferenceCatalog(doc)
     selected_names = set(selected_parameters)
@@ -146,8 +161,7 @@ def extract_rows(doc, elements, parameter_mode, selected_parameters, catalog=Non
     type_parameters_by_id = {}
 
     for element in elements:
-        if element.Category is not None:
-            category_name = element.Category.Name
+        category_name = element.Category.Name if element.Category is not None else ""
         if _is_element_type(element):
             if parameter_mode == MODE_INSTANCES:
                 continue
@@ -176,14 +190,14 @@ def extract_rows(doc, elements, parameter_mode, selected_parameters, catalog=Non
                 except Exception:
                     instance_name = ""
             instance_unique_id = element.UniqueId
-            instance_parameters = _parameter_values(element, selected_names, catalog)
+            instance_parameters = _parameter_values(element, selected_names, catalog, usage_map)
 
         if parameter_mode != MODE_INSTANCES:
             if type_id in seen_type_ids:
                 continue
             seen_type_ids.add(type_id)
             rows.append(
-                _build_type_row(type_element, category_name, selected_names, catalog)
+                _build_type_row(type_element, category_name, selected_names, catalog, usage_map)
             )
             continue
 
@@ -192,7 +206,7 @@ def extract_rows(doc, elements, parameter_mode, selected_parameters, catalog=Non
         else:
             if type_id not in type_parameters_by_id:
                 type_parameters_by_id[type_id] = _parameter_values(
-                    type_element, selected_names, catalog
+                    type_element, selected_names, catalog, usage_map
                 )
             type_parameters = type_parameters_by_id[type_id]
         parameters = {}
@@ -201,6 +215,8 @@ def extract_rows(doc, elements, parameter_mode, selected_parameters, catalog=Non
             instance_record = instance_parameters.get(name)
             chosen = instance_record or type_record
             parameters[name] = {
+                "typeRecord": type_record,
+                "instanceRecord": instance_record,
                 "value": chosen.get("value") if chosen else None,
                 "typeValue": type_record.get("value") if type_record else None,
                 "instanceValue": instance_record.get("value") if instance_record else None,

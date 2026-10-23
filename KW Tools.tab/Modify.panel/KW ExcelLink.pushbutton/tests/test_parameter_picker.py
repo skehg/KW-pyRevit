@@ -87,6 +87,32 @@ class ParameterPickerTests(unittest.TestCase):
             self.assertEqual(window._items[name].Mode, mode)
         self.assertEqual(len(set(item.BadgeBackground for item in window._items.values())), 3)
 
+    def test_semantic_type_badges_display_names_and_category_coverage(self):
+        self.usage = {
+            "opaque-width": {
+                "name": "Width", "displayName": "Width", "dataType": "Length",
+                "isType": True, "categoryCount": 1, "totalCategories": 2,
+                "categoryNames": ["Doors"],
+            },
+            "opaque-flag": {
+                "name": "Enabled", "displayName": "Enabled", "dataType": "Yes/No",
+                "isInstance": True, "categoryCount": 2, "totalCategories": 2,
+                "categoryNames": ["Doors", "Windows"],
+            },
+        }
+        window = self.window()
+        self.assertEqual(window._items["opaque-width"].Name, "Width")
+        self.assertEqual(window._items["opaque-width"].DataType, "Length")
+        self.assertEqual(window._items["opaque-width"].Coverage, "1/2 categories")
+        self.assertEqual(str(window._items["opaque-width"]), "opaque-width")
+        window.txtSearch.Text = "width"
+        window.on_search_changed(None, None)
+        self.assertEqual(self.names(window.lstAvailable.Items), ["opaque-width"])
+        window.txtSearch.Text = ""
+        window.cboCoverage = types.SimpleNamespace(SelectedIndex=1)
+        window.on_filter_changed(None, None)
+        self.assertEqual(self.names(window.lstAvailable.Items), ["opaque-flag"])
+
     def test_types_mode_hides_instance_only_including_restored_selections(self):
         window = self.window("Types Mode", ["Comments", "Mark"])
         self.assertEqual(self.names(window.lstAvailable.Items), ["Width"])
@@ -95,6 +121,20 @@ class ParameterPickerTests(unittest.TestCase):
         window.on_continue(None, None)
         self.assertEqual(window.selected_parameters, ["Mark"])
         self.assertEqual(window.action, "next")
+
+    def test_types_mode_common_filter_counts_type_availability_not_instance_coverage(self):
+        self.usage = {"Width": {
+            "name": "Width", "isType": True, "isInstance": True,
+            "categoryCount": 2, "totalCategories": 2,
+            "categoryIds": [1, 2], "categoryNames": ["Doors", "Windows"],
+            "typeCategoryIds": [1], "instanceCategoryIds": [2],
+        }}
+        window = self.window("Types Mode")
+        self.assertEqual(window._items["Width"].Coverage, "1/2 categories")
+        window.cboCoverage = types.SimpleNamespace(SelectedIndex=1)
+        window.on_filter_changed(None, None)
+        self.assertEqual(self.names(window.lstAvailable.Items), [])
+        self.assertEqual(self.usage["Width"]["categoryCount"], 2)
 
     def test_types_mode_filters_cannot_restore_hidden_parameters(self):
         window = self.window("Types Mode")

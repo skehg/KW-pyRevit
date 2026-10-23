@@ -47,12 +47,56 @@ def read_schedule_defaults(uidoc, selection_mode):
 
 
 def schedule_parameters(defaults, usage):
-    names = []
+    keys = []
     for field in defaults["fields"]:
         name = field.GetName()
-        if name in usage and name not in names and _supported_field(field):
-            names.append(name)
-    return names
+        if not _supported_field(field):
+            continue
+        candidates = [
+            key for key, entry in usage.items()
+            if (entry.get("name") or key) == name
+        ]
+        identity = _field_identity(field)
+        if identity is not None:
+            matching = [
+                key for key in candidates
+                if _same_identity(usage[key].get("identity"), identity)
+            ]
+            if matching:
+                candidates = matching
+        if len(candidates) == 1:
+            if candidates[0] not in keys:
+                keys.append(candidates[0])
+        elif len(candidates) > 1:
+            defaults.setdefault("issues", []).append(
+                "Schedule field '{0}' matches multiple parameters; it was not selected.".format(
+                    name
+                )
+            )
+    return keys
+
+
+def _field_identity(field):
+    for name in ("ParameterId", "parameterId", "Guid", "GUID", "ParameterGuid"):
+        try:
+            value = getattr(field, name)
+        except Exception:
+            continue
+        if value is not None and str(value):
+            return str(value)
+    return None
+
+
+def _same_identity(left, right):
+    if left is None or right is None:
+        return False
+    left = str(left).strip().lower()
+    right = str(right).strip().lower()
+    if left.startswith("builtin:"):
+        left = left[len("builtin:"):]
+    if right.startswith("builtin:"):
+        right = right[len("builtin:"):]
+    return left == right
 
 
 def _supported_field(field):
@@ -64,11 +108,34 @@ def _column_for(field, sheet):
         return None
     candidates = [column for column in sheet["columns"]
                   if column.get("parameterName") == field.GetName()]
+    identity = _field_identity(field)
+    if identity is not None:
+        matches = [
+            column for column in candidates
+            if _same_identity(column.get("parameterIdentity"), identity)
+        ]
+        if matches:
+            candidates = matches
+        elif len(candidates) > 1:
+            return None
     target = "type" if str(field.FieldType) == "ElementType" else "instance"
     for column in candidates:
         if column.get("target") == target:
             return None if column.get("disabled") else column
-    usage = sheet.get("parameterUsage", {}).get(field.GetName(), {})
+    usage_map = sheet.get("parameterUsage", {})
+    parameter_key = (
+        candidates[0].get("parameterKey") if candidates else None
+    )
+    usage = usage_map.get(parameter_key) if parameter_key is not None else None
+    if usage is None:
+        usage = next(
+            (
+                item for key, item in usage_map.items()
+                if (item.get("name") or key) == field.GetName()
+                and (identity is None or _same_identity(item.get("identity"), identity))
+            ),
+            {},
+        )
     if usage.get("isType" if target == "type" else "isInstance"):
         return None
     return candidates[0] if len(candidates) == 1 and not candidates[0].get("disabled") else None

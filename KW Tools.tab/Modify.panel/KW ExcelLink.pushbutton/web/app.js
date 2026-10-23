@@ -7,6 +7,7 @@ import * as RC from "./range_clipboard.js";
 import * as TT from "./text_tools.js";
 import * as SS from "./spreadsheet.js";
 import * as TN from "./type_names.js";
+import {cellColumn, typeLabel} from "./cell_metadata.js";
 
 (function () {
   "use strict";
@@ -92,7 +93,7 @@ import * as TN from "./type_names.js";
     var id = column.target === "type"
       ? row.TypeElementId
       : (column.target === "typeName" ? row.TypeElementId : row.ElementId);
-    return [column.target, id, column.parameterName || "__TYPE_NAME__"].join("|");
+    return [column.target, id, column.parameterKey || column.parameterName || "__TYPE_NAME__"].join("|");
   }
 
   function reportChangeCount() {
@@ -645,11 +646,15 @@ import * as TN from "./type_names.js";
   }
 
   function buildChange(row, column, value) {
+    column = cellColumn(column, row);
     var change = {
       target: column.target,
       elementId: row.ElementId,
       typeElementId: row.TypeElementId,
       parameterName: column.parameterName,
+      parameterKey: column.parameterKey,
+      parameterIdentity: column.parameterIdentity,
+      specTypeId: column.specTypeId,
       parameterGuid: column.parameterGuid || null,
       parameterBuiltin: column.parameterBuiltin,
       storageType: column.storageType,
@@ -762,6 +767,11 @@ import * as TN from "./type_names.js";
   // Sets one value on every visible row where the column is editable. Shared type
   // values are recorded once per type and copied to all of that type's rows.
   function bulkSetValue(column, value) {
+    table.getData("active").forEach(function (row) {
+      if (cellEditable(column, row)) {
+        RC.literalValue(value == null ? "" : String(value), cellColumn(column, row));
+      }
+    });
     var historyBefore = captureEditState();
     var edited = new Set();
     var typeValues = new Set();
@@ -1030,12 +1040,14 @@ import * as TN from "./type_names.js";
     if (column.storageType === "ElementId" && column.options) {
       return {
         editor: "list",
-        editorParams: {
-          values: column.options,
-          autocomplete: true,
-          listOnEmpty: true,
-          allowEmpty: true,
-          clearable: false
+        editorParams: function (cell) {
+          return {
+            values: cellColumn(column, cell.getRow().getData()).options || [],
+            autocomplete: true,
+            listOnEmpty: true,
+            allowEmpty: true,
+            clearable: false
+          };
         }
       };
     }
@@ -1046,7 +1058,7 @@ import * as TN from "./type_names.js";
   }
 
   function displayTitle(column) {
-    return column.unit ? column.title + " [" + column.unit + "]" : column.title;
+    return column.title;
   }
 
   function isPending(cell, column) {
@@ -1076,6 +1088,12 @@ import * as TN from "./type_names.js";
         badge.title = "Formula column " + letter;
         wrapper.appendChild(badge);
       }
+      var column = columnForField(field);
+      var details = document.createElement("span");
+      details.className = "col-data-type";
+      details.textContent = column ? typeLabel(column) : "";
+      details.title = details.textContent;
+      wrapper.appendChild(details);
       var label = document.createElement("span");
       label.className = "col-label";
       label.textContent = cell.getValue();
@@ -1353,9 +1371,9 @@ import * as TN from "./type_names.js";
     var apply = null;
     function invalidate() {
       plan = null;
-      if (apply) { apply.disabled = true; }
+      if (apply) { apply.disabled = false; }
       samples.replaceChildren();
-      summary.textContent = "Preview to see the change count and sample results.";
+      summary.textContent = "Stage changes directly, or Preview to see the change count and sample results.";
       error.textContent = "";
     }
     function preview() {
@@ -1395,15 +1413,9 @@ import * as TN from "./type_names.js";
     var title = kind === "replace" ? "Find / Replace" : "Change case";
     var result = showModal(title, form, [
       {label: "Preview", value: null, onClick: preview},
-      {label: "Stage changes", value: "apply", primary: true, disabled: true, onClick: function () {
-        if (!plan) { return false; }
-        if (currentSheet() !== sourceSheet || plan.changes.some(function (change) {
-          return change.row[change.column.field] !== change.before;
-        })) {
-          invalidate();
-          error.textContent = "The grid changed. Preview again before staging.";
-          return false;
-        }
+      {label: "Stage changes", value: "apply", primary: true, onClick: function () {
+        preview();
+        if (!plan || !plan.changes.length) { return false; }
         acceptedPlan = plan;
       }},
       {label: "Cancel", value: null}
@@ -2221,7 +2233,13 @@ import * as TN from "./type_names.js";
       var column = selectedColumn();
       if (column.storageType === "ElementId" && column.options) {
         input = el("select");
-        fillOptions(input, column.options.map(function (option) {
+        var choices = new Set();
+        visibleRows.forEach(function (row) {
+          if (cellEditable(column, row)) {
+            (cellColumn(column, row).options || []).forEach(function (option) { choices.add(option); });
+          }
+        });
+        fillOptions(input, Array.from(choices).map(function (option) {
           return { value: option, label: option };
         }));
       } else {
@@ -2260,6 +2278,13 @@ import * as TN from "./type_names.js";
           return false;
         }
       }
+      try {
+        visibleRows.forEach(function (row) {
+          if (cellEditable(column, row)) {
+            RC.literalValue(String(value), cellColumn(column, row));
+          }
+        });
+      } catch (exc) { error.textContent = exc.message; return false; }
       result = { column: column, value: value };
       return true;
     }
@@ -2269,11 +2294,13 @@ import * as TN from "./type_names.js";
       { label: "Cancel", value: null }
     ]).then(function (choice) {
       if (choice !== "ok" || !result) { return; }
-      bulkSetValue(result.column, result.value).then(function (summary) {
-        showStatus("Set " + displayTitle(result.column) + " on " + summary.rows + " row(s)" +
-          (summary.skipped ? "; skipped " + summary.skipped + " locked cell(s)" : "") +
-          ". Review the highlighted cells, then Apply Changes.");
-      });
+      try {
+        bulkSetValue(result.column, result.value).then(function (summary) {
+          showStatus("Set " + displayTitle(result.column) + " on " + summary.rows + " row(s)" +
+            (summary.skipped ? "; skipped " + summary.skipped + " locked cell(s)" : "") +
+            ". Review the highlighted cells, then Apply Changes.");
+        }).catch(reportGridError);
+      } catch (exc) { reportGridError(exc); }
     });
   }
 

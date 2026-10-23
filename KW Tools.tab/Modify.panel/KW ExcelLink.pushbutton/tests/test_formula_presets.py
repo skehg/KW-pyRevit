@@ -34,6 +34,37 @@ class FormulaPresetTests(unittest.TestCase):
         self.assertEqual(loaded["sheets"][0]["layout"]["formulas"], {"Result": rule})
         self.assertNotIn("rows", loaded["sheets"][0])
 
+    def test_combined_preset_keeps_grid_layout_categories_and_parameter_keys(self):
+        workbook = {
+            "parameterMode": "Instances Mode",
+            "gridLayout": "combined",
+            "sheets": [{
+                "name": "Combined categories",
+                "categoryId": None,
+                "categoryKey": "combined:OST_Doors|OST_Walls",
+                "sheetKey": "combined:OST_Doors|OST_Walls",
+                "categories": [
+                    {"categoryId": 10, "categoryKey": "OST_Doors", "name": "Doors"},
+                    {"categoryId": 20, "categoryKey": "OST_Walls", "name": "Walls"},
+                ],
+                "parameters": ["opaque-param-key"],
+                "rows": [{"ElementId": 1}],
+            }],
+        }
+        data = presets.preset_from_workbook(
+            workbook, [{}], "Combined", "Current View"
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "combined.json")
+            presets._write_json(path, data)
+            loaded = presets.load_preset(path)
+        sheet = loaded["sheets"][0]
+        self.assertEqual(loaded["gridLayout"], "combined")
+        self.assertEqual(sheet["categories"], workbook["sheets"][0]["categories"])
+        self.assertEqual(sheet["parameters"], ["opaque-param-key"])
+        self.assertIsNone(sheet["categoryId"])
+        self.assertNotIn("rows", sheet)
+
     def test_old_presets_and_invalid_rules(self):
         self.assertEqual(presets._clean_layout({})["formulas"], {})
         self.assertEqual(presets._clean_formulas({

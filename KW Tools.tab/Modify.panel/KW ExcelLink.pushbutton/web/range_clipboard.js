@@ -86,7 +86,7 @@ export function planPaste(matrix, rows, columns, startRow, startColumn, editable
       var row = rows[startRow + r], column = columns[startColumn + c];
       if (!editable(column, row)) { skipped += 1; return; }
       var value;
-      try { value = pasteValue(raw, column); }
+      try { value = pasteValue(raw, cellColumn(column, row)); }
       catch (error) { throw new Error("Paste row " + (r + 1) + ", column " + (c + 1) +
         " (" + column.title + "): " + error.message); }
       var key = changeKey(row, column);
@@ -114,7 +114,7 @@ export function planFillDown(cells, columnForField, editable, changeKey, hasForm
       var cell = row[c], data = cell.getRow().getData();
       if (!editable(column, data)) { skipped += 1; return; }
       // Copy actual values, not clipboard text or formula expressions.
-      var validated = literalValue(value == null ? "" : String(value), column);
+      var validated = literalValue(value == null ? "" : String(value), cellColumn(column, data));
       if (cell.getValue() === validated && !(hasFormula && hasFormula(data, column))) { return; }
       var key = changeKey(data, column);
       changes.set(key, {row: data, column: column, value: validated});
@@ -124,3 +124,4 @@ export function planFillDown(cells, columnForField, editable, changeKey, hasForm
   return {changes: Array.from(changes.values()), skipped: skipped, types: types.size};
 }
 import {nameValue} from "./type_names.js";
+import {cellColumn} from "./cell_metadata.js";

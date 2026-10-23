@@ -26,6 +26,10 @@ BASE_COLUMNS = [
 def build_columns(selected_parameters, usage_map, parameter_mode):
     columns = [dict(column) for column in BASE_COLUMNS]
     for column in columns:
+        column["dataType"] = (
+            "Integer" if column["field"] in ("ElementId", "TypeElementId")
+            else "Yes/No" if column["field"] == "IsTypeRow" else "Text"
+        )
         if column.get("target") == "typeName":
             column["formulaAllowed"] = parameter_mode == MODE_TYPES
     for index, name in enumerate(selected_parameters):
@@ -38,35 +42,43 @@ def build_columns(selected_parameters, usage_map, parameter_mode):
                 columns.append(_parameter_column(
                     index, name, "Type", TARGET_TYPE, False,
                     parameter_mode != MODE_INSTANCES,
+                    usage,
                 ))
             if has_instance:
                 columns.append(_parameter_column(
-                    index, name, "Instance", TARGET_INSTANCE, False, True
+                    index, name, "Instance", TARGET_INSTANCE, False, True, usage
                 ))
         elif has_type:
             columns.append(_parameter_column(
-                index, name, "Type", TARGET_TYPE, False, True
+                index, name, "Type", TARGET_TYPE, False, True, usage
             ))
         else:
             columns.append(_parameter_column(
-                index, name, "Type", TARGET_TYPE, True, False
+                index, name, "Type", TARGET_TYPE, True, False, usage
             ))
     return columns
 
 
-def _parameter_column(index, name, suffix, target, disabled, formulas_allowed):
+def _parameter_column(index, name, suffix, target, disabled, formulas_allowed, usage=None):
+    usage = usage or {}
     is_type = target == TARGET_TYPE
     return {
-        "title": "{0} ({1})".format(name, suffix),
+        "title": "{0} ({1})".format(usage.get("displayName", name), suffix),
         "field": "p{0}_{1}".format(index, suffix.lower()),
         "columnType": "parameter",
-        "parameterName": name,
+        "parameterKey": name,
+        "parameterName": usage.get("name", name),
+        "parameterIdentity": usage.get("identity"),
+        "dataType": usage.get("dataType"),
+        "specTypeId": usage.get("specTypeId"),
+        "parameterGuid": usage.get("guid"),
+        "parameterBuiltin": usage.get("builtin"),
         "target": target,
         "editable": not disabled,
         "disabled": disabled,
-        "formulaAllowed": not disabled and formulas_allowed,
+        "formulaAllowed": not disabled and formulas_allowed and usage.get("storageType") != "ElementId",
         "typeHighlight": is_type,
-        "storageType": None,
+        "storageType": usage.get("storageType"),
     }
 
 
@@ -79,32 +91,45 @@ def project_rows(rows, columns, catalog=None):
         for column in columns:
             if column.get("columnType") != "parameter":
                 continue
-            name = column["parameterName"]
+            name = column.get("parameterKey", column["parameterName"])
             record = parameters.get(name, {})
             target = column["target"]
+            target_record = record.get("typeRecord" if target == TARGET_TYPE else "instanceRecord")
+            metadata = target_record if target_record is not None else record
             value_key = "typeValue" if target == TARGET_TYPE else "instanceValue"
             result[column["field"]] = record.get(value_key)
             presence_key = "isTypeParam" if target == TARGET_TYPE else "isInstanceParam"
-            storage_type = record.get("storageType")
+            storage_type = metadata.get("storageType")
+            reference_kind = metadata.get("referenceKind") if target_record is not None else column.get("referenceKind")
+            options = catalog.options(reference_kind) if catalog is not None and reference_kind else None
+            result[column["field"] + "__metadata"] = {
+                "parameterIdentity": metadata.get("identity", column.get("parameterIdentity")),
+                "parameterGuid": metadata.get("guid"),
+                "parameterBuiltin": metadata.get("builtin"),
+                "specTypeId": metadata.get("specTypeId", column.get("specTypeId")),
+                "storageType": storage_type,
+                "referenceKind": reference_kind,
+                "options": options,
+                "unit": metadata.get("unit", column.get("unit")),
+            }
             result[column["field"] + "__disabled"] = (
                 column.get("disabled", False)
                 or not record.get(presence_key, False)
-                or record.get("isReadOnly", True)
+                or metadata.get("isReadOnly", True)
                 or storage_type == "None"
-                or (storage_type == "ElementId" and not column.get("referenceKind"))
+                or (storage_type == "ElementId" and not reference_kind)
             )
-            if record.get(presence_key) and record.get("readOnlyReason"):
-                result[column["field"] + "__note"] = record["readOnlyReason"]
+            if not record.get(presence_key, False):
+                result[column["field"] + "__note"] = "Parameter is not available on this element."
+            elif metadata.get("readOnlyReason"):
+                result[column["field"] + "__note"] = metadata["readOnlyReason"]
             if column.get("storageType") is None:
-                column["storageType"] = record.get("storageType")
+                column["storageType"] = metadata.get("storageType")
                 if column["storageType"] == "ElementId":
                     column["formulaAllowed"] = False
-            if target == TARGET_TYPE:
-                column["parameterGuid"] = record.get("guid")
-                column["parameterBuiltin"] = record.get("builtin")
-            elif not column.get("parameterGuid"):
-                column["parameterGuid"] = record.get("guid")
-                column["parameterBuiltin"] = record.get("builtin")
+            if column.get("parameterIdentity") is None and record.get(presence_key):
+                column["parameterGuid"] = metadata.get("guid")
+                column["parameterBuiltin"] = metadata.get("builtin")
         projected.append(result)
     return projected
 
@@ -119,7 +144,7 @@ def _attach_reference_options(rows, columns, catalog):
         kind_key = "typeKind" if column["target"] == TARGET_TYPE else "instanceKind"
         unit_key = "typeUnit" if column["target"] == TARGET_TYPE else "instanceUnit"
         for row in rows:
-            record = row.get("Parameters", {}).get(column["parameterName"], {})
+            record = row.get("Parameters", {}).get(column.get("parameterKey", column["parameterName"]), {})
             if record.get(unit_key) and not column["unit"]:
                 column["unit"] = record[unit_key]
             if record.get(kind_key) and not column["referenceKind"]:

@@ -29,7 +29,7 @@ from core.column_builder import project_rows
 from core.element_refs import ReferenceCatalog
 from core.extract import extract_rows
 from core.revit_view import run_view_action
-from core.selection import elements_for_category, resolve_elements_by_id
+from core.selection import resolve_elements_by_id
 from core.workbook_builder import build_import_workbook
 from core.xlsx_import import diff_xlsx, read_import_plan
 from ui.import_dialogs import open_with_shell, pick_xlsx, report_import_issues
@@ -60,15 +60,22 @@ def _layout_matches(plan, workbook):
     """True when every worksheet in the file maps onto a sheet already in the grid."""
     if not plan["sheets"] or plan.get("parameterMode") != workbook.get("parameterMode"):
         return False
+    if plan.get("gridLayout") != workbook.get("gridLayout"):
+        return False
+
+    def category_keys(sheet):
+        return set((item.get("categoryKey"), item.get("categoryId"))
+                   for item in sheet.get("categories") or [])
+
     sheets = {}
     for sheet in workbook.get("sheets") or []:
-        try:
-            sheets[int(sheet.get("categoryId"))] = sheet
-        except (TypeError, ValueError):
-            continue
+        key = sheet.get("categoryKey") or str(sheet.get("categoryId"))
+        sheets[key] = sheet
     for entry in plan["sheets"]:
-        sheet = sheets.get(int(entry["categoryId"]))
-        if sheet is None or not set(entry["parameters"]) <= set(sheet["parameters"]):
+        key = entry.get("categoryKey") or str(entry.get("categoryId"))
+        sheet = sheets.get(key)
+        if (sheet is None or category_keys(entry) != category_keys(sheet)
+                or not set(entry["parameters"]) <= set(sheet["parameters"])):
             return False
     return True
 
@@ -221,15 +228,19 @@ class _WorkbookEventHandler(IExternalEventHandler):
         self.workbook["_sourceElementIds"] = list(self.source_element_ids)
         catalog = ReferenceCatalog(doc)
         for sheet in self.workbook["sheets"]:
-            elements = elements_for_category(
-                self.source_elements, sheet["categoryId"]
-            )
+            category_ids = set(item["categoryId"] for item in sheet.get("categories") or [])
+            if not category_ids:
+                category_ids.add(sheet["categoryId"])
+            elements = [element for element in self.source_elements
+                        if element.Category is not None
+                        and element_id_value(element.Category.Id) in category_ids]
             rows = extract_rows(
                 doc,
                 elements,
                 self.workbook["parameterMode"],
                 sheet["parameters"],
                 catalog,
+                sheet.get("parameterUsage"),
             )
             columns = sheet["columns"]
             sheet["rows"] = project_rows(rows, columns, catalog)

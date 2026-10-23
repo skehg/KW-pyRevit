@@ -24,6 +24,7 @@ from core.element_refs import (
 )
 from core.types import TARGET_INSTANCE, TARGET_TYPE, TARGET_TYPE_NAME, element_id_value
 from core.type_names import collect_type_names, type_name_value, validate_type_renames
+from core.parameter_metadata import parameter_identity
 
 _WALL_BASE_BUILTIN = int(BuiltInParameter.WALL_BASE_CONSTRAINT)
 _FAMILY_LEVEL_BUILTIN = int(BuiltInParameter.FAMILY_LEVEL_PARAM)
@@ -47,7 +48,7 @@ def _group_changes(changes):
 
     for change in changes:
         target = change.get("target")
-        parameter_name = change.get("parameterName")
+        parameter_name = change.get("parameterKey") or change.get("parameterName")
         if target == TARGET_TYPE_NAME:
             type_id = int(change.get("typeElementId") or change.get("elementId"))
             add_change(type_changes, (type_id, "__TYPE_NAME__"), change)
@@ -86,6 +87,15 @@ def _find_parameter(element, change):
         if parameter is None or parameter.Definition is None:
             continue
         if parameter.Definition.Name != name:
+            continue
+        if change.get("parameterIdentity"):
+            if parameter_identity(element.Document, element, parameter) != change["parameterIdentity"]:
+                continue
+            if parameter.Definition.GetDataType().TypeId != change.get("specTypeId"):
+                continue
+            if str(parameter.StorageType) != change.get("storageType"):
+                continue
+            candidates.append(parameter)
             continue
         if guid:
             try:

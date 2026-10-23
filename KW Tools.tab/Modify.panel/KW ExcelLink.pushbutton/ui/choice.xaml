@@ -13,6 +13,12 @@
             <TextBlock x:Name="lblTitle" FontSize="18" TextWrapping="Wrap" Margin="0,0,0,4"/>
             <TextBlock x:Name="lblContext" FontSize="12" TextWrapping="Wrap"
                        Foreground="#566273" Margin="0,0,0,10"/>
+            <StackPanel x:Name="pnlGridLayout" Orientation="Horizontal"
+                        Visibility="Collapsed" Margin="0,0,0,8">
+                <TextBlock Text="Grid layout:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <ComboBox x:Name="cboGridLayout" MinWidth="210" Height="27"
+                          VerticalContentAlignment="Center"/>
+            </StackPanel>
         </StackPanel>
         <DockPanel Grid.Row="1">
             <TextBox DockPanel.Dock="Top" x:Name="txtSearch" MinHeight="28"

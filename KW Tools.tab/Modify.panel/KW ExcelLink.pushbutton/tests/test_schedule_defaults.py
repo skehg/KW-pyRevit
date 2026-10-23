@@ -8,12 +8,15 @@ import unittest
 from unittest.mock import Mock, patch
 
 
-def field(name, key, hidden=False, kind="Instance"):
-    return types.SimpleNamespace(
+def field(name, key, hidden=False, kind="Instance", param_id=None):
+    result = types.SimpleNamespace(
         GetName=lambda: name, FieldId=key, IsHidden=hidden,
         HasSchedulableField=kind in ("Instance", "ElementType"), FieldType=kind,
         GetSpecTypeId=lambda: "length",
     )
+    if param_id is not None:
+        result.ParameterId = param_id
+    return result
 
 
 def rule(key, kind="Equal", value="D", storage="String"):
@@ -152,6 +155,29 @@ class ScheduleDefaultsTests(unittest.TestCase):
         layout, issues = self.module.build_schedule_layout(self.doc, self.defaults(), self.sheet)
         self.assertEqual(layout["filters"]["advanced"]["rules"], [])
         self.assertTrue(any("Mark: BeginsWith" in issue for issue in issues))
+
+    def test_opaque_parameter_keys_use_identity_to_disambiguate_schedule_names(self):
+        defaults = {"fields": [field("Mark", 1, param_id=-42)], "issues": []}
+        usage = {
+            "parameter-key-a": {
+                "name": "Mark", "identity": "builtin:-42",
+            },
+            "parameter-key-b": {
+                "name": "Mark", "identity": "shared:other",
+            },
+        }
+        self.assertEqual(self.module.schedule_parameters(defaults, usage), [
+            "parameter-key-a",
+        ])
+
+    def test_ambiguous_schedule_name_is_reported_instead_of_guessed(self):
+        defaults = {"fields": [field("Mark", 1)], "issues": []}
+        usage = {
+            "parameter-key-a": {"name": "Mark", "identity": "builtin:-42"},
+            "parameter-key-b": {"name": "Mark", "identity": "shared:other"},
+        }
+        self.assertEqual(self.module.schedule_parameters(defaults, usage), [])
+        self.assertTrue(any("multiple parameters" in issue for issue in defaults["issues"]))
 
 
 if __name__ == "__main__":

@@ -190,9 +190,25 @@ def preset_from_workbook(workbook, layouts, name, selection_mode):
     sheets = []
     for index, sheet in enumerate(workbook.get("sheets") or []):
         layout = layouts[index] if index < len(layouts or []) else None
+        categories = []
+        for category in sheet.get("categories") or []:
+            categories.append({
+                "categoryId": category.get("categoryId"),
+                "categoryKey": category.get("categoryKey"),
+                "name": category.get("name"),
+            })
+        if not categories and sheet.get("categoryId") is not None:
+            categories.append({
+                "categoryId": sheet.get("categoryId"),
+                "categoryKey": sheet.get("categoryKey"),
+                "name": category_display_name(sheet.get("name")),
+            })
         sheets.append({
             "categoryKey": sheet.get("categoryKey"),
+            "sheetKey": sheet.get("sheetKey") or sheet.get("categoryKey"),
+            "categoryId": sheet.get("categoryId"),
             "categoryName": category_display_name(sheet.get("name")),
+            "categories": categories,
             "parameters": list(sheet.get("parameters") or []),
             "layout": _clean_layout(layout),
         })
@@ -201,6 +217,7 @@ def preset_from_workbook(workbook, layouts, name, selection_mode):
         "name": name,
         "selectionMode": selection_mode,
         "parameterMode": workbook.get("parameterMode"),
+        "gridLayout": workbook.get("gridLayout") or "separate",
         "sheets": sheets,
     }
 
@@ -308,7 +325,15 @@ def match_category(preset_sheet, options):
         for option in options:
             if option.get("builtin") == key:
                 return option
-    name = (preset_sheet.get("categoryName") or "").lower()
+    try:
+        category_id = int(preset_sheet.get("categoryId"))
+    except (TypeError, ValueError):
+        category_id = None
+    if category_id is not None:
+        for option in options:
+            if option.get("category_id") == category_id:
+                return option
+    name = (preset_sheet.get("categoryName") or preset_sheet.get("name") or "").lower()
     for option in options:
         if category_display_name(option["label"]).lower() == name:
             return option

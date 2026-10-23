@@ -8,7 +8,15 @@ from core.types import MODE_TYPES
 
 class ParameterListItem(object):
     def __init__(self, name, usage):
-        self.Name = name
+        self.Key = name
+        self.Name = usage.get("displayName", usage.get("name", name))
+        self.DataType = usage.get("dataType") or "Unspecified"
+        self.Coverage = (
+            "{0}/{1} categories".format(usage["categoryCount"], usage["totalCategories"])
+            if usage.get("totalCategories", 0) > 1 else ""
+        )
+        self.Details = "{0}\n{1}\n{2}".format(
+            self.Name, self.DataType, ", ".join(usage.get("categoryNames") or []))
         if usage.get("isType") and usage.get("isInstance"):
             self.Mode = "Type + Instance"
             self.BadgeBackground = "#F0EAF8"
@@ -23,12 +31,12 @@ class ParameterListItem(object):
             self.BadgeForeground = "#465260"
 
     def __str__(self):
-        return self.Name
+        return self.Key
 
 
 class ChoiceWizardWindow(forms.WPFWindow):
     def __init__(self, options, title, selected=None, multiple=False, back=True,
-                 context_text=None):
+                 context_text=None, grid_layout=None):
         forms.WPFWindow.__init__(
             self, os.path.join(os.path.dirname(__file__), "choice.xaml")
         )
@@ -43,8 +51,14 @@ class ChoiceWizardWindow(forms.WPFWindow):
         self._chosen = set(selected or [])
         self._multiple = multiple
         self._refreshing = False
+        self.grid_layout = grid_layout
         self.btnBack.Visibility = Visibility.Visible if back else Visibility.Collapsed
         self.lstChoices.SelectionMode = SelectionMode.Multiple if multiple else SelectionMode.Single
+        if grid_layout is not None:
+            self.pnlGridLayout.Visibility = Visibility.Visible
+            self.cboGridLayout.Items.Add("Separate category sheets")
+            self.cboGridLayout.Items.Add("Combined grid")
+            self.cboGridLayout.SelectedIndex = 1 if grid_layout == "combined" else 0
         self._refresh_choices()
 
     def _capture(self):
@@ -54,6 +68,10 @@ class ChoiceWizardWindow(forms.WPFWindow):
             self._chosen.clear()
         self._chosen.update(str(item) for item in self.lstChoices.SelectedItems)
         self.selected = [item for item in self._options if item in self._chosen]
+        if self.grid_layout is not None:
+            self.grid_layout = (
+                "combined" if self.cboGridLayout.SelectedIndex == 1 else "separate"
+            )
 
     def on_selection_changed(self, sender, args):
         if hasattr(self, "_refreshing") and not self._refreshing:
@@ -106,9 +124,18 @@ class ParameterWizardWindow(forms.WPFWindow):
         self._parameter_names = sorted(
             (name for name, usage in usage_map.items()
              if parameter_mode != MODE_TYPES or usage.get("isType")),
-            key=lambda value: value.lower()
+            key=lambda value: usage_map[value].get("displayName", value).lower()
         )
-        self._usage_map = usage_map
+        self._usage_map = dict((key, dict(value)) for key, value in usage_map.items())
+        if parameter_mode == MODE_TYPES:
+            for usage in self._usage_map.values():
+                if "typeCategoryIds" in usage:
+                    included = set(usage["typeCategoryIds"])
+                    usage["categoryCount"] = len(included)
+                    usage["categoryNames"] = [
+                        label for category_id, label in zip(usage["categoryIds"], usage["categoryNames"])
+                        if category_id in included
+                    ]
         self._items = {}
         self._available_displays = set()
         self.selected_parameters = None
@@ -119,9 +146,11 @@ class ParameterWizardWindow(forms.WPFWindow):
         if parameter_mode == MODE_TYPES:
             self.lblMode.Text += " | Instance-only parameters are hidden."
         self.cboAvailability.SelectionChanged += self.on_filter_changed
+        if hasattr(self, "cboCoverage"):
+            self.cboCoverage.SelectionChanged += self.on_filter_changed
 
         for name in self._parameter_names:
-            self._items[name] = ParameterListItem(name, usage_map[name])
+            self._items[name] = ParameterListItem(name, self._usage_map[name])
             self._available_displays.add(name)
         for name in selected or []:
             if name in self._items:
@@ -190,6 +219,10 @@ class ParameterWizardWindow(forms.WPFWindow):
 
         def matches_usage(name):
             usage = self._usage_map[name]
+            coverage = getattr(self, "cboCoverage", None)
+            if (coverage is not None and coverage.SelectedIndex == 1
+                    and usage.get("categoryCount", 0) < usage.get("totalCategories", 0)):
+                return False
             is_type = bool(usage.get("isType"))
             is_instance = bool(usage.get("isInstance"))
             if filter_mode == "Type parameters":
@@ -203,10 +236,10 @@ class ParameterWizardWindow(forms.WPFWindow):
         items = sorted(
             [
                 item for item in self._available_displays
-                if search_text in item.lower()
+                if search_text in self._items[item].Name.lower()
                 and matches_usage(item)
             ],
-            key=lambda value: value.lower(),
+            key=lambda value: self._items[value].Name.lower(),
         )
         self.lstAvailable.Items.Clear()
         for item in items:

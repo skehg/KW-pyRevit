@@ -141,6 +141,31 @@ class HostInitializationTests(unittest.TestCase):
 
 
 class HostDeliveryTests(unittest.TestCase):
+    def test_import_layout_matches_combined_sheet_identity_and_selected_keys(self):
+        with open(os.path.join(ROOT, "ui", "host.py"), encoding="utf-8") as stream:
+            tree = ast.parse(stream.read())
+        node = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                    and node.name == "_layout_matches")
+        namespace = {}
+        exec(compile(ast.Module(body=[node], type_ignores=[]), "host.layout_matches", "exec"), namespace)
+        sheet = {
+            "categoryId": None, "categoryKey": "combined:OST_Doors|OST_Windows",
+            "categories": [
+                {"categoryId": 1, "categoryKey": "OST_Doors"},
+                {"categoryId": 2, "categoryKey": "OST_Windows"},
+            ],
+            "parameters": ["identity-a", "identity-b"],
+        }
+        workbook = {"parameterMode": "Instances Mode", "gridLayout": "combined", "sheets": [sheet]}
+        plan = {"parameterMode": "Instances Mode", "gridLayout": "combined",
+                "sheets": [dict(sheet, parameters=["identity-a"])]}
+        matches = namespace["_layout_matches"]
+        self.assertTrue(matches(plan, workbook))
+        self.assertFalse(matches(dict(plan, sheets=[dict(sheet, categoryKey="combined:OST_Walls")]), workbook))
+        self.assertFalse(matches(dict(plan, sheets=[dict(sheet, parameters=["other-identity"])]), workbook))
+        self.assertFalse(matches(dict(plan, gridLayout="separate"), workbook))
+        self.assertFalse(matches(dict(plan, sheets=[dict(sheet, categories=[])]), workbook))
+
     def setUp(self):
         with open(os.path.join(ROOT, "ui", "host.py"), encoding="utf-8") as stream:
             tree = ast.parse(stream.read())
@@ -233,16 +258,14 @@ class HostDeliveryTests(unittest.TestCase):
                           and node.name == "_WorkbookEventHandler")
         method = next(node for node in host_class.body
                       if isinstance(node, ast.FunctionDef) and node.name == "_refresh")
-        kept = types.SimpleNamespace(Id=10, category_id=5)
+        kept = types.SimpleNamespace(Id=10, Category=types.SimpleNamespace(Id=5))
+        other_category = types.SimpleNamespace(Id=30, Category=types.SimpleNamespace(Id=6))
         received = []
         namespace = {
             "resolve_elements_by_id": resolver_namespace["resolve_elements_by_id"],
             "element_id_value": lambda element_id: element_id,
             "ReferenceCatalog": lambda doc: "catalog",
-            "elements_for_category": lambda elements, category_id: [
-                element for element in elements if element.category_id == category_id
-            ],
-            "extract_rows": lambda doc, elements, mode, parameters, catalog: (
+            "extract_rows": lambda doc, elements, mode, parameters, catalog, usage: (
                 received.extend(elements) or ["row"]
             ),
             "project_rows": lambda rows, columns, catalog: ["refreshed"],
@@ -252,27 +275,28 @@ class HostDeliveryTests(unittest.TestCase):
                      "host._refresh", "exec"), namespace)
         deleted_stale_reference = object()
         handler = types.SimpleNamespace(
-            source_elements=[kept, deleted_stale_reference],
-            source_element_ids=[10, 20],
+            source_elements=[kept, other_category, deleted_stale_reference],
+            source_element_ids=[10, 20, 30],
             workbook={
-                "_sourceElementIds": [10, 20],
+                "_sourceElementIds": [10, 20, 30],
                 "parameterMode": "Instances Mode",
                 "sheets": [{
-                    "categoryId": 5, "parameters": ["Mark"], "columns": ["column"],
+                    "categoryId": None, "categories": [{"categoryId": 5}, {"categoryId": 6}],
+                    "parameters": ["Mark"], "columns": ["column"],
                 }],
             },
         )
         document = types.SimpleNamespace(
-            GetElement=lambda element_id: {10: kept}.get(element_id)
+            GetElement=lambda element_id: {10: kept, 30: other_category}.get(element_id)
         )
 
         removed = namespace["_refresh"](handler, document)
 
         self.assertEqual(removed, 1)
-        self.assertEqual(handler.source_elements, [kept])
-        self.assertEqual(handler.source_element_ids, [10])
-        self.assertEqual(handler.workbook["_sourceElementIds"], [10])
-        self.assertEqual(received, [kept])
+        self.assertEqual(handler.source_elements, [kept, other_category])
+        self.assertEqual(handler.source_element_ids, [10, 30])
+        self.assertEqual(handler.workbook["_sourceElementIds"], [10, 30])
+        self.assertEqual(received, [kept, other_category])
         self.assertEqual(handler.workbook["sheets"][0]["rows"], ["refreshed"])
 
     def dispatch_close(self, pending=None, event_pending=False, message_type="close"):

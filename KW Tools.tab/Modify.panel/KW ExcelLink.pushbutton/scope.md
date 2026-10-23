@@ -16,7 +16,7 @@ A pyRevit7 tool that:
 - Supports batch apply of parameter changes back to Revit
 - Supports type renaming
 - Handles mixed‑use parameters (sometimes type, sometimes instance)
-- Builds one sheet per category
+- Builds either separate category sheets or one combined multi-category sheet
 - Allows custom parameter column selection and ordering
 - Supports two parameter modes: Types Mode and Instances Mode
 - Uses a wizard flow before opening the datagrid
@@ -26,9 +26,12 @@ A pyRevit7 tool that:
 ## WIZARD FLOW (MANDATORY)
 
 Steps 2-4 have **Back** and **Cancel**, retaining scope, categories, mode and
-each category's ordered field list while navigating. For multiple categories,
-Back in Step 4 revisits the previous category; Back from the first category
-returns to Step 3. Step 1 has Cancel (there is no preceding step).
+ordered field selections while navigating. Separate mode retains an ordered
+field list per category; combined mode retains one shared field list. The
+category step offers **Separate category sheets** and **Combined grid**. In
+separate mode, Back in Step 4 revisits the previous category; Back from the
+first category, or from the combined picker, returns to Step 3. Step 1 has
+Cancel (there is no preceding step).
 
 The grid's **Back** button returns to Step 4 for the active sheet, with its
 current fields preselected. Finish the wizard to rebuild the workbook from
@@ -77,7 +80,16 @@ filter-by-sheet, grouping and total settings are not portable grid filters.
 
 Extract only category names (cheap operation).
 User selects categories to include.
-Each category becomes its own sheet.
+On a new launch, selected Revit elements preselect **Selected Elements** in
+Step 1 and their categories in Step 2 (limited to the chosen scope).
+Choosing **Current View** on a schedule preselects all categories found in
+that schedule's scoped elements instead. These are initial defaults only:
+Back navigation retains the user's category choices for each scope, and
+returning from the grid retains its existing scope and categories.
+User chooses **Separate category sheets** (one sheet and parameter picker per
+category) or **Combined grid** (one sheet and one shared parameter picker for
+all selected categories). A multicategory schedule scoped to Current View
+defaults to Combined grid; the user can change the layout.
 
 ### Step 3 — Parameter Mode
 
@@ -88,7 +100,8 @@ User chooses:
 
 ### Step 4 — Parameter Selection
 
-For each selected category:
+For each selected category, or once across all selected categories for a
+combined grid:
 
 - Build a parameter usage map:
   - isType
@@ -98,10 +111,12 @@ For each selected category:
   list into a selected-datagrid-columns list
 - The picker supports name search and availability filters for type, instance
   and mixed-use parameters; rows identify their availability and show counts
-  for visible available parameters and selected columns.
+  for visible available parameters and selected columns. Combined rows also
+  show category coverage.
 - Both lists show the parameter name separately from a smaller, right-aligned
   availability badge: blue Type, grey Instance, or purple Type + Instance.
-  Long names are trimmed with the full name available in a tooltip.
+  Friendly data type and project unit appear as metadata above the parameter
+  name; long names are trimmed with the full name available in a tooltip.
 - In Types Mode the picker hides instance-only parameters and excludes them
   from restored selections. Mixed-use parameters remain available for their
   type values. Existing imported/preset workbook column rules are unchanged.
@@ -117,6 +132,8 @@ For each selected category:
 ### Step 5 — Datagrid Opens
 
 Build sheets, columns, rows, highlighting, disabled cells, formula engine, change tracking.
+Parameter column headers show the friendly data type and project unit above the
+parameter name. In a combined grid, the Category column is visible.
 
 For category-less generic `ElementType` references (such as Callout Tag),
 dropdowns use Revit's `GetSimilarTypes()` plus the current reference, rather than
@@ -292,10 +309,16 @@ Copilot must generate code that:
 
 - **Export XLSX** writes `.xlsx` by default (`core/xlsx_export.py`, no
   external dependencies); `.json` remains available in the save dialog.
-- XLSX layout: one worksheet per category, frozen bold header row with
-  filters, highlighted type columns, greyed read-only cells. Element ID,
-  Unique ID and Type Element ID are kept as hidden columns, and a very-hidden
-  `_ExcelLink` sheet maps each column to its parameter/target for re-import.
+- XLSX layout follows the selected grid layout (separate category worksheets
+  or one combined worksheet). Row 1 contains parameter data types and units;
+  row 2 contains parameter names; element data starts on row 3. Freeze the
+  first two rows and apply AutoFilter to row 2. Type columns are highlighted
+  and read-only cells greyed. Element ID, Unique ID and Type Element ID are
+  kept as hidden columns, and a very-hidden `_ExcelLink` sheet maps each
+  column by its stable parameter key and target for re-import.
+- The current workbook schema is required; legacy ExcelLink XLSX schemas are
+  not supported. Combined worksheets record their category list and stable
+  combined sheet identity.
 - Values are saved (not grid formulas).
 
 ### Units
@@ -341,7 +364,7 @@ Copilot must generate code that:
 ### Presets (reusable grid settings)
 
 - **Save Preset** in the datagrid stores the selection mode, parameter mode,
-  categories, ordered parameters and per-sheet layout (user-resized column
+  grid layout (separate or combined), categories, ordered parameter keys and per-sheet layout (user-resized column
   widths and sorting, keyed by column title) as JSON. No element data is
   stored, so presets work in any project or view (`core/presets.py`,
   `ui/preset_dialogs.py`).
@@ -514,10 +537,11 @@ right-hand end of each column's filter input.
   apostrophes inside words; it does not preserve acronyms. Sentence case
   lowercases the text and capitalizes the first letter and the next letter
   following each `.`, `!` or `?`; it does not infer abbreviations.
-- Both dialogs show a count and up to eight before/after examples before
-  **Stage changes** becomes available. Changing inputs invalidates the
-  preview. Case conversion previews immediately; Find/Replace uses
-  **Preview** after entering options. Cancel/Escape never stages edits.
+- Both dialogs allow **Stage changes** without first using **Preview**.
+  Staging validates the current options and grid values; invalid input stays
+  in the dialog with an error. **Preview** optionally shows a count and up to
+  eight before/after examples. Changing inputs clears the preview. Case
+  conversion previews immediately. Cancel/Escape never stages edits.
 - Only editable String parameters and editable type names participate.
   Locked, numeric, element-reference and null-valued cells are counted as
   skipped. Unchanged results do not create pending edits. Blank resulting
