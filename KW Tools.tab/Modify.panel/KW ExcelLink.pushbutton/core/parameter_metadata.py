@@ -7,6 +7,42 @@ import re
 from core.types import element_id_value
 
 
+_OST_DOORS = -2000023
+_OST_WINDOWS = -2000014
+_OST_CURTAIN_PANELS = -2000170
+# CURTAIN_WALL_PANELS_HEIGHT/WIDTH -> GENERIC_HEIGHT/DOOR_WIDTH
+_CURTAIN_TO_GENERIC = {-1010300: -1001300, -1010301: -1001301}
+_GENERIC_TO_CURTAIN = dict((value, key) for key, value in _CURTAIN_TO_GENERIC.items())
+
+
+def shadowed_parameter_ids(owner):
+    """Built-in ids hidden on this element because Revit exposes a same-named twin.
+
+    Curtain panel doors/windows and curtain panels carry both the curtain-panel and
+    generic Height/Width built-ins. The element's own category decides which one is
+    meaningful, so mixed-category selections still resolve each row correctly.
+    """
+    category = getattr(owner, "Category", None)
+    if category is None:
+        return set()
+    category_id = element_id_value(category.Id)
+    if category_id in (_OST_DOORS, _OST_WINDOWS):
+        aliases = _CURTAIN_TO_GENERIC
+    elif category_id == _OST_CURTAIN_PANELS:
+        aliases = _GENERIC_TO_CURTAIN
+    else:
+        return set()
+    present = set()
+    for parameter in owner.Parameters:
+        if parameter is None or parameter.Definition is None:
+            continue
+        parameter_id = element_id_value(parameter.Id)
+        if parameter_id in _CURTAIN_TO_GENERIC or parameter_id in _GENERIC_TO_CURTAIN:
+            present.add(parameter_id)
+    return set(hidden for hidden, kept in aliases.items()
+               if hidden in present and kept in present)
+
+
 def compatible_spec(spec_id):
     """Forge spec patch/minor versions do not change the physical quantity."""
     return re.sub(r"-([0-9]+)\.[0-9]+\.[0-9]+$", r"-\1", spec_id)

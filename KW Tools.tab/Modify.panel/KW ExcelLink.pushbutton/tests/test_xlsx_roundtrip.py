@@ -96,6 +96,43 @@ def make_workbook(layout="combined", value=10.0, title="Width (Instance)"):
     }
 
 
+def make_reference_workbook(value="Family A: Type 1"):
+    workbook = make_workbook(layout="separate", value=value, title="Family and Type")
+    sheet = workbook["sheets"][0]
+    identity = "builtin:-1002052"
+    key = '["builtin:-1002052","","ElementId"]'
+    usage = {
+        "name": "Family and Type",
+        "displayName": "Family and Type",
+        "identity": identity,
+        "specTypeId": "",
+        "dataType": "Reference",
+        "storageType": "ElementId",
+        "guid": None,
+        "builtin": -1002052,
+        "isType": False,
+        "isInstance": True,
+    }
+    sheet["parameters"] = [key]
+    sheet["parameterUsage"] = {key: usage}
+    column = sheet["columns"][-1]
+    column.update(
+        parameterKey=key, parameterName=usage["name"],
+        parameterIdentity=identity, specTypeId="", dataType="Reference",
+        storageType="ElementId", unit=None, options=[
+            "Family A: Type 1", "Family A: Type 2",
+        ], parameterGuid=None, parameterBuiltin=-1002052,
+        referenceKind={"allowNone": False, "changesType": True},
+    )
+    row = sheet["rows"][0]
+    row["p0_instance__metadata"].update(
+        parameterIdentity=identity, parameterGuid=None,
+        parameterBuiltin=-1002052, specTypeId="", storageType="ElementId",
+        referenceKind=column["referenceKind"], options=column["options"], unit=None,
+    )
+    return workbook
+
+
 class XlsxRoundtripTests(unittest.TestCase):
     def setUp(self):
         self.path = os.path.join(os.path.dirname(__file__), "_xlsx_roundtrip.xlsx")
@@ -199,6 +236,25 @@ class XlsxRoundtripTests(unittest.TestCase):
         self.assertEqual(plan["gridLayout"], "separate")
         self.assertEqual(plan["sheets"][0]["categoryId"], 1)
         self.assertEqual(plan["sheets"][0]["categoryKey"], "category:walls")
+
+    def test_empty_spec_type_id_roundtrips_and_allows_reference_edits(self):
+        exported = make_reference_workbook(value="Family A: Type 2")
+        xlsx_export.write_xlsx(exported, self.path)
+
+        plan = xlsx_import.read_import_plan(self.path)
+        sheet_plan = plan["sheets"][0]
+        key = sheet_plan["parameterKeys"][0]
+        self.assertEqual(sheet_plan["parameterUsage"][key]["specTypeId"], "")
+
+        current = make_reference_workbook(value="Family A: Type 1")
+        diff = xlsx_import.diff_xlsx(current, self.path)
+        self.assertEqual(diff["summary"]["changed"], 1)
+        self.assertEqual(len(diff["updates"]), 1)
+        change = diff["updates"][0]
+        self.assertEqual(change["parameterIdentity"], "builtin:-1002052")
+        self.assertEqual(change["specTypeId"], "")
+        self.assertEqual(change["storageType"], "ElementId")
+        self.assertEqual(change["value"], "Family A: Type 2")
 
     def test_picker_order_and_row_order_do_not_change_parameter_targets(self):
         key_a = '["shared:a","spec:length","Double"]'

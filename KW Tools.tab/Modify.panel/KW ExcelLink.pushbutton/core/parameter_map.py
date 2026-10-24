@@ -3,7 +3,8 @@
 from Autodesk.Revit.DB import ElementType
 
 from core.types import element_id_value
-from core.parameter_metadata import parameter_descriptor, collapse_usage, parameter_group_key
+from core.parameter_metadata import (parameter_descriptor, collapse_usage, parameter_group_key,
+                                     shadowed_parameter_ids)
 from core.optional_fields import derived_descriptors, is_false_positive
 
 
@@ -29,8 +30,11 @@ def build_parameter_usage_map(doc, elements):
 
     def descriptors(element):
         records = []
+        hidden = shadowed_parameter_ids(element)
         for parameter in element.Parameters:
             if parameter is None or parameter.Definition is None or not parameter.Definition.Name:
+                continue
+            if hidden and element_id_value(parameter.Id) in hidden:
                 continue
             descriptor = parameter_descriptor(doc, element, parameter)
             descriptor["useful"] = not is_false_positive(parameter)

@@ -166,6 +166,8 @@ class ParameterMetadataTests(unittest.TestCase):
         namespace = {
             "ElementType": ElementType,
             "parameter_descriptor": self.metadata.parameter_descriptor,
+            "shadowed_parameter_ids": self.metadata.shadowed_parameter_ids,
+            "element_id_value": lambda value: value,
             "_READ_ONLY_REASON": "Read-only in Revit.",
             "_read_parameter": lambda p, owner, catalog: {
                 "isReadOnly": False, "readOnlyReason": None, "value": p.Id},
@@ -206,6 +208,8 @@ class ParameterMetadataTests(unittest.TestCase):
         namespace = {
             "ElementType": ElementType,
             "parameter_descriptor": self.metadata.parameter_descriptor,
+            "shadowed_parameter_ids": self.metadata.shadowed_parameter_ids,
+            "element_id_value": lambda value: value,
             "_READ_ONLY_REASON": "Read-only in Revit.",
             "_read_parameter": lambda p, owner, catalog: {
                 "isReadOnly": False, "readOnlyReason": None, "value": p.Id},
@@ -286,6 +290,8 @@ class ParameterMetadataTests(unittest.TestCase):
         namespace = {
             "ElementType": ElementType,
             "parameter_descriptor": self.metadata.parameter_descriptor,
+            "shadowed_parameter_ids": self.metadata.shadowed_parameter_ids,
+            "element_id_value": lambda value: value,
             "_READ_ONLY_REASON": "Read-only in Revit.",
             "_read_parameter": lambda p, owner, catalog: {
                 "isReadOnly": True, "readOnlyReason": "Read-only in Revit.", "value": 2100},
@@ -356,6 +362,120 @@ class ParameterMetadataTests(unittest.TestCase):
         self.assertIs(find(self.owner, change), correct)
         self.assertIsNone(find(self.owner, dict(change, specTypeId="text")))
         self.assertIsNone(find(self.owner, dict(change, storageType="String")))
+
+    def _curtain_twin_elements(self):
+        self.db.LabelUtils.GetLabelForSpec = lambda spec: "Length"
+        length = "autodesk.spec.aec:length-2.0.0"
+
+        def size_parameters(*ids):
+            names = {-1001300: "Height", -1010300: "Height", -1001301: "Width", -1010301: "Width"}
+            return [parameter(names[pid], pid, length, "Double") for pid in ids]
+
+        doors = types.SimpleNamespace(Id=-2000023, Name="Doors")
+        windows = types.SimpleNamespace(Id=-2000014, Name="Windows")
+        panels = types.SimpleNamespace(Id=-2000170, Name="Curtain Panels")
+        door_type = ElementType()
+        door_type.Category = doors
+        door_type.UniqueId = "door-type"
+        door_type.Family = types.SimpleNamespace(UniqueId="door-family")
+        door_type.Parameters = size_parameters(-1001300, -1001301)
+        window_type = ElementType()
+        window_type.Category = windows
+        window_type.UniqueId = "window-type"
+        window_type.Family = types.SimpleNamespace(UniqueId="window-family")
+        window_type.Parameters = size_parameters(-1001300, -1001301)
+        types_by_id = {1: door_type, 2: window_type}
+        self.doc.GetElement = lambda key: types_by_id.get(key)
+        twins = (-1010300, -1001300, -1010301, -1001301)
+        return {
+            "door": types.SimpleNamespace(Category=doors, UniqueId="door", GetTypeId=lambda: 1,
+                                          Parameters=[]),
+            "window": types.SimpleNamespace(Category=windows, UniqueId="window",
+                                            GetTypeId=lambda: 2, Parameters=[]),
+            "curtain_door": types.SimpleNamespace(Category=doors, UniqueId="cp-door",
+                                                  GetTypeId=lambda: -1,
+                                                  Parameters=size_parameters(*twins)),
+            "curtain_window": types.SimpleNamespace(Category=windows, UniqueId="cp-window",
+                                                    GetTypeId=lambda: -1,
+                                                    Parameters=size_parameters(*twins)),
+            "panel": types.SimpleNamespace(Category=panels, UniqueId="panel", GetTypeId=lambda: -1,
+                                           Parameters=size_parameters(*twins)),
+        }
+
+    def _size_usage(self, elements):
+        with patch.dict(sys.modules, {"core.parameter_metadata": self.metadata}):
+            module = load("curtain_twin_map", os.path.join("core", "parameter_map.py"))
+        module.element_id_value = lambda value: value
+        usage = module.build_parameter_usage_map(self.doc, elements)
+        return dict((name, [entry for entry in usage.values() if entry["name"] == name])
+                    for name in ("Height", "Width"))
+
+    def test_shadowed_ids_depend_on_each_elements_category(self):
+        elements = self._curtain_twin_elements()
+        shadowed = self.metadata.shadowed_parameter_ids
+        self.assertEqual(shadowed(elements["curtain_door"]), {-1010300, -1010301})
+        self.assertEqual(shadowed(elements["curtain_window"]), {-1010300, -1010301})
+        self.assertEqual(shadowed(elements["panel"]), {-1001300, -1001301})
+        self.assertEqual(shadowed(elements["door"]), set())
+        other = types.SimpleNamespace(Category=types.SimpleNamespace(Id=-2000011),
+                                      Parameters=elements["panel"].Parameters)
+        self.assertEqual(shadowed(other), set())
+
+    def test_door_and_window_selections_show_one_height_and_width(self):
+        elements = self._curtain_twin_elements()
+        for selection in (["door", "curtain_door"], ["window", "curtain_window"],
+                          ["door", "curtain_door", "window", "curtain_window"]):
+            sizes = self._size_usage([elements[name] for name in selection])
+            for name in ("Height", "Width"):
+                self.assertEqual(len(sizes[name]), 1, (selection, name))
+                entry = sizes[name][0]
+                self.assertEqual(entry["displayName"], name)
+                self.assertTrue(entry["isType"] and entry["isInstance"])
+                self.assertTrue(all("builtin:-10103" not in member for member in entry["members"]))
+
+    def test_curtain_panel_selection_keeps_curtain_panel_height_and_width(self):
+        elements = self._curtain_twin_elements()
+        sizes = self._size_usage([elements["panel"]])
+        self.assertEqual(len(sizes["Height"]), 1)
+        self.assertEqual(sizes["Height"][0]["members"],
+                         ['["builtin:-1010300","autodesk.spec.aec:length-2.0.0","Double"]'])
+        self.assertEqual(sizes["Width"][0]["members"],
+                         ['["builtin:-1010301","autodesk.spec.aec:length-2.0.0","Double"]'])
+        self.assertEqual(sizes["Height"][0]["displayName"], "Height")
+
+    def test_mixed_categories_share_columns_but_read_each_categorys_parameter(self):
+        elements = self._curtain_twin_elements()
+        selection = [elements[name] for name in ("door", "curtain_door", "panel")]
+        sizes = self._size_usage(selection)
+        self.assertEqual(len(sizes["Height"]), 1)
+        height = sizes["Height"][0]
+        self.assertEqual(height["displayName"], "Height")
+        self.assertEqual(height["categoryNames"], ["Curtain Panels", "Doors"])
+        self.assertEqual(sorted(height["members"]), [
+            '["builtin:-1001300","autodesk.spec.aec:length-2.0.0","Double"]',
+            '["builtin:-1010300","autodesk.spec.aec:length-2.0.0","Double"]'])
+        with open(os.path.join(ROOT, "core", "extract.py"), encoding="utf-8") as stream:
+            node = next(item for item in ast.parse(stream.read()).body
+                        if isinstance(item, ast.FunctionDef) and item.name == "_parameter_values")
+        namespace = {
+            "ElementType": ElementType,
+            "parameter_descriptor": self.metadata.parameter_descriptor,
+            "shadowed_parameter_ids": self.metadata.shadowed_parameter_ids,
+            "element_id_value": lambda value: value,
+            "_READ_ONLY_REASON": "Read-only in Revit.",
+            "_read_parameter": lambda p, owner, catalog: {
+                "isReadOnly": True, "readOnlyReason": "Read-only in Revit.", "value": p.Id},
+        }
+        exec(compile(ast.Module(body=[node], type_ignores=[]), "twin_values", "exec"), namespace)
+        usage = {height["key"]: height}
+        catalog = types.SimpleNamespace(doc=self.doc)
+        read = namespace["_parameter_values"]
+        self.assertEqual(read(elements["curtain_door"], {height["key"]}, catalog, usage)
+                         [height["key"]]["value"], -1001300)
+        self.assertEqual(read(elements["panel"], {height["key"]}, catalog, usage)
+                         [height["key"]]["value"], -1010300)
+        self.assertNotIn("coexist", read(elements["panel"], {height["key"]}, catalog, usage)
+                         [height["key"]]["readOnlyReason"])
 
 
 if __name__ == "__main__":

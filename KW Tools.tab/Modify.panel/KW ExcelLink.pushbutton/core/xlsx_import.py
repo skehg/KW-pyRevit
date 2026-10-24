@@ -268,7 +268,7 @@ def _read_meta(reader, sheets):
             record["parameterKey"] = _text(record.get("parameterKey")) or None
             record["parameterName"] = _text(record.get("parameterName")) or None
             record["parameterIdentity"] = _text(record.get("parameterIdentity")) or None
-            record["specTypeId"] = _text(record.get("specTypeId")) or None
+            record["specTypeId"] = _text(record.get("specTypeId"))
             for json_key in ("options", "referenceKind"):
                 raw_json = record.get(json_key)
                 if raw_json in (None, u""):
@@ -283,7 +283,7 @@ def _read_meta(reader, sheets):
             if record.get("columnType") == u"parameter":
                 key = record["parameterKey"]
                 if not key or not record["parameterName"] or not record["parameterIdentity"] \
-                        or not record["specTypeId"]:
+                        or record["specTypeId"] is None:
                     raise ValueError("ExcelLink parameter metadata is missing its stable identity.")
                 try:
                     usage = json.loads(_text(record.get("usage")))
@@ -299,6 +299,7 @@ def _read_meta(reader, sheets):
                         )
                 if (usage.get("name") != record["parameterName"]
                         or usage.get("identity") != record["parameterIdentity"]
+                        or usage.get("specTypeId") is None
                         or usage.get("specTypeId") != record["specTypeId"]
                         or usage.get("storageType") != _text(record.get("storageType"))):
                     raise ValueError("ExcelLink parameter usage identity is inconsistent.")
@@ -534,7 +535,7 @@ def _map_headers(header_row, sheet, metadata_columns):
             usage = current_usage.get(parameter_key) or {}
             current_identity = (column.get("parameterIdentity")
                                 or usage.get("identity"))
-            current_spec = column.get("specTypeId") or usage.get("specTypeId")
+            current_spec = column.get("specTypeId", usage.get("specTypeId"))
             if (current_identity != metadata.get("parameterIdentity")
                     or current_spec != metadata.get("specTypeId")):
                 issues.append(
@@ -683,9 +684,11 @@ def _change_metadata(column, row):
     metadata = row.get(u"{0}__metadata".format(field))
     if not isinstance(metadata, dict):
         raise ValueError("The row is missing authoritative parameter metadata.")
-    for key in ("parameterIdentity", "specTypeId", "storageType"):
+    for key in ("parameterIdentity", "storageType"):
         if not metadata.get(key):
             raise ValueError("The row parameter metadata is missing '{0}'.".format(key))
+    if "specTypeId" not in metadata or metadata.get("specTypeId") is None:
+        raise ValueError("The row parameter metadata is missing 'specTypeId'.")
     target = column.get("target")
     if target not in ("type", "instance"):
         raise ValueError("The row parameter metadata has an unsupported target.")

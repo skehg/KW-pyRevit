@@ -11,7 +11,7 @@ from core.element_refs import (
     locked_reason,
 )
 from core.types import MODE_INSTANCES, element_id_value
-from core.parameter_metadata import parameter_descriptor
+from core.parameter_metadata import parameter_descriptor, shadowed_parameter_ids
 
 
 _READ_ONLY_REASON = "Read-only in Revit."
@@ -81,11 +81,14 @@ def _parameter_values(element, selected_names, catalog, usage_map=None):
         for selected in selected_names:
             for member in usage_map[selected].get("members", [selected]):
                 member_keys[member] = selected
+    hidden = shadowed_parameter_ids(element)
     for parameter in element.Parameters:
         if parameter is None or parameter.Definition is None:
             continue
         name = parameter.Definition.Name
         if name not in wanted_names:
+            continue
+        if hidden and element_id_value(parameter.Id) in hidden:
             continue
         if usage_map is not None:
             descriptor = parameter_descriptor(catalog.doc, element, parameter)

@@ -264,7 +264,8 @@ def _meta_rows(workbook, sheet_entries):
             if column.get("columnType") == "parameter":
                 if (not parameter_key or not usage
                         or not usage.get("name") or not usage.get("displayName")
-                        or not usage.get("identity") or not usage.get("specTypeId")
+                        or not usage.get("identity") or "specTypeId" not in usage
+                        or usage.get("specTypeId") is None
                         or not usage.get("dataType") or not usage.get("storageType")
                         or "isType" not in usage or "isInstance" not in usage):
                     raise ValueError("Parameter columns require stable parameter metadata.")
