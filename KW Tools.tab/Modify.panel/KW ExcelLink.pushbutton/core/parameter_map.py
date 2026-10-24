@@ -3,7 +3,7 @@
 from Autodesk.Revit.DB import ElementType
 
 from core.types import element_id_value
-from core.parameter_metadata import parameter_descriptor
+from core.parameter_metadata import parameter_descriptor, collapse_usage, parameter_group_key
 from core.optional_fields import derived_descriptors, is_false_positive
 
 
@@ -25,6 +25,7 @@ def build_parameter_usage_map(doc, elements):
     type_parameters_by_id = {}
     category_ids = set(element_id_value(element.Category.Id) for element in elements
                        if element.Category is not None)
+    conflicts = set()
 
     def descriptors(element):
         records = []
@@ -34,6 +35,11 @@ def build_parameter_usage_map(doc, elements):
             descriptor = parameter_descriptor(doc, element, parameter)
             descriptor["useful"] = not is_false_positive(parameter)
             records.append(descriptor)
+        owner_groups = {}
+        for record in records:
+            group = parameter_group_key(record)
+            owner_groups.setdefault(group, set()).add(record["identity"])
+        conflicts.update(group for group, keys in owner_groups.items() if len(keys) > 1)
         return records
 
     def add(records, target, category_id):
@@ -87,6 +93,7 @@ def build_parameter_usage_map(doc, elements):
                 entry = usage[key]
                 entry["displayName"] = "{0} [{1}; {2}]".format(
                     name, entry["dataType"], entry["identity"])
+    usage = collapse_usage(usage, conflicts)
     instance_categories = sorted(set(
         element_id_value(element.Category.Id) for element in elements
         if not isinstance(element, ElementType) and element.Category is not None))

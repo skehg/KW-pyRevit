@@ -183,6 +183,156 @@ class ParameterMetadataTests(unittest.TestCase):
         self.assertEqual(len(values), 2)
         self.assertEqual({record["value"] for record in values.values()}, {-1, -2})
 
+    def test_compatible_definitions_across_families_collapse_but_keep_write_identities(self):
+        category = types.SimpleNamespace(Id=10, Name="Doors")
+        first = types.SimpleNamespace(
+            Category=category, UniqueId="first", GetTypeId=lambda: -1,
+            Parameters=[parameter("Validation Height", -101, "length", "Double")])
+        second = types.SimpleNamespace(
+            Category=category, UniqueId="second", GetTypeId=lambda: -1,
+            Parameters=[parameter("Validation Height", -102, "length", "Double")])
+        with patch.dict(sys.modules, {"core.parameter_metadata": self.metadata}):
+            module = load("grouped_map", os.path.join("core", "parameter_map.py"))
+        usage = module.build_parameter_usage_map(self.doc, [first, second])
+        entries = [(key, entry) for key, entry in usage.items()
+                   if entry["name"] == "Validation Height"]
+        self.assertEqual(len(entries), 1)
+        key, entry = entries[0]
+        self.assertEqual(entry["displayName"], "Validation Height")
+        self.assertEqual(len(entry["members"]), 2)
+        with open(os.path.join(ROOT, "core", "extract.py"), encoding="utf-8") as stream:
+            node = next(item for item in ast.parse(stream.read()).body
+                        if isinstance(item, ast.FunctionDef) and item.name == "_parameter_values")
+        namespace = {
+            "ElementType": ElementType,
+            "parameter_descriptor": self.metadata.parameter_descriptor,
+            "_READ_ONLY_REASON": "Read-only in Revit.",
+            "_read_parameter": lambda p, owner, catalog: {
+                "isReadOnly": False, "readOnlyReason": None, "value": p.Id},
+        }
+        exec(compile(ast.Module(body=[node], type_ignores=[]), "group_values", "exec"), namespace)
+        for owner, pid in ((first, -101), (second, -102)):
+            record = namespace["_parameter_values"](
+                owner, {key}, types.SimpleNamespace(doc=self.doc), usage)[key]
+            self.assertEqual(record["value"], pid)
+            self.assertNotEqual(record["identity"], entry["identity"])
+            self.assertTrue(record["identity"].endswith(":" + str(pid)))
+        first.Parameters.extend(second.Parameters)
+        record = namespace["_parameter_values"](
+            first, {key}, types.SimpleNamespace(doc=self.doc), usage)[key]
+        self.assertTrue(record["isReadOnly"])
+        self.assertIsNone(record["value"])
+        self.assertIn("coexist", record["readOnlyReason"])
+
+    def test_same_owner_conflicts_stay_separate(self):
+        category = types.SimpleNamespace(Id=10, Name="Doors")
+        owner = types.SimpleNamespace(
+            Category=category, UniqueId="first", GetTypeId=lambda: -1,
+            Parameters=[parameter("Height", -101, "length", "Double"),
+                        parameter("Height", -102, "length", "Double")])
+        with patch.dict(sys.modules, {"core.parameter_metadata": self.metadata}):
+            module = load("conflicting_map", os.path.join("core", "parameter_map.py"))
+        entries = [entry for entry in module.build_parameter_usage_map(
+            self.doc, [owner]).values() if entry["name"] == "Height"]
+        self.assertEqual(len(entries), 2)
+        self.assertTrue(all("members" not in entry for entry in entries))
+
+    def test_spec_minor_patch_versions_group_but_different_quantities_do_not(self):
+        old = {"name": "Height", "specTypeId": "autodesk.spec.aec:length-2.0.0",
+               "storageType": "Double"}
+        new = dict(old, specTypeId="autodesk.spec.aec:length-2.0.1")
+        area = dict(old, specTypeId="autodesk.spec.aec:area-2.0.0")
+        self.assertEqual(self.metadata.parameter_group_key(old),
+                         self.metadata.parameter_group_key(new))
+        self.assertNotEqual(self.metadata.parameter_group_key(old),
+                            self.metadata.parameter_group_key(area))
+
+    def test_same_builtin_spec_aliases_do_not_create_owner_conflicts(self):
+        self.db.LabelUtils.GetLabelForSpec = lambda spec: "Length"
+        category = types.SimpleNamespace(Id=10, Name="Doors")
+        owner = types.SimpleNamespace(
+            Category=category, UniqueId="first", GetTypeId=lambda: -1,
+            Parameters=[
+                parameter("Height", -1001300, "autodesk.spec.aec:length-2.0.0", "Double"),
+                parameter("Height", -1001300, "autodesk.spec.aec:length-2.0.1", "Double")])
+        with patch.dict(sys.modules, {"core.parameter_metadata": self.metadata}):
+            module = load("builtin_alias_map", os.path.join("core", "parameter_map.py"))
+        entries = [entry for entry in module.build_parameter_usage_map(
+            self.doc, [owner]).values() if entry["name"] == "Height"]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(len(entries[0]["members"]), 2)
+        self.assertEqual(entries[0]["displayName"], "Height")
+
+    def test_same_builtin_aliases_merge_even_when_other_height_definitions_conflict(self):
+        self.db.LabelUtils.GetLabelForSpec = lambda spec: "Length"
+        category = types.SimpleNamespace(Id=10, Name="Doors")
+        owner = types.SimpleNamespace(
+            Category=category, UniqueId="first", GetTypeId=lambda: -1,
+            Parameters=[
+                parameter("Height", -1001300, "autodesk.spec.aec:length-2.0.0", "Double"),
+                parameter("Height", -1001300, "autodesk.spec.aec:length-2.0.1", "Double"),
+                parameter("Height", -999, "autodesk.spec.aec:length-2.0.1", "Double")])
+        with patch.dict(sys.modules, {"core.parameter_metadata": self.metadata}):
+            module = load("builtin_conflict_alias_map", os.path.join("core", "parameter_map.py"))
+        entries = [entry for entry in module.build_parameter_usage_map(
+            self.doc, [owner]).values() if entry["name"] == "Height"]
+        self.assertEqual(len(entries), 2)
+        aliases = next(entry for entry in entries if entry["identity"] == "builtin:-1001300")
+        self.assertEqual(len(aliases["members"]), 2)
+        self.assertEqual(aliases["displayName"], "Height [Length; builtin:-1001300]")
+        with open(os.path.join(ROOT, "core", "extract.py"), encoding="utf-8") as stream:
+            node = next(item for item in ast.parse(stream.read()).body
+                        if isinstance(item, ast.FunctionDef) and item.name == "_parameter_values")
+        namespace = {
+            "ElementType": ElementType,
+            "parameter_descriptor": self.metadata.parameter_descriptor,
+            "_READ_ONLY_REASON": "Read-only in Revit.",
+            "_read_parameter": lambda p, owner, catalog: {
+                "isReadOnly": True, "readOnlyReason": "Read-only in Revit.", "value": 2100},
+        }
+        exec(compile(ast.Module(body=[node], type_ignores=[]), "alias_values", "exec"), namespace)
+        record = namespace["_parameter_values"](
+            owner, {aliases["key"]}, types.SimpleNamespace(doc=self.doc),
+            {aliases["key"]: aliases})[aliases["key"]]
+        self.assertEqual(record["value"], 2100)
+        self.assertNotIn("coexist", record["readOnlyReason"])
+        self.assertEqual(record["identity"], "builtin:-1001300")
+
+    def test_existing_preset_explicit_definition_keys_remain_valid(self):
+        key = '["builtin:-1001300","length","Double"]'
+        usage = {"group": {
+            "members": [key], "name": "Height", "identity": "group",
+            "specTypeId": "length", "storageType": "Double"}}
+        self.metadata.restore_parameter_keys(usage, [key])
+        self.assertEqual(usage[key]["identity"], "builtin:-1001300")
+        self.assertEqual(usage[key]["builtin"], -1001300)
+        self.assertNotIn("members", usage[key])
+
+    def test_reopening_picker_coalesces_legacy_and_grouped_height_selections(self):
+        old = '["builtin:-1001300","autodesk.spec.aec:length-2.0.0","Double"]'
+        patch_key = '["builtin:-1001300","autodesk.spec.aec:length-2.0.1","Double"]'
+        alias = '["builtin:-1001300","autodesk.spec.aec:length-2","Double"]'
+        group = '["field","Height","autodesk.spec.aec:length-2","Double"]'
+        usage = {group: {"members": [old, patch_key], "name": "Height"}}
+        selected = self.metadata.canonical_parameter_keys(
+            usage, [old, group, patch_key, alias])
+        self.assertEqual(selected, [group])
+        self.assertEqual(list(usage), [group])
+        usage[group].update(
+            isType=True, isInstance=True, dataType="Length",
+            storageType="Double", specTypeId="autodesk.spec.aec:length-2.0.0")
+        with patch.dict(sys.modules, {"core.types": self.types}):
+            columns_module = load("restored_height_columns", os.path.join("core", "column_builder.py"))
+        columns = columns_module.build_columns(selected, usage, "Instances Mode")
+        height_columns = [column for column in columns if column.get("columnType") == "parameter"]
+        self.assertEqual([column["target"] for column in height_columns], ["type", "instance"])
+        projected = columns_module.project_rows([{"Parameters": {
+            group: {"isTypeParam": False, "isInstanceParam": True,
+                    "instanceValue": 2900, "storageType": "Double", "isReadOnly": True}
+        }}], columns)
+        displayed = [projected[0].get(column["field"]) for column in height_columns]
+        self.assertEqual(displayed, [None, 2900])
+
     def test_apply_requires_identity_spec_and_storage_match(self):
         with open(os.path.join(ROOT, "core", "apply_changes.py"), encoding="utf-8") as stream:
             tree = ast.parse(stream.read())

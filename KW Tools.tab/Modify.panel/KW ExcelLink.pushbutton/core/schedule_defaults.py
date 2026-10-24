@@ -2,6 +2,7 @@
 """Read schedule defaults without changing the schedule or its elements."""
 
 import re
+import json
 
 from Autodesk.Revit.DB import UnitUtils, ViewSchedule
 
@@ -61,6 +62,8 @@ def schedule_parameters(defaults, usage):
             matching = [
                 key for key in candidates
                 if _same_identity(usage[key].get("identity"), identity)
+                or any(_same_identity(json.loads(member)[0], identity)
+                       for member in usage[key].get("members", []))
             ]
             if matching:
                 candidates = matching

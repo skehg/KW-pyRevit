@@ -105,6 +105,26 @@ class XlsxRoundtripTests(unittest.TestCase):
             if os.path.exists(path):
                 os.remove(path)
 
+    def test_grouped_picker_identity_roundtrips_but_edits_use_exact_row_identity(self):
+        from core.parameter_metadata import parameter_group_key
+        workbook = make_workbook(value=12.5)
+        sheet = workbook["sheets"][0]
+        group = parameter_group_key(PARAMETER_USAGE)
+        grouped_usage = dict(PARAMETER_USAGE, identity=group, members=[PARAMETER_KEY])
+        sheet["parameters"] = [group]
+        sheet["parameterUsage"] = {group: grouped_usage}
+        sheet["columns"][-1].update(parameterKey=group, parameterIdentity=group)
+        xlsx_export.write_xlsx(workbook, self.path)
+        plan = xlsx_import.read_import_plan(self.path)
+        self.assertEqual(plan["sheets"][0]["parameterKeys"], [group])
+        self.assertEqual(plan["sheets"][0]["parameterUsage"][group]["members"], [PARAMETER_KEY])
+        sheet["rows"][0]["p0_instance"] = 10.0
+        change = xlsx_import.diff_xlsx(workbook, self.path)["updates"][0]
+        self.assertEqual(change["parameterKey"], group)
+        self.assertEqual(change["parameterIdentity"], "shared:width-guid")
+        self.assertEqual(change["parameterGuid"], "width-guid")
+        self.assertEqual(change["value"], 12.5)
+
     def test_readonly_derived_identity_and_field_options_roundtrip(self):
         from core.optional_fields import derived_descriptors
         workbook = make_workbook()

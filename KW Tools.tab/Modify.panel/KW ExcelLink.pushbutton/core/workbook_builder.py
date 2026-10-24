@@ -40,6 +40,8 @@ def _combined_category_key(categories):
 
 def build_sheet(doc, catalog, label, category_id, elements, parameters,
                 parameter_mode, usage_map, categories=None, field_options=None):
+    from core.parameter_metadata import restore_parameter_keys
+    restore_parameter_keys(usage_map, parameters)
     if field_options is not None:
         from core.optional_fields import select_usage
         usage_map = select_usage(usage_map, field_options)
@@ -171,6 +173,8 @@ def build_preset_workbook(doc, preset, selection_mode, source_elements):
         )
         usage_map = build_parameter_usage_map(doc, elements)
         wanted = list(entry.get("parameters") or entry.get("parameterKeys") or [])
+        from core.parameter_metadata import canonical_parameter_keys
+        wanted = canonical_parameter_keys(usage_map, wanted)
         parameters = [key for key in wanted if key in usage_map]
         for key in wanted:
             if key not in usage_map:
@@ -278,7 +282,10 @@ def build_import_workbook(doc, file_path):
                                 if isinstance(metadata, dict) and metadata.get("fieldOptions")), None)
         for key, metadata in requested_usage.items():
             if isinstance(metadata, dict):
+                current_members = usage_map.get(key, {}).get("members")
                 usage_map.setdefault(key, {}).update(metadata)
+                if current_members is not None:
+                    usage_map[key]["members"] = current_members
         parameters = entry.get("parameterKeys") or entry.get("parameters") or []
         sheet = build_sheet(
             doc, catalog, label, category_id, elements, parameters,

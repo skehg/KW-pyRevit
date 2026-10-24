@@ -76,6 +76,11 @@ def _parameter_values(element, selected_names, catalog, usage_map=None):
         return result
     wanted_names = (set(usage_map[key].get("name", key) for key in selected_names)
                     if usage_map is not None else selected_names)
+    member_keys = {}
+    if usage_map is not None:
+        for selected in selected_names:
+            for member in usage_map[selected].get("members", [selected]):
+                member_keys[member] = selected
     for parameter in element.Parameters:
         if parameter is None or parameter.Definition is None:
             continue
@@ -84,7 +89,7 @@ def _parameter_values(element, selected_names, catalog, usage_map=None):
             continue
         if usage_map is not None:
             descriptor = parameter_descriptor(catalog.doc, element, parameter)
-            key = descriptor["key"]
+            key = member_keys.get(descriptor["key"], descriptor["key"])
         else:
             descriptor = None
             key = name
@@ -95,6 +100,12 @@ def _parameter_values(element, selected_names, catalog, usage_map=None):
             if not usage_map[key].get(scope):
                 continue
         existing = result.get(key)
+        if (existing is not None and descriptor is not None
+                and usage_map[key].get("members")
+                and existing.get("identity") != descriptor["identity"]):
+            existing.update(value=None, isReadOnly=True,
+                            readOnlyReason="Multiple compatible definitions coexist on this element; select individual definitions.")
+            continue
         # Some elements expose two parameters with one name (e.g. a read-only
         # schedule "Level" and the editable placement "Level"); keep the editable one,
         # otherwise the one whose lock reason is more specific than plain read-only.

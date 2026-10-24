@@ -133,6 +133,30 @@ combined grid:
 
 #### Optional API fields and reversible false-positive filtering
 
+Compatible parameter definitions now share one picker listing and grid column
+per scope: grouping uses the exact displayed name, semantic Forge spec (ignoring
+minor/patch version differences), and storage type. For example, multiple
+family-specific Length definitions of `Grille Height Validation` become one
+listing. Actual identities/GUIDs/spec versions remain in each cell's metadata
+and are used for writing, refresh and XLSX import; the grouped label is never
+used as the parameter setter identity.
+
+Different quantities/storage types remain separate. When multiple compatible
+definitions coexist on one element in the same scope, they stay separate too,
+because merging them would discard a value. An older saved grouped selection
+that becomes ambiguous is read-only with an explanation rather than silently
+choosing a parameter. Existing identity-specific preset/XLSX selections remain
+supported. The grouping does not depend on the false-positive-filter checkbox:
+that checkbox controls known placeholder suppression, not catalog presentation.
+Multiple compatible spec-version representations of the same built-in/shared
+identity are aliases, not conflicting definitions. They collapse even when
+other genuinely distinct same-name definitions must remain separate. Each
+cell still carries its actual spec version for write-back.
+When reopening Parameters or loading a preset, previous identity-specific and
+grouped selections now resolve to a single current picker entry. This avoids
+restoring a second Height listing/instance column alongside its group. Explicit
+XLSX reconstruction remains identity-preserving to match the file's schema.
+
 Step 4 has three controls:
 
 - **Offer coordinates (read-only)** is off by default. Enable it, then select

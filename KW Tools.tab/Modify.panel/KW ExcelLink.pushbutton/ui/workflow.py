@@ -355,6 +355,12 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
                 step = 2
                 continue
             field_store_key = "combined" if combined else key
+            from core.parameter_metadata import canonical_parameter_keys
+            selected_fields = canonical_parameter_keys(usage, selected_fields or [])
+            if combined:
+                combined_fields = selected_fields
+            else:
+                fields[key] = selected_fields
             if schedule is not None and field_store_key not in schedule_layout_defaulted:
                 if combined or key not in fields:
                     seeded = schedule_parameters(schedule, usage)
