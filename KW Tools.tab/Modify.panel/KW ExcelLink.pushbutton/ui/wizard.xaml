@@ -109,7 +109,7 @@
             </WrapPanel>
         </StackPanel>
         <TextBlock Grid.Row="1"
-                   Text="Filter by usage or search by name. Select several fields and add them in one step; selected columns stay in the order shown."
+                   Text="Filter by usage or search by name. Right-click available parameters to sort or filter by data type. Add includes highlighted parameters hidden by filters."
                    Margin="0,0,0,8"
                    TextWrapping="Wrap"
                    Foreground="#374151"/>
@@ -151,20 +151,39 @@
                          VerticalContentAlignment="Center"
                          ToolTip="Filter available parameters by name"
                          TextChanged="on_search_changed"/>
+                <TextBlock x:Name="lblAvailableStatus"
+                           DockPanel.Dock="Bottom"
+                           Margin="0,6,0,0"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Foreground="#566273"/>
                 <ListBox x:Name="lstAvailable"
                          SelectionMode="Extended"
+                         SelectionChanged="on_available_selection_changed"
+                         PreviewMouseRightButtonDown="on_available_right_click"
+                         ContextMenuOpening="on_available_menu_opening"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ItemContainerStyle="{StaticResource ParameterRowStyle}"
                          ItemTemplate="{StaticResource ParameterRowTemplate}"
                          BorderBrush="#CBD5E1"
-                         Background="White"/>
+                         Background="White">
+                    <ListBox.ContextMenu>
+                        <ContextMenu Style="{x:Null}">
+                            <ContextMenu.Resources>
+                                <!-- pyRevit's MenuItem template has no submenu popup or checkmark. -->
+                                <Style TargetType="{x:Type MenuItem}"/>
+                            </ContextMenu.Resources>
+                            <MenuItem Header="Sort and filter"/>
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
+                </ListBox>
             </DockPanel>
             <StackPanel Grid.Column="1"
                         VerticalAlignment="Center"
                         Margin="12,0">
                 <Button Width="82" Height="32" Margin="0,0,0,8"
                         AutomationProperties.Name="Add"
-                        ToolTip="Add selected available parameters"
+                        ToolTip="Add all highlighted available parameters, including those hidden by filters"
                         Click="on_add">
                     <StackPanel Orientation="Horizontal">
                         <Path Style="{StaticResource ActionArrowStyle}" Margin="0,0,5,0"/>

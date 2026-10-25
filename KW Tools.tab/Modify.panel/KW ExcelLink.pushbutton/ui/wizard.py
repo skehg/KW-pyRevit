@@ -160,6 +160,10 @@ class ParameterWizardWindow(forms.WPFWindow):
                     ]
         self._items = {}
         self._available_displays = set()
+        self._highlighted_available = set()
+        self._refreshing_available = False
+        self._sort_by = "name"
+        self._data_type_filter = None
         self.selected_parameters = None
         self.action = "cancel"
         self.btnContinue.Content = "Open Grid" if last else "Next category"
@@ -196,6 +200,7 @@ class ParameterWizardWindow(forms.WPFWindow):
 
     def on_field_options_changed(self, sender, args):
         from core.optional_fields import select_usage
+        self._capture_available_selection()
         selected = [str(item) for item in self.lstSelected.Items]
         self.field_options = {
             "coordinates": bool(self.chkCoordinates.IsChecked),
@@ -232,7 +237,18 @@ class ParameterWizardWindow(forms.WPFWindow):
         self._refresh_available()
 
     def on_add(self, sender, args):
-        self._transfer_selected(self.lstAvailable, self.lstSelected)
+        self._capture_available_selection()
+        items = sorted(self._highlighted_available, key=self._available_sort_key)
+        if not items:
+            return
+        for key in items:
+            self.lstSelected.Items.Add(self._items[key])
+        self.lstSelected.SelectedItems.Clear()
+        for key in items:
+            self.lstSelected.SelectedItems.Add(self._items[key])
+        self._available_displays.difference_update(items)
+        self._highlighted_available.clear()
+        self._refresh_available()
 
     def on_remove(self, sender, args):
         self._transfer_selected(self.lstSelected, self.lstAvailable)
@@ -270,10 +286,86 @@ class ParameterWizardWindow(forms.WPFWindow):
                 destination.SelectedItems.Add(self._items[item])
         self._refresh_available()
 
-    def _refresh_available(self):
-        selected_items = set(
-            str(item) for item in self.lstAvailable.SelectedItems
+    def _capture_available_selection(self):
+        self._highlighted_available.difference_update(
+            str(item) for item in self.lstAvailable.Items)
+        self._highlighted_available.update(
+            str(item) for item in self.lstAvailable.SelectedItems)
+        self._highlighted_available.intersection_update(self._available_displays)
+
+    def on_available_selection_changed(self, sender, args):
+        if (not hasattr(self, "_highlighted_available")
+                or self._refreshing_available):
+            return
+        self._capture_available_selection()
+        self._update_available_status()
+
+    def _available_sort_key(self, key):
+        item = self._items[key]
+        name_key = (item.Name.lower(), item.Name, key)
+        if self._sort_by == "dataType":
+            return (item.DataType.lower(), item.DataType) + name_key
+        return name_key
+
+    def on_available_right_click(self, sender, args):
+        # Keep ListBoxItem's right-click handling from replacing a bulk selection.
+        args.Handled = True
+
+    def on_available_menu_opening(self, sender, args):
+        from System.Windows.Controls import MenuItem
+        menu = sender.ContextMenu
+        menu.Items.Clear()
+        sort_menu = MenuItem()
+        sort_menu.Header = "Sort by"
+        for key, label in (("name", "Name A-Z"),
+                           ("dataType", "Data type, then name A-Z")):
+            option = MenuItem()
+            option.Header = label
+            option.Tag = key
+            option.IsCheckable = True
+            option.IsChecked = self._sort_by == key
+            option.Click += self.on_sort_available
+            sort_menu.Items.Add(option)
+        menu.Items.Add(sort_menu)
+        filter_menu = MenuItem()
+        filter_menu.Header = "Data type"
+        data_types = set(item.DataType for item in self._items.values())
+        if self._data_type_filter is not None:
+            data_types.add(self._data_type_filter)
+        for data_type in [None] + sorted(data_types, key=lambda value: (value.lower(), value)):
+            option = MenuItem()
+            option.Header = data_type if data_type is not None else "All data types"
+            option.Tag = data_type
+            option.IsCheckable = True
+            option.IsChecked = self._data_type_filter == data_type
+            option.Click += self.on_filter_data_type
+            filter_menu.Items.Add(option)
+        menu.Items.Add(filter_menu)
+
+    def on_sort_available(self, sender, args):
+        self._sort_by = str(sender.Tag)
+        sender.IsChecked = True
+        self._refresh_available()
+
+    def on_filter_data_type(self, sender, args):
+        self._data_type_filter = sender.Tag
+        sender.IsChecked = True
+        self._refresh_available()
+
+    def _update_available_status(self):
+        visible = set(str(item) for item in self.lstAvailable.Items)
+        hidden_count = len(self._highlighted_available - visible)
+        self.lblAvailableStatus.Text = (
+            "Sort: {0} | Filter: {1}\n"
+            "{2} highlighted ({3} hidden). Add includes hidden highlights.".format(
+                "Data type, then name" if self._sort_by == "dataType" else "Name A-Z",
+                self._data_type_filter if self._data_type_filter is not None else "All data types",
+                len(self._highlighted_available), hidden_count,
+            )
         )
+
+    def _refresh_available(self):
+        self._capture_available_selection()
         search_text = str(self.txtSearch.Text or "").strip().lower()
         selected_filter = self.cboAvailability.SelectedItem
         filter_mode = str(
@@ -301,17 +393,24 @@ class ParameterWizardWindow(forms.WPFWindow):
             [
                 item for item in self._available_displays
                 if search_text in self._items[item].Name.lower()
+                and (self._data_type_filter is None
+                     or self._items[item].DataType == self._data_type_filter)
                 and matches_usage(item)
             ],
-            key=lambda value: self._items[value].Name.lower(),
+            key=self._available_sort_key,
         )
-        self.lstAvailable.Items.Clear()
-        for item in items:
-            self.lstAvailable.Items.Add(self._items[item])
-        self.lstAvailable.SelectedItems.Clear()
-        for item in items:
-            if item in selected_items:
-                self.lstAvailable.SelectedItems.Add(self._items[item])
+        self._refreshing_available = True
+        try:
+            self.lstAvailable.Items.Clear()
+            for item in items:
+                self.lstAvailable.Items.Add(self._items[item])
+            self.lstAvailable.SelectedItems.Clear()
+            for item in items:
+                if item in self._highlighted_available:
+                    self.lstAvailable.SelectedItems.Add(self._items[item])
+        finally:
+            self._refreshing_available = False
+        self._update_available_status()
         self.lblCounts.Text = (
             "{0} shown of {1} available · {2} selected".format(
                 len(items), len(self._available_displays), self.lstSelected.Items.Count

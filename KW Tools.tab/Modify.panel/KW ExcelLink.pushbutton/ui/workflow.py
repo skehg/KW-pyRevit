@@ -4,7 +4,7 @@ from pyrevit import forms
 
 from core.element_refs import ReferenceCatalog
 from core.parameter_map import build_parameter_usage_map
-from core.presets import default_preset_name, find_preset, load_preset, preset_label
+from core.presets import default_preset, load_preset, preset_label
 from core.schedule_defaults import (
     build_schedule_layout,
     read_schedule_defaults,
@@ -95,13 +95,15 @@ def _run_preset(uidoc, doc, item, selection_mode=None):
         )
         return None
     workbook["presetName"] = item["name"]
+    workbook["presetRelativePath"] = item["relativePath"]
+    workbook["presetSource"] = item["source"]
     return workbook, source_elements
 
 
 def _step_one_options():
     options = list(SELECTION_MODES)
     options.extend((IMPORT_MODE, LOAD_PRESET, MANAGE_PRESETS))
-    default_item = find_preset(default_preset_name())
+    default_item = default_preset()
     if default_item is not None:
         options.append(DEFAULT_PRESET_PREFIX + preset_label(default_item))
     return options, default_item
@@ -476,4 +478,7 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
                 "sheets": sheets,
                 "_sourceElementIds": [element_id_value(e.Id) for e in source_elements],
             }
+            for key in ("presetName", "presetRelativePath", "presetSource"):
+                if key in previous:
+                    result[key] = previous[key]
             return result, source_elements

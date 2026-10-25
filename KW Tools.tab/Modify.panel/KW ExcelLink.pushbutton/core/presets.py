@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Named grid presets stored per user (and optionally in a shared folder).
+"""Named grid presets in writable User and read-only Enterprise libraries.
 
 A preset records the wizard choices (selection mode, parameter mode,
 categories and ordered parameters) plus column layout, filters and formula
@@ -8,13 +8,15 @@ templates. It contains no element data, so it can be reused in any project.
 
 import io
 import json
+import logging
 import os
 import re
 
 PRESET_VERSION = 2
-SOURCE_PERSONAL = "personal"
-SOURCE_SHARED = "shared"
+SOURCE_USER = "user"
+SOURCE_ENTERPRISE = "enterprise"
 _EXTENSION = ".json"
+_LOGGER = logging.getLogger(__name__)
 
 
 def _app_data_dir():
@@ -22,7 +24,7 @@ def _app_data_dir():
     return os.path.join(root, "KW", "ExcelLink")
 
 
-def personal_folder():
+def default_user_folder():
     return os.path.join(_app_data_dir(), "presets")
 
 
@@ -53,81 +55,168 @@ def _write_json(path, data):
 def load_settings():
     try:
         settings = _read_json(_settings_path())
-    except (IOError, OSError, ValueError):
-        settings = {}
-    return settings if isinstance(settings, dict) else {}
+    except (IOError, OSError) as exc:
+        if exc.errno == 2:
+            return {}
+        raise
+    if not isinstance(settings, dict):
+        raise ValueError("ExcelLink settings must contain a JSON object.")
+    return settings
 
 
 def save_settings(settings):
     _write_json(_settings_path(), settings)
 
 
-def shared_folder():
-    folder = load_settings().get("sharedFolder")
-    return folder or None
+def user_folder():
+    return load_settings().get("userFolder") or default_user_folder()
 
 
-def set_shared_folder(folder):
+def enterprise_folder():
+    settings = load_settings()
+    return settings.get("enterpriseFolder", settings.get("sharedFolder")) or None
+
+
+def _normalized(path):
+    return os.path.normcase(os.path.realpath(os.path.abspath(path)))
+
+
+def _inside(path, root):
+    path, root = _normalized(path), _normalized(root)
+    return path == root or path.startswith(root.rstrip(os.sep) + os.sep)
+
+
+def _set_folder(key, folder):
+    if folder:
+        folder = os.path.abspath(folder)
+        if not os.path.isdir(folder):
+            raise ValueError("Choose an existing presets folder: {0}".format(folder))
+        other = enterprise_folder() if key == "userFolder" else user_folder()
+        if other and (_inside(folder, other) or _inside(other, folder)):
+            raise ValueError("Enterprise and User locations must not overlap.")
     settings = load_settings()
     if folder:
-        settings["sharedFolder"] = folder
+        settings[key] = folder
     else:
+        settings.pop(key, None)
+    if key == "enterpriseFolder":
         settings.pop("sharedFolder", None)
     save_settings(settings)
 
 
+def set_user_folder(folder):
+    _set_folder("userFolder", folder or default_user_folder())
+
+
+def set_enterprise_folder(folder):
+    _set_folder("enterpriseFolder", folder)
+
+
 def folder_for(source):
-    return shared_folder() if source == SOURCE_SHARED else personal_folder()
+    if source == SOURCE_USER:
+        return user_folder()
+    if source == SOURCE_ENTERPRISE:
+        return enterprise_folder()
+    raise ValueError("Unknown preset library: {0}".format(source))
 
 
 def safe_file_name(name):
     cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name).strip(" .")
     if not cleaned:
         raise ValueError("Enter a preset name.")
+    if re.match(r"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)", cleaned, re.I):
+        raise ValueError("This preset name is reserved by Windows.")
     return cleaned + _EXTENSION
 
 
-def _list_folder(folder, source):
-    presets = []
-    if not folder or not os.path.isdir(folder):
-        return presets
-    for file_name in sorted(os.listdir(folder)):
-        if not file_name.lower().endswith(_EXTENSION):
-            continue
-        path = os.path.join(folder, file_name)
-        try:
-            data = _read_json(path)
-        except (IOError, OSError, ValueError):
-            continue
-        if not isinstance(data, dict) or not isinstance(data.get("sheets"), list):
-            continue
-        presets.append({
-            "name": data.get("name") or file_name[:-len(_EXTENSION)],
-            "path": path,
-            "source": source,
-        })
-    return presets
+def _report_issue(message, issues):
+    _LOGGER.warning(message)
+    if issues is not None:
+        issues.append(message)
 
 
-def list_presets():
-    """Personal presets first; shared presets with the same name are hidden."""
-    personal = _list_folder(personal_folder(), SOURCE_PERSONAL)
-    names = set(item["name"].lower() for item in personal)
-    shared = [
-        item for item in _list_folder(shared_folder(), SOURCE_SHARED)
-        if item["name"].lower() not in names
-    ]
-    return sorted(personal + shared, key=lambda item: item["name"].lower())
+def _walk_library(folder, issues=None):
+    if not folder:
+        return
+    if not os.path.isdir(folder):
+        if folder != default_user_folder() or os.path.exists(folder):
+            _report_issue("Presets location unavailable: {0}".format(folder), issues)
+        return
+
+    def on_error(exc):
+        _report_issue("Could not read presets: {0}".format(exc), issues)
+
+    for current, directories, files in os.walk(folder, onerror=on_error, followlinks=False):
+        directories[:] = sorted(
+            [name for name in directories
+             if not os.path.islink(os.path.join(current, name))
+             and _inside(os.path.join(current, name), folder)],
+            key=lambda name: name.lower(),
+        )
+        yield current, files
+
+
+def _list_folder(folder, source, issues=None):
+    items = []
+    for current, files in _walk_library(folder, issues):
+        for file_name in sorted(files):
+            if not file_name.lower().endswith(_EXTENSION):
+                continue
+            path = os.path.join(current, file_name)
+            if not _inside(path, folder):
+                _report_issue("Preset points outside its library: {0}".format(path), issues)
+                continue
+            try:
+                data = load_preset(path)
+                if not isinstance(data.get("name", ""), (str, type(u""))):
+                    raise ValueError("Preset name must be text.")
+            except (IOError, OSError, ValueError, TypeError) as exc:
+                _report_issue("Could not load preset {0}: {1}".format(path, exc), issues)
+                continue
+            items.append({
+                "name": data.get("name") or file_name[:-len(_EXTENSION)],
+                "path": path,
+                "source": source,
+                "relativePath": os.path.relpath(path, folder),
+            })
+    return items
+
+
+def list_presets(issues=None):
+    """Keep both libraries and every subfolder visible, including duplicate names."""
+    items = _list_folder(enterprise_folder(), SOURCE_ENTERPRISE, issues)
+    items.extend(_list_folder(user_folder(), SOURCE_USER, issues))
+    return sorted(items, key=lambda item: (
+        item["source"], item["relativePath"].lower()
+    ))
 
 
 def preset_label(item):
-    return item["name"] + (" [shared]" if item["source"] == SOURCE_SHARED else "")
+    return "{0} [{1}: {2}]".format(
+        item["name"], item["source"].title(), item["relativePath"]
+    )
 
 
-def find_preset(name):
-    for item in list_presets():
-        if item["name"].lower() == (name or "").lower():
-            return item
+def preset_reference(item):
+    return {"source": item["source"], "relativePath": item["relativePath"]}
+
+
+def find_preset(reference):
+    if not reference:
+        return None
+    items = list_presets()
+    if isinstance(reference, dict):
+        for item in items:
+            if (item["source"] == reference.get("source")
+                    and os.path.normcase(item["relativePath"])
+                    == os.path.normcase(reference.get("relativePath") or "")):
+                return item
+    else:
+        # Legacy defaults used a name, with personal presets taking precedence.
+        for source in (SOURCE_USER, SOURCE_ENTERPRISE):
+            for item in items:
+                if item["source"] == source and item["name"].lower() == reference.lower():
+                    return item
     return None
 
 
@@ -149,33 +238,85 @@ def load_preset(path):
     return data
 
 
-def preset_path(name, source=SOURCE_PERSONAL):
+def _relative_path(path):
+    path = (path or "").replace("\\", os.sep).replace("/", os.sep)
+    if os.path.isabs(path) or os.path.splitdrive(path)[0]:
+        raise ValueError("Choose a relative path inside the User presets location.")
+    if any(part == ".." for part in path.split(os.sep)):
+        raise ValueError("Preset folders must stay inside the User location.")
+    for part in path.split(os.sep):
+        if part in ("", "."):
+            continue
+        if (re.search(r'[<>:"|?*\x00-\x1f]', part) or part.endswith((" ", "."))
+                or re.match(r"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)", part, re.I)):
+            raise ValueError("Invalid Windows folder or file name: {0}".format(part))
+    result = os.path.normpath(path)
+    return "" if result == "." else result
+
+
+def _user_path(relative):
+    root = user_folder()
+    path = os.path.join(root, _relative_path(relative))
+    enterprise = enterprise_folder()
+    if not _inside(path, root) or (enterprise and _inside(path, enterprise)):
+        raise ValueError("Enterprise presets are read-only. Choose a User folder.")
+    return path
+
+
+def user_subfolders():
+    return sorted([
+        os.path.relpath(current, user_folder())
+        for current, files in _walk_library(user_folder())
+        if _normalized(current) != _normalized(user_folder())
+    ], key=lambda path: path.lower())
+
+
+def ensure_user_folder(subfolder=""):
+    path = _user_path(subfolder)
+    if not os.path.isdir(path):
+        os.makedirs(path)
+    return path
+
+
+def preset_path(name, source=SOURCE_USER, subfolder=""):
+    if source != SOURCE_USER:
+        raise ValueError("Enterprise presets are read-only. Save a User copy instead.")
     folder = folder_for(source)
     if not folder:
-        raise ValueError("No shared presets folder is configured.")
-    return os.path.join(folder, safe_file_name(name))
+        raise ValueError("No User presets location is configured.")
+    return _user_path(os.path.join(_relative_path(subfolder), safe_file_name(name)))
 
 
-def save_preset(preset, source=SOURCE_PERSONAL):
-    path = preset_path(preset["name"], source)
+def save_preset(preset, source=SOURCE_USER, subfolder=""):
+    path = preset_path(preset["name"], source, subfolder)
     _write_json(path, preset)
     return path
 
 
 def delete_preset(item):
-    os.remove(item["path"])
-    if (default_preset_name() or "").lower() == item["name"].lower():
+    if item["source"] != SOURCE_USER:
+        raise ValueError("Enterprise presets are read-only.")
+    path = _user_path(item["relativePath"])
+    if _normalized(path) != _normalized(item["path"]):
+        raise ValueError("Preset no longer belongs to the configured User location.")
+    default = default_preset()
+    os.remove(path)
+    if default and preset_reference(default) == preset_reference(item):
         set_default_preset(None)
 
 
-def default_preset_name():
-    return load_settings().get("defaultPreset") or None
+def default_preset():
+    reference = load_settings().get("defaultPreset")
+    item = find_preset(reference)
+    if item and not isinstance(reference, dict):
+        set_default_preset(item)
+    return item
 
 
-def set_default_preset(name):
+def set_default_preset(item):
     settings = load_settings()
-    if name:
-        settings["defaultPreset"] = name
+    if item:
+        settings["defaultPreset"] = preset_reference(item)
     else:
         settings.pop("defaultPreset", None)
     save_settings(settings)

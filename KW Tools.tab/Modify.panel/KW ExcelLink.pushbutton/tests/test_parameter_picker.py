@@ -45,6 +45,7 @@ class FakeWindow(object):
         self.lblCategory = types.SimpleNamespace(Text="")
         self.lblMode = types.SimpleNamespace(Text="")
         self.lblCounts = types.SimpleNamespace(Text="")
+        self.lblAvailableStatus = types.SimpleNamespace(Text="")
         self.txtSearch = types.SimpleNamespace(Text="")
         self.cboAvailability = types.SimpleNamespace(
             SelectionChanged=Event(),
@@ -252,6 +253,224 @@ class ParameterPickerTests(unittest.TestCase):
         window.cboAvailability.SelectedItem.Content = "Type parameters"
         window.on_filter_changed(None, None)
         self.assertEqual(self.names(window.lstAvailable.Items), ["Mark", "Width"])
+
+    def typed_window(self, selected=None):
+        self.usage = {
+            "width": {"name": "Width", "dataType": "Length", "isType": True},
+            "height": {"name": "Height", "dataType": "Length", "isType": True},
+            "comments": {"name": "Comments", "dataType": "Text", "isInstance": True},
+            "mark": {"name": "Mark", "dataType": "Text", "isInstance": True},
+            "enabled": {"name": "Enabled", "dataType": "Yes/No", "isInstance": True},
+        }
+        return self.window(selected=selected)
+
+    def sort_available(self, window, key):
+        window.on_sort_available(types.SimpleNamespace(Tag=key), None)
+
+    def filter_data_type(self, window, data_type):
+        window.on_filter_data_type(types.SimpleNamespace(Tag=data_type), None)
+
+    def test_sorting_by_data_type_then_name_preserves_bulk_highlights_and_right_panel(self):
+        window = self.typed_window(selected=["mark", "height"])
+        window.lstSelected.SelectedItems.Add(window._items["height"])
+        window.lstAvailable.SelectedItems.extend(
+            [window._items["width"], window._items["comments"]])
+        self.sort_available(window, "dataType")
+        self.assertEqual(self.names(window.lstAvailable.Items), ["width", "comments", "enabled"])
+        self.assertEqual(set(self.names(window.lstAvailable.SelectedItems)), {"width", "comments"})
+        self.assertEqual(self.names(window.lstSelected.Items), ["mark", "height"])
+        self.assertEqual(self.names(window.lstSelected.SelectedItems), ["height"])
+        self.sort_available(window, "name")
+        self.assertEqual(self.names(window.lstAvailable.Items), ["comments", "enabled", "width"])
+        self.assertEqual(set(self.names(window.lstAvailable.SelectedItems)), {"width", "comments"})
+
+    def test_add_includes_hidden_highlights_in_sort_order_and_retains_browsing_settings(self):
+        window = self.typed_window(selected=["mark"])
+        window.lstAvailable.SelectedItems.extend(
+            [window._items["comments"], window._items["width"], window._items["height"]])
+        self.filter_data_type(window, "Length")
+        self.assertIn("3 highlighted (1 hidden)", window.lblAvailableStatus.Text)
+        self.sort_available(window, "dataType")
+        window.on_add(None, None)
+        self.assertEqual(self.names(window.lstSelected.Items), ["mark", "height", "width", "comments"])
+        self.assertEqual(self.names(window.lstSelected.SelectedItems), ["height", "width", "comments"])
+        self.assertEqual(window._highlighted_available, set())
+        self.assertEqual(window.lstAvailable.SelectedItems, [])
+        self.assertEqual(window.lstAvailable.Items, [])
+        self.assertEqual(window._sort_by, "dataType")
+        self.assertEqual(window._data_type_filter, "Length")
+        self.filter_data_type(window, None)
+        self.assertEqual(self.names(window.lstAvailable.Items), ["enabled"])
+        self.assertEqual(window.lstAvailable.SelectedItems, [])
+
+    def test_filtering_restores_hidden_highlights_and_respects_visible_deselection(self):
+        window = self.typed_window()
+        window.lstAvailable.SelectedItems.extend(
+            [window._items["width"], window._items["comments"]])
+        self.filter_data_type(window, "Length")
+        self.assertEqual(self.names(window.lstAvailable.SelectedItems), ["width"])
+        window.lstAvailable.SelectedItems.Clear()
+        window.on_available_selection_changed(None, None)
+        self.assertEqual(window._highlighted_available, {"comments"})
+        self.filter_data_type(window, None)
+        self.assertEqual(self.names(window.lstAvailable.SelectedItems), ["comments"])
+        window.txtSearch.Text = "not found"
+        window.on_search_changed(None, None)
+        self.assertIn("1 highlighted (1 hidden)", window.lblAvailableStatus.Text)
+        window.on_add(None, None)
+        self.assertEqual(self.names(window.lstSelected.Items), ["comments"])
+        self.assertEqual(window.txtSearch.Text, "not found")
+
+    def test_refresh_selection_events_do_not_discard_hidden_highlights(self):
+        window = self.typed_window()
+
+        class SelectionCollection(Collection):
+            def Clear(self):
+                super(SelectionCollection, self).Clear()
+                window.on_available_selection_changed(None, None)
+
+            def Add(self, item):
+                super(SelectionCollection, self).Add(item)
+                window.on_available_selection_changed(None, None)
+
+        window.lstAvailable.SelectedItems = SelectionCollection()
+        window.lstAvailable.SelectedItems.Add(window._items["width"])
+        window.lstAvailable.SelectedItems.Add(window._items["comments"])
+        self.filter_data_type(window, "Text")
+        self.assertEqual(window._highlighted_available, {"width", "comments"})
+        self.assertEqual(self.names(window.lstAvailable.SelectedItems), ["comments"])
+        self.filter_data_type(window, None)
+        self.assertEqual(set(self.names(window.lstAvailable.SelectedItems)), {"width", "comments"})
+        window.on_add(None, None)
+        self.assertEqual(window._highlighted_available, set())
+        self.assertEqual(window.lstAvailable.SelectedItems, [])
+
+    def test_disabling_optional_fields_discards_highlights_for_unavailable_fields(self):
+        self.usage["derived:internal_0"] = {
+            "name": "Internal X", "dataType": "Length", "isInstance": True,
+            "derivedGroup": "coordinates",
+        }
+        window = self.window()
+        window.chkCoordinates = types.SimpleNamespace(IsChecked=True)
+        window.chkUsefulFields = types.SimpleNamespace(IsChecked=False)
+        window.chkFalsePositives = types.SimpleNamespace(IsChecked=False)
+        window.on_field_options_changed(None, None)
+        window.lstAvailable.SelectedItems.Add(window._items["derived:internal_0"])
+        self.filter_data_type(window, "Text")
+        window.chkCoordinates.IsChecked = False
+        window.on_field_options_changed(None, None)
+        self.assertEqual(window._highlighted_available, set())
+        self.assertEqual(window._data_type_filter, "Text")
+        window.on_add(None, None)
+        self.assertEqual(window.lstSelected.Items, [])
+
+    def test_usage_and_coverage_filters_also_preserve_hidden_highlights(self):
+        window = self.typed_window()
+        window.lstAvailable.SelectedItems.Add(window._items["comments"])
+        window.cboAvailability.SelectedItem.Content = "Type parameters"
+        window.on_filter_changed(None, None)
+        self.assertEqual(self.names(window.lstAvailable.Items), ["height", "width"])
+        self.assertEqual(window._highlighted_available, {"comments"})
+        window.cboAvailability.SelectedItem.Content = "All parameters"
+        window._usage_map["comments"].update(categoryCount=1, totalCategories=2)
+        window.cboCoverage.SelectedIndex = 1
+        window.on_filter_changed(None, None)
+        self.assertNotIn("comments", self.names(window.lstAvailable.Items))
+        window.on_add(None, None)
+        self.assertEqual(self.names(window.lstSelected.Items), ["comments"])
+        self.assertEqual(window.cboCoverage.SelectedIndex, 1)
+
+    def test_remove_does_not_restore_highlights_or_reset_sort_and_filter(self):
+        window = self.typed_window()
+        self.sort_available(window, "dataType")
+        self.filter_data_type(window, "Length")
+        window.lstAvailable.SelectedItems.Add(window._items["width"])
+        window.on_add(None, None)
+        window.on_remove(None, None)
+        self.assertEqual(self.names(window.lstAvailable.Items), ["height", "width"])
+        self.assertEqual(window.lstAvailable.SelectedItems, [])
+        self.assertEqual(window._highlighted_available, set())
+        self.assertEqual(window._sort_by, "dataType")
+        self.assertEqual(window._data_type_filter, "Length")
+
+    def test_field_option_refresh_keeps_browsing_settings_and_remaining_highlights(self):
+        window = self.typed_window()
+        self.sort_available(window, "dataType")
+        self.filter_data_type(window, "Text")
+        window.lstAvailable.SelectedItems.Add(window._items["comments"])
+        window.chkCoordinates = types.SimpleNamespace(IsChecked=False)
+        window.chkUsefulFields = types.SimpleNamespace(IsChecked=False)
+        window.chkFalsePositives = types.SimpleNamespace(IsChecked=False)
+        window.on_field_options_changed(None, None)
+        self.assertEqual(window._sort_by, "dataType")
+        self.assertEqual(window._data_type_filter, "Text")
+        self.assertEqual(self.names(window.lstAvailable.Items), ["comments", "mark"])
+        self.assertEqual(self.names(window.lstAvailable.SelectedItems), ["comments"])
+
+    def test_right_click_does_not_replace_bulk_selection(self):
+        window = self.typed_window()
+        window.lstAvailable.SelectedItems.extend(
+            [window._items["width"], window._items["comments"]])
+        args = types.SimpleNamespace(Handled=False)
+        window.on_available_right_click(window.lstAvailable, args)
+        self.assertTrue(args.Handled)
+        self.assertEqual(self.names(window.lstAvailable.SelectedItems), ["width", "comments"])
+
+    def test_context_menu_lists_unique_data_types_and_current_choices_even_when_empty(self):
+        window = self.typed_window()
+        self.sort_available(window, "dataType")
+        self.filter_data_type(window, "Length")
+        window._items = {}
+        menu = types.SimpleNamespace(Items=Collection())
+        sender = types.SimpleNamespace(ContextMenu=menu)
+
+        class MenuItem(object):
+            def __init__(self):
+                self.Items = Collection()
+                self.Click = Event()
+
+        controls = types.ModuleType("System.Windows.Controls")
+        controls.MenuItem = MenuItem
+        with patch.dict(sys.modules, {"System.Windows.Controls": controls}):
+            window.on_available_menu_opening(sender, None)
+        self.assertEqual([item.Header for item in menu.Items], ["Sort by", "Data type"])
+        self.assertEqual([item.IsChecked for item in menu.Items[0].Items], [False, True])
+        self.assertEqual([item.Header for item in menu.Items[1].Items], ["All data types", "Length"])
+        self.assertEqual([item.IsChecked for item in menu.Items[1].Items], [False, True])
+        window = self.typed_window()
+        with patch.dict(sys.modules, {"System.Windows.Controls": controls}):
+            window.on_available_menu_opening(sender, None)
+        self.assertEqual([item.Header for item in menu.Items[1].Items],
+                         ["All data types", "Length", "Text", "Yes/No"])
+
+    def test_context_menu_is_only_on_available_list_and_handlers_are_wired(self):
+        root = ET.parse(os.path.join(ROOT, "ui", "wizard.xaml")).getroot()
+        wpf = "{http://schemas.microsoft.com/winfx/2006/xaml/presentation}"
+        x = "{http://schemas.microsoft.com/winfx/2006/xaml}"
+        available = next(node for node in root.iter(wpf + "ListBox")
+                         if node.get(x + "Name") == "lstAvailable")
+        selected = next(node for node in root.iter(wpf + "ListBox")
+                        if node.get(x + "Name") == "lstSelected")
+        self.assertEqual(available.get("SelectionMode"), "Extended")
+        for event, handler in (
+            ("SelectionChanged", "on_available_selection_changed"),
+            ("PreviewMouseRightButtonDown", "on_available_right_click"),
+            ("ContextMenuOpening", "on_available_menu_opening"),
+        ):
+            self.assertEqual(available.get(event), handler)
+        self.assertEqual(len(list(available.iter(wpf + "ContextMenu"))), 1)
+        self.assertEqual(len(list(selected.iter(wpf + "ContextMenu"))), 0)
+
+    def test_context_menu_uses_native_templates_instead_of_pyrevit_header_only_style(self):
+        root = ET.parse(os.path.join(ROOT, "ui", "wizard.xaml")).getroot()
+        wpf = "{http://schemas.microsoft.com/winfx/2006/xaml/presentation}"
+        menu = next(root.iter(wpf + "ContextMenu"))
+        self.assertEqual(menu.get("Style"), "{x:Null}")
+        resources = menu.find(wpf + "ContextMenu.Resources")
+        style = resources.find(wpf + "Style")
+        self.assertEqual(style.get("TargetType"), "{x:Type MenuItem}")
+        self.assertIsNone(style.get("BasedOn"))
+        self.assertEqual(len(style), 0)
 
     def test_multi_add_remove_and_reorder_preserve_badges_and_names(self):
         window = self.window(selected=["Width"])

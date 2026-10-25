@@ -14,19 +14,28 @@ SELECTION_MODES = (
 
 
 def choose_preset(title="Load preset"):
-    items = presets.list_presets()
+    items = _list_presets()
     if not items:
         forms.alert(
             "No presets saved yet. Open a grid and use Save Preset.", title=TITLE
         )
         return None
-    labels = [presets.preset_label(item) for item in items]
-    picked = forms.SelectFromList.show(
-        labels, title=title, button_name="Select", multiselect=False
-    )
-    if not picked:
-        return None
-    return items[labels.index(picked)]
+    from ui.preset_browser import PresetBrowserWindow
+    dialog = PresetBrowserWindow(items, title)
+    dialog.ShowDialog()
+    return dialog.selected
+
+
+def _list_presets():
+    issues = []
+    items = presets.list_presets(issues)
+    if issues:
+        forms.alert(
+            "Some presets or locations could not be read:\n\n{0}".format(
+                "\n".join(issues)
+            ), title=TITLE,
+        )
+    return items
 
 
 def report_preset_issues(name, issues):
@@ -60,17 +69,9 @@ def save_from_grid(workbook, layouts):
         return None
     presets.safe_file_name(name)
 
-    source = presets.SOURCE_PERSONAL
-    if presets.shared_folder():
-        choice = forms.alert(
-            "Where should '{0}' be saved?".format(name),
-            title=TITLE,
-            options=["My presets", "Shared presets folder"],
-        )
-        if not choice:
-            return None
-        if choice == "Shared presets folder":
-            source = presets.SOURCE_SHARED
+    subfolder = _choose_user_subfolder(workbook)
+    if subfolder is None:
+        return None
 
     selection_mode = workbook.get("selectionMode")
     if selection_mode == "Entire Project":
@@ -85,44 +86,86 @@ def save_from_grid(workbook, layouts):
         if not selection_mode:
             return None
 
-    path = presets.preset_path(name, source)
+    path = presets.preset_path(name, subfolder=subfolder)
     if os.path.exists(path) and not forms.alert(
-        "A preset named '{0}' already exists. Replace it?".format(name),
+        "A User preset already exists at:\n{0}\n\nReplace it?".format(path),
         title=TITLE, yes=True, no=True,
     ):
         return None
 
     preset = presets.preset_from_workbook(workbook, layouts, name, selection_mode)
-    path = presets.save_preset(preset, source)
-    default_name = presets.default_preset_name()
-    if (default_name or "").lower() != name.lower() and forms.alert(
+    path = presets.save_preset(preset, subfolder=subfolder)
+    item = {
+        "source": presets.SOURCE_USER,
+        "relativePath": os.path.relpath(path, presets.user_folder()),
+    }
+    default = presets.default_preset()
+    if (not default or presets.preset_reference(default) != item) and forms.alert(
         "Open '{0}' by default from the first wizard step?".format(name),
         title=TITLE, yes=True, no=True,
     ):
-        presets.set_default_preset(name)
+        presets.set_default_preset(item)
+    workbook["presetRelativePath"] = item["relativePath"]
+    workbook["presetSource"] = presets.SOURCE_USER
     return name, path
+
+
+def _choose_user_subfolder(workbook):
+    root_label = "[User root]"
+    new_label = "[New subfolder...]"
+    relative = workbook.get("presetRelativePath") or ""
+    suggested = os.path.dirname(relative)
+    folders = presets.user_subfolders()
+    if suggested and suggested not in folders:
+        folders.append(suggested)
+    options = [root_label] + sorted(folders, key=lambda path: path.lower()) + [new_label]
+    choice = forms.ask_for_one_item(
+        options, title="Save in User presets",
+        prompt="User location: {0}".format(presets.user_folder()),
+        default=suggested or root_label,
+    )
+    if not choice:
+        return None
+    if choice == new_label:
+        relative = forms.ask_for_string(
+            default=suggested,
+            prompt="Folder path relative to User location (for example Doors\\Audits):",
+            title="New User preset subfolder",
+        )
+        return relative.strip() if relative and relative.strip() else None
+    return "" if choice == root_label else choice
 
 
 _SET_DEFAULT = "Set default preset"
 _CLEAR_DEFAULT = "Clear default preset"
-_DELETE = "Delete a preset"
-_SET_SHARED = "Set shared presets folder"
-_CLEAR_SHARED = "Stop using shared presets folder"
-_OPEN_FOLDER = "Open my presets folder"
+_DELETE = "Delete User presets"
+_SET_ENTERPRISE = "Set Enterprise location (read-only)"
+_CLEAR_ENTERPRISE = "Clear Enterprise location"
+_SET_USER = "Set User location"
+_OPEN_FOLDER = "Open User location"
 
 
 def manage_presets():
-    default_name = presets.default_preset_name()
-    shared = presets.shared_folder()
+    try:
+        _manage_presets()
+    except (IOError, OSError, ValueError) as exc:
+        script.get_logger().error("Could not manage ExcelLink presets: {0}".format(exc))
+        forms.alert("Could not manage presets:\n{0}".format(exc), title=TITLE)
+
+
+def _manage_presets():
+    default = presets.default_preset()
+    enterprise = presets.enterprise_folder()
     actions = [_SET_DEFAULT]
-    if default_name:
+    if presets.load_settings().get("defaultPreset"):
         actions.append(_CLEAR_DEFAULT)
-    actions.extend([_DELETE, _SET_SHARED])
-    if shared:
-        actions.append(_CLEAR_SHARED)
+    actions.extend([_DELETE, _SET_ENTERPRISE, _SET_USER])
+    if enterprise:
+        actions.append(_CLEAR_ENTERPRISE)
     actions.append(_OPEN_FOLDER)
-    status = "Default: {0} | Shared folder: {1}".format(
-        default_name or "none", shared or "none"
+    status = "Default: {0} | Enterprise: {1} | User: {2}".format(
+        presets.preset_label(default) if default else "none / unavailable",
+        enterprise or "not configured", presets.user_folder(),
     )
     action = forms.SelectFromList.show(
         actions, title="Manage presets - " + status, button_name="Run",
@@ -131,14 +174,21 @@ def manage_presets():
     if action == _SET_DEFAULT:
         item = choose_preset("Choose the default preset")
         if item:
-            presets.set_default_preset(item["name"])
+            presets.set_default_preset(item)
     elif action == _CLEAR_DEFAULT:
         presets.set_default_preset(None)
     elif action == _DELETE:
-        items = presets.list_presets()
+        items = [
+            item for item in _list_presets()
+            if item["source"] == presets.SOURCE_USER
+        ]
+        if not items:
+            forms.alert("No User presets to delete. Enterprise presets are read-only.",
+                        title=TITLE)
+            return
         labels = [presets.preset_label(item) for item in items]
         picked = forms.SelectFromList.show(
-            labels, title="Choose presets to delete", button_name="Delete",
+            labels, title="Choose User presets to delete", button_name="Delete",
             multiselect=True,
         )
         if not picked:
@@ -149,7 +199,7 @@ def manage_presets():
         if not selected:
             return
         names = u"\n".join(
-            u"{0} ({1})".format(item["name"], item["source"])
+            presets.preset_label(item)
             for item in selected
         )
         if forms.alert(
@@ -158,16 +208,22 @@ def manage_presets():
         ):
             for item in selected:
                 presets.delete_preset(item)
-    elif action == _SET_SHARED:
-        folder = forms.pick_folder(title="Shared ExcelLink presets folder")
+    elif action == _SET_ENTERPRISE:
+        folder = forms.pick_folder(title="Enterprise presets location (read-only)")
         if folder:
-            presets.set_shared_folder(folder)
-    elif action == _CLEAR_SHARED:
-        presets.set_shared_folder(None)
+            presets.set_enterprise_folder(folder)
+    elif action == _CLEAR_ENTERPRISE:
+        presets.set_enterprise_folder(None)
+    elif action == _SET_USER:
+        folder = forms.pick_folder(title="User presets location")
+        if folder and forms.alert(
+            "Use this User location?\n{0}\n\nExisting presets are not moved. "
+            "Copy them in Windows Explorer if needed.".format(folder),
+            title=TITLE, yes=True, no=True,
+        ):
+            presets.set_user_folder(folder)
     elif action == _OPEN_FOLDER:
-        folder = presets.personal_folder()
-        if not os.path.isdir(folder):
-            os.makedirs(folder)
+        folder = presets.ensure_user_folder()
         from ui.import_dialogs import open_with_shell
 
         open_with_shell(folder)

@@ -14,7 +14,7 @@ class WizardNavigationTests(unittest.TestCase):
             "pyrevit": ["forms"],
             "core.element_refs": ["ReferenceCatalog"],
             "core.parameter_map": ["build_parameter_usage_map"],
-            "core.presets": ["default_preset_name", "find_preset", "load_preset", "preset_label"],
+            "core.presets": ["default_preset", "load_preset", "preset_label"],
             "core.schedule_defaults": ["build_schedule_layout", "read_schedule_defaults", "schedule_parameters"],
             "core.selection": ["category_options", "elements_for_category", "resolve_source_elements"],
             "core.types": ["element_id_value"],
@@ -45,7 +45,7 @@ class WizardNavigationTests(unittest.TestCase):
         f.elements_for_category.side_effect = lambda elements, key: [elements[key - 1]]
         f.build_parameter_usage_map.return_value = {"Mark": {}, "Level": {}, "Width": {}}
         f.element_id_value.side_effect = lambda value: value
-        f.find_preset.return_value = None
+        f.default_preset.return_value = None
         f.read_schedule_defaults.return_value = None
         f.build_sheet.side_effect = lambda doc, catalog, label, key, elements, fields, mode, usage, **kwargs: {
             "categoryId": key, "name": label, "parameters": fields, "rows": [],
@@ -126,7 +126,7 @@ class WizardNavigationTests(unittest.TestCase):
 
     def test_default_preset_stays_in_preset_group(self):
         item = {"name": "Doors"}
-        self.flow.find_preset.return_value = item
+        self.flow.default_preset.return_value = item
         self.flow.preset_label.return_value = "Doors"
         options, default_item = self.flow._step_one_options()
         self.assertIs(default_item, item)
@@ -239,11 +239,17 @@ class WizardNavigationTests(unittest.TestCase):
 
     def test_grid_resume_starts_at_active_category_and_preserves_layout(self):
         previous = self.workbook()
+        previous.update({
+            "presetName": "Audit", "presetSource": "enterprise",
+            "presetRelativePath": os.path.join("Doors", "Audit.json"),
+        })
         self.actions = [("Walls [2]", "next", ["Width", "Level"])]
         workbook, _ = self.flow.run_wizard(None, None, previous, self.source, 1)
         self.assertEqual(self.visits[0], ("Walls [2]", ["Width"], True))
         self.assertEqual(workbook["sheets"][1]["parameters"], ["Width", "Level"])
         self.assertEqual(workbook["sheets"][0]["layout"], previous["sheets"][0]["layout"])
+        for key in ("presetName", "presetSource", "presetRelativePath"):
+            self.assertEqual(workbook[key], previous[key])
 
     def test_cancel_does_not_mutate_existing_workbook(self):
         previous = self.workbook()
@@ -302,12 +308,18 @@ class WizardNavigationTests(unittest.TestCase):
         self.flow.ChoiceWizardWindow.side_effect = lambda *args, **kwargs: types.SimpleNamespace(
             action="next", selected=["Entire Model"], ShowDialog=lambda: None
         )
-        result = self.flow._run_preset(None, None, {"path": "preset.json", "name": "Doors"})
+        item = {
+            "path": "preset.json", "name": "Doors", "source": "enterprise",
+            "relativePath": os.path.join("Doors", "Audit.json"),
+        }
+        result = self.flow._run_preset(None, None, item)
         self.flow.resolve_source_elements.assert_called_once_with(None, "Entire Model")
         self.flow.build_preset_workbook.assert_called_once_with(
             None, self.flow.load_preset.return_value, "Entire Model", self.source
         )
         self.assertEqual(result, (built, self.source))
+        self.assertEqual(built["presetRelativePath"], item["relativePath"])
+        self.assertEqual(built["presetSource"], "enterprise")
 
     def test_cancelling_preset_scope_does_not_collect_or_build(self):
         self.flow.load_preset.return_value = {"selectionMode": "Current View"}

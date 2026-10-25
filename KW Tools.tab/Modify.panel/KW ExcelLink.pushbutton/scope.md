@@ -127,6 +127,14 @@ combined grid:
   and mixed-use parameters; rows identify their availability and show counts
   for visible available parameters and selected columns. Combined rows also
   show category coverage.
+- Right-click the available-parameters list to sort by **Name A-Z** (default)
+  or **Data type, then name A-Z**, and filter to one data type or **All data types**.
+  These controls combine with the unchanged search and availability filters.
+  Highlighted parameters remain highlighted when hidden by any browsing filter.
+  The status beneath the available list reports hidden highlights; **Add**
+  transfers all highlights, including hidden ones, in the active sort order.
+  Add clears available-list highlights but retains sorting and filtering.
+  Browsing controls never reorder the right-hand columns or change their selection.
 - Both lists show the parameter name separately from a smaller, right-aligned
   availability badge: blue Type, grey Instance, or purple Type + Instance.
   Friendly data type and project unit appear as metadata above the parameter
@@ -458,14 +466,35 @@ Copilot must generate code that:
   widths and sorting, keyed by column title) as JSON. No element data is
   stored, so presets work in any project or view (`core/presets.py`,
   `ui/preset_dialogs.py`).
-- Personal presets live in `%APPDATA%\KW\ExcelLink\presets`; settings
-  (default preset, shared folder) in `%APPDATA%\KW\ExcelLink\settings.json`.
-  An optional shared/team folder is also listed (marked `[shared]`); a
-  personal preset hides a shared one of the same name. Saving asks which
-  folder to use when a shared folder is set.
+- Presets have two libraries: **Enterprise** (read-only in ExcelLink) and
+  **User** (writable). Enterprise is unconfigured by default; User defaults to
+  `%APPDATA%\KW\ExcelLink\presets`. Both locations can be selected under
+  **Manage presets...**. Changing a location does not move existing files;
+  copy them in Windows Explorer if needed. Locations must not overlap.
+- The BIM manager publishes Enterprise presets by copying JSON files and
+  subfolders into its location. ExcelLink never saves, overwrites, deletes or
+  creates folders there; use Windows permissions for additional protection.
+  An existing shared-folder setting is retained as the Enterprise location.
+- **Load Preset...** displays a searchable folder tree grouped by Enterprise
+  and User. Nested subfolders (for example `Doors\Audits` or `Renumbering`)
+  define the organisation without tags or an index file. Root-level presets
+  remain supported. Matching names in different libraries/folders remain
+  visible; search matches names, filenames, folder paths and library names.
+- **Save Preset** always writes to User. Choose an existing subfolder, the
+  User root, or enter a new relative subfolder path (created on save).
+  Saving an Enterprise preset creates an independent User copy, suggesting
+  the same relative folder and preset name. Existing files require overwrite
+  confirmation. Enterprise updates do not change User copies.
+- Settings remain in `%APPDATA%\KW\ExcelLink\settings.json`. Defaults identify
+  the library and relative file path, not just the name. Legacy name-only
+  defaults migrate when resolved, preferring User as before. A missing default
+  does not silently select a same-named preset from another folder/library.
+  Unavailable locations and invalid presets are logged and reported in the
+  preset picker; other readable presets remain available.
 - Step 1 lists **Open default preset: <name>** (when a default is set),
   **Load Preset...** and **Manage presets...** (set/clear default, delete one
-  or more presets in a single operation, set/clear shared folder, open folder).
+  or more User presets in a single operation, set/clear Enterprise location,
+  set User location, open User location in Explorer).
   Loading either a named or default
   preset first asks for a fresh selection mode, then skips Steps 2–4 and
   opens the grid (`workbook_builder.build_preset_workbook`). Its saved
