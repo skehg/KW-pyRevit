@@ -101,7 +101,7 @@ class FormulaPresetTests(unittest.TestCase):
         filters = {"advanced": {"join": "and", "rules": [
             {"title": "Door Number (Instance)", "op": "startsWith", "value": "D", "value2": ""},
             {"title": "Level (Instance)", "op": "equals", "value": "Level 01", "value2": ""},
-        ]}}
+        ]}, "show": "topLevelInstances"}
         sort = [{"title": "Door Number (Instance)", "dir": "asc"}]
         workbook = {
             "parameterMode": "Instances Mode",
@@ -120,6 +120,7 @@ class FormulaPresetTests(unittest.TestCase):
         sheet = loaded["sheets"][0]
         self.assertEqual(loaded["selectionMode"], "Entire Model")
         self.assertEqual(sheet["parameters"], parameters)
+        self.assertEqual(sheet["layout"]["filters"]["show"], "topLevelInstances")
         self.assertEqual(sheet["layout"]["filters"]["advanced"], filters["advanced"])
         self.assertEqual(sheet["layout"]["sort"], sort)
 

@@ -135,12 +135,29 @@ def manage_presets():
     elif action == _CLEAR_DEFAULT:
         presets.set_default_preset(None)
     elif action == _DELETE:
-        item = choose_preset("Choose a preset to delete")
-        if item and forms.alert(
-            "Delete preset '{0}'?\n{1}".format(item["name"], item["path"]),
+        items = presets.list_presets()
+        labels = [presets.preset_label(item) for item in items]
+        picked = forms.SelectFromList.show(
+            labels, title="Choose presets to delete", button_name="Delete",
+            multiselect=True,
+        )
+        if not picked:
+            return
+        if isinstance(picked, (str, type(u""))):
+            picked = [picked]
+        selected = [items[labels.index(label)] for label in picked if label in labels]
+        if not selected:
+            return
+        names = u"\n".join(
+            u"{0} ({1})".format(item["name"], item["source"])
+            for item in selected
+        )
+        if forms.alert(
+            u"Delete these preset(s)?\n\n{0}".format(names),
             title=TITLE, yes=True, no=True,
         ):
-            presets.delete_preset(item)
+            for item in selected:
+                presets.delete_preset(item)
     elif action == _SET_SHARED:
         folder = forms.pick_folder(title="Shared ExcelLink presets folder")
         if folder:

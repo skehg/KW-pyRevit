@@ -242,7 +242,10 @@ def _clean_layout(layout):
     }
 
 
-_SHOW_OPTIONS = ("all", "pending", "notPending", "editable", "readOnly", "typeRows", "instanceRows")
+_SHOW_OPTIONS = (
+    "all", "topLevelInstances", "pending", "notPending", "editable",
+    "readOnly", "typeRows", "instanceRows",
+)
 _FILTER_OPERATORS = (
     "contains", "notContains", "equals", "notEquals", "startsWith", "endsWith",
     "gt", "gte", "lt", "lte", "between", "empty", "notEmpty", "wildcard", "regex",

@@ -464,8 +464,9 @@ Copilot must generate code that:
   personal preset hides a shared one of the same name. Saving asks which
   folder to use when a shared folder is set.
 - Step 1 lists **Open default preset: <name>** (when a default is set),
-  **Load Preset...** and **Manage presets...** (set/clear default, delete,
-  set/clear shared folder, open folder). Loading either a named or default
+  **Load Preset...** and **Manage presets...** (set/clear default, delete one
+  or more presets in a single operation, set/clear shared folder, open folder).
+  Loading either a named or default
   preset first asks for a fresh selection mode, then skips Steps 2–4 and
   opens the grid (`workbook_builder.build_preset_workbook`). Its saved
   columns, order, filters, sorting and formulas apply to the newly collected
