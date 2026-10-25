@@ -151,6 +151,29 @@
                          VerticalContentAlignment="Center"
                          ToolTip="Filter available parameters by name"
                          TextChanged="on_search_changed"/>
+                <Border x:Name="pnlDataTypeFilter"
+                        DockPanel.Dock="Top"
+                        Visibility="Collapsed"
+                        Background="#FFF3CD"
+                        BorderBrush="#D8B45A"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        Padding="7,5"
+                        Margin="0,0,0,7">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right"
+                                Content="Clear"
+                                Padding="7,2"
+                                Margin="8,0,0,0"
+                                ToolTip="Clear only the data-type filter"
+                                Click="on_clear_data_type_filter"/>
+                        <TextBlock x:Name="lblDataTypeFilter"
+                                   Foreground="#664D03"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   TextWrapping="Wrap"/>
+                    </DockPanel>
+                </Border>
                 <TextBlock x:Name="lblAvailableStatus"
                            DockPanel.Dock="Bottom"
                            Margin="0,6,0,0"

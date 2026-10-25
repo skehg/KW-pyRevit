@@ -136,6 +136,8 @@ class ParameterWizardWindow(forms.WPFWindow):
                  selected=None, last=True, context_text=None, field_options=None,
                  combined_categories=False):
         from core.optional_fields import field_options as normalize_options, select_usage
+        from System.Windows import Visibility
+        self._visibility = Visibility
         xaml_path = os.path.join(os.path.dirname(__file__), "wizard.xaml")
         forms.WPFWindow.__init__(self, xaml_path)
         self._all_usage = usage_map
@@ -352,7 +354,19 @@ class ParameterWizardWindow(forms.WPFWindow):
         sender.IsChecked = True
         self._refresh_available()
 
+    def on_clear_data_type_filter(self, sender, args):
+        self._data_type_filter = None
+        self._refresh_available()
+
     def _update_available_status(self):
+        self.pnlDataTypeFilter.Visibility = (
+            self._visibility.Visible if self._data_type_filter is not None
+            else self._visibility.Collapsed
+        )
+        self.lblDataTypeFilter.Text = (
+            "Data type filter: {0}".format(self._data_type_filter)
+            if self._data_type_filter is not None else ""
+        )
         visible = set(str(item) for item in self.lstAvailable.Items)
         hidden_count = len(self._highlighted_available - visible)
         self.lblAvailableStatus.Text = (

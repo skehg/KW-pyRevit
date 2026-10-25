@@ -133,7 +133,12 @@ combined grid:
   Highlighted parameters remain highlighted when hidden by any browsing filter.
   The status beneath the available list reports hidden highlights; **Add**
   transfers all highlights, including hidden ones, in the active sort order.
-  Add clears available-list highlights but retains sorting and filtering.
+  An amber banner above the list identifies the active data-type filter, even
+  when no rows match. Its **Clear** button removes only that filter.
+  Add clears available-list highlights but retains the data-type filter and
+  its banner so parameters can be added in successive batches in the desired
+  column order. Sorting, search, usage, coverage and optional-field settings
+  also remain unchanged.
   Browsing controls never reorder the right-hand columns or change their selection.
 - Both lists show the parameter name separately from a smaller, right-aligned
   availability badge: blue Type, grey Instance, or purple Type + Instance.

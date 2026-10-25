@@ -46,6 +46,8 @@ class FakeWindow(object):
         self.lblMode = types.SimpleNamespace(Text="")
         self.lblCounts = types.SimpleNamespace(Text="")
         self.lblAvailableStatus = types.SimpleNamespace(Text="")
+        self.pnlDataTypeFilter = types.SimpleNamespace(Visibility="Collapsed")
+        self.lblDataTypeFilter = types.SimpleNamespace(Text="")
         self.txtSearch = types.SimpleNamespace(Text="")
         self.cboAvailability = types.SimpleNamespace(
             SelectionChanged=Event(),
@@ -284,7 +286,7 @@ class ParameterPickerTests(unittest.TestCase):
         self.assertEqual(self.names(window.lstAvailable.Items), ["comments", "enabled", "width"])
         self.assertEqual(set(self.names(window.lstAvailable.SelectedItems)), {"width", "comments"})
 
-    def test_add_includes_hidden_highlights_in_sort_order_and_retains_browsing_settings(self):
+    def test_add_includes_hidden_highlights_in_sort_order_and_retains_data_type_filter(self):
         window = self.typed_window(selected=["mark"])
         window.lstAvailable.SelectedItems.extend(
             [window._items["comments"], window._items["width"], window._items["height"]])
@@ -299,9 +301,23 @@ class ParameterPickerTests(unittest.TestCase):
         self.assertEqual(window.lstAvailable.Items, [])
         self.assertEqual(window._sort_by, "dataType")
         self.assertEqual(window._data_type_filter, "Length")
-        self.filter_data_type(window, None)
+        self.assertEqual(window.pnlDataTypeFilter.Visibility, "Visible")
+        window.on_clear_data_type_filter(None, None)
         self.assertEqual(self.names(window.lstAvailable.Items), ["enabled"])
         self.assertEqual(window.lstAvailable.SelectedItems, [])
+
+    def test_successive_adds_keep_filter_and_append_in_user_chosen_order(self):
+        window = self.typed_window(selected=["mark"])
+        self.filter_data_type(window, "Length")
+        for key in ("width", "height"):
+            window.lstAvailable.SelectedItems.Add(window._items[key])
+            window.on_add(None, None)
+            self.assertEqual(window._data_type_filter, "Length")
+            self.assertEqual(window.pnlDataTypeFilter.Visibility, "Visible")
+            self.assertEqual(window.lstAvailable.SelectedItems, [])
+            self.assertEqual(window._highlighted_available, set())
+        self.assertEqual(self.names(window.lstSelected.Items), ["mark", "width", "height"])
+        self.assertEqual(window.lstAvailable.Items, [])
 
     def test_filtering_restores_hidden_highlights_and_respects_visible_deselection(self):
         window = self.typed_window()
@@ -363,6 +379,7 @@ class ParameterPickerTests(unittest.TestCase):
         self.assertEqual(window._data_type_filter, "Text")
         window.on_add(None, None)
         self.assertEqual(window.lstSelected.Items, [])
+        self.assertEqual(window._data_type_filter, "Text")
 
     def test_usage_and_coverage_filters_also_preserve_hidden_highlights(self):
         window = self.typed_window()
@@ -392,6 +409,63 @@ class ParameterPickerTests(unittest.TestCase):
         self.assertEqual(window._highlighted_available, set())
         self.assertEqual(window._sort_by, "dataType")
         self.assertEqual(window._data_type_filter, "Length")
+
+    def test_filter_banner_stays_visible_for_empty_results_and_clear_keeps_other_settings(self):
+        window = self.typed_window(selected=["mark"])
+        self.assertEqual(window.pnlDataTypeFilter.Visibility, "Collapsed")
+        self.sort_available(window, "dataType")
+        window.txtSearch.Text = "missing"
+        window.cboAvailability.SelectedItem.Content = "Type parameters"
+        window.cboCoverage.SelectedIndex = 1
+        self.filter_data_type(window, "Length")
+        self.assertEqual(window.lstAvailable.Items, [])
+        self.assertEqual(window.pnlDataTypeFilter.Visibility, "Visible")
+        self.assertEqual(window.lblDataTypeFilter.Text, "Data type filter: Length")
+        window.on_clear_data_type_filter(None, None)
+        self.assertIsNone(window._data_type_filter)
+        self.assertEqual(window.pnlDataTypeFilter.Visibility, "Collapsed")
+        self.assertEqual(window.lblDataTypeFilter.Text, "")
+        self.assertEqual(window.txtSearch.Text, "missing")
+        self.assertEqual(window.cboAvailability.SelectedItem.Content, "Type parameters")
+        self.assertEqual(window.cboCoverage.SelectedIndex, 1)
+        self.assertEqual(window._sort_by, "dataType")
+        self.assertEqual(self.names(window.lstSelected.Items), ["mark"])
+
+    def test_clear_filter_restores_hidden_highlights_without_adding_them(self):
+        window = self.typed_window()
+        window.lstAvailable.SelectedItems.Add(window._items["width"])
+        self.filter_data_type(window, "Text")
+        window.on_clear_data_type_filter(None, None)
+        self.assertEqual(self.names(window.lstAvailable.SelectedItems), ["width"])
+        self.assertEqual(window.lstSelected.Items, [])
+
+    def test_successful_add_retains_search_usage_and_coverage(self):
+        window = self.typed_window()
+        self.sort_available(window, "dataType")
+        self.filter_data_type(window, "Length")
+        window.txtSearch.Text = "width"
+        window.cboAvailability.SelectedItem.Content = "Type parameters"
+        window.cboCoverage.SelectedIndex = 1
+        window.on_search_changed(None, None)
+        window.lstAvailable.SelectedItems.Add(window._items["width"])
+        window.on_add(None, None)
+        self.assertEqual(window._data_type_filter, "Length")
+        self.assertEqual(window.txtSearch.Text, "width")
+        self.assertEqual(window.cboAvailability.SelectedItem.Content, "Type parameters")
+        self.assertEqual(window.cboCoverage.SelectedIndex, 1)
+        self.assertEqual(window._sort_by, "dataType")
+        self.assertEqual(self.names(window.lstSelected.Items), ["width"])
+
+    def test_filter_banner_clear_button_is_wired_above_available_list(self):
+        root = ET.parse(os.path.join(ROOT, "ui", "wizard.xaml")).getroot()
+        wpf = "{http://schemas.microsoft.com/winfx/2006/xaml/presentation}"
+        x = "{http://schemas.microsoft.com/winfx/2006/xaml}"
+        banner = next(node for node in root.iter(wpf + "Border")
+                      if node.get(x + "Name") == "pnlDataTypeFilter")
+        self.assertEqual(banner.get("Visibility"), "Collapsed")
+        self.assertEqual(banner.get("DockPanel.Dock"), "Top")
+        button = next(banner.iter(wpf + "Button"))
+        self.assertEqual(button.get("Click"), "on_clear_data_type_filter")
 
     def test_field_option_refresh_keeps_browsing_settings_and_remaining_highlights(self):
         window = self.typed_window()
