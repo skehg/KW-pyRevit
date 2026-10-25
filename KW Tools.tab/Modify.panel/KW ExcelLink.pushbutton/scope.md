@@ -706,9 +706,15 @@ the UI). The sheet list marks filtered sheets with "(filtered)".
   back changes stay pending after the apply.
 - **Set value...** writes one value to a column for every visible row
   (shared type values are set once per type; formulas are not allowed).
-- **Select in Revit**, **Isolate in view** (temporary isolate, inside a
-  transaction so it is one Undo step) and **Reset view** act on the visible
-  rows; type rows map to their instances (`core/revit_view.py`).
+- **Select in Revit** and **Isolate in view** (temporary isolate, inside a
+  transaction so it is one Undo step) act on the visible rows. The Revit menu
+  also offers **Select highlighted rows in Revit** and **Isolate highlighted
+  rows in view**, which act only on rows intersected by the highlighted cell
+  range in the active sheet. A right-click inside the highlighted range uses
+  that range; right-clicking elsewhere uses only that row. In both menus,
+  **Reset view** resets temporary hide/isolate in the active view and is
+  independent of the row scope. Type rows map to their instances
+  (`core/revit_view.py`).
 - **Export XLSX** asks whether to save only the visible rows when filters
   are active.
 

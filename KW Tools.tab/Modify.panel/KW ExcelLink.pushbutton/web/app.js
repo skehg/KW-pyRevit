@@ -981,7 +981,7 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
     event.preventDefault();
     try {
       event.clipboardData.setData("text/plain", copiedRangeText());
-      showStatus("Copied selected values (no formulas).");
+      showStatus("Copied highlighted values (no formulas).");
     } catch (error) { showStatus("Copy failed: " + error.message, true); }
   });
 
@@ -1448,8 +1448,8 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
       table.addRange(cell, cell);
     }
     var menu = el("div", "col-menu range-menu");
-    menu.setAttribute("aria-label", "Selected range actions");
-    menu.appendChild(el("div", "col-menu-title", "Selected range"));
+    menu.setAttribute("aria-label", "Highlighted range actions");
+    menu.appendChild(el("div", "col-menu-title", "Highlighted range"));
     function action(label, callback, parent) {
       var button = makeButton(label, function () {
         closeColumnMenu();
@@ -1463,7 +1463,7 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
         showStatus("Clipboard access is unavailable. Use Ctrl+C in the grid.", true); return;
       }
       navigator.clipboard.writeText(copiedRangeText()).then(function () {
-        showStatus("Copied selected values (no formulas).");
+        showStatus("Copied highlighted values (no formulas).");
       }).catch(function (exc) { showStatus("Copy failed: " + exc.message + ". Use Ctrl+C in the grid.", true); });
     });
     action("Paste values", function () {
@@ -1482,6 +1482,16 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
       action(option.label, function () { openTextTool("case", option.value); }, cases);
     });
     menu.appendChild(cases);
+    var revit = el("details");
+    revit.appendChild(el("summary", null, "Revit"));
+    action("Select highlighted rows in Revit", function () {
+      sendRevitView("select", "highlighted");
+    }, revit);
+    action("Isolate highlighted rows in view", function () {
+      sendRevitView("isolate", "highlighted");
+    }, revit);
+    action("Reset view", function () { sendRevitView("reset"); }, revit);
+    menu.appendChild(revit);
     document.body.appendChild(menu);
     menu.style.left = Math.max(8, Math.min(event.clientX, window.innerWidth - menu.offsetWidth - 8)) + "px";
     menu.style.top = Math.max(8, Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 8)) + "px";
@@ -1505,6 +1515,10 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
   var revitButtons = ["selectButton", "isolateButton", "resetViewButton"].map(function (id) {
     return document.getElementById(id);
   });
+  var highlightedRevitButtons = ["selectHighlightedButton", "isolateHighlightedButton"].map(function (id) {
+    return document.getElementById(id);
+  });
+  var revitBusy = false;
   var filterBarTimer = null;
   var contextCache = { sheet: null, context: null };
   fillOptions(showSelect, F.SHOW_OPTIONS);
@@ -2317,19 +2331,47 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
 
   // ------------------------------------------------------------ revit views
 
-  function setRevitButtons(busy) {
-    revitButtons.forEach(function (node) { node.disabled = busy; });
+  function highlightedRows() {
+    if (!tableReady || !table || table.getRanges().length !== 1) { return []; }
+    var highlightedIds = new Set();
+    table.getRanges()[0].getCells().forEach(function (row) {
+      row.forEach(function (cell) {
+        var data = cell.getRow().getData();
+        if (data && data.UniqueId != null) { highlightedIds.add(String(data.UniqueId)); }
+      });
+    });
+    return table.getData("active").filter(function (row) {
+      return row.UniqueId != null && highlightedIds.has(String(row.UniqueId));
+    });
   }
 
-  function sendRevitView(mode) {
+  function updateHighlightedRevitButtons() {
+    var disabled = revitBusy || !highlightedRows().length;
+    highlightedRevitButtons.forEach(function (node) { node.disabled = disabled; });
+  }
+
+  function setRevitButtons(busy) {
+    revitBusy = busy;
+    revitButtons.concat(highlightedRevitButtons).forEach(function (node) {
+      node.disabled = busy;
+    });
+    if (!busy) { updateHighlightedRevitButtons(); }
+  }
+
+  function sendRevitView(mode, scope) {
     if (!currentSheet() || !tableReady) { return; }
-    var rows = mode === "reset" ? [] : table.getData("active");
+    var rows = mode === "reset" ? [] :
+      scope === "highlighted" ? highlightedRows() : table.getData("active");
     if (mode !== "reset" && !rows.length) {
-      showStatus("No visible rows to send to Revit.", true);
+      showStatus(scope === "highlighted"
+        ? "No highlighted rows in the active sheet to send to Revit."
+        : "No visible rows to send to Revit.", true);
       return;
     }
     setRevitButtons(true);
-    showStatus(mode === "reset" ? "Resetting the active view…" : "Sending " + rows.length + " row(s) to Revit…");
+    showStatus(mode === "reset" ? "Resetting the active view…" :
+      "Sending " + rows.length + " " + (scope === "highlighted" ? "highlighted" : "visible") +
+      " row(s) to Revit…");
     post({
       type: "revitView",
       mode: mode,
@@ -2409,6 +2451,9 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
   function openSheet(index, persistCurrent) {
     closeColumnMenu();
     blurGridInput();
+    if (tableReady) {
+      table.getRanges().forEach(function (range) { range.remove(); });
+    }
     if (tableReady && currentSheet() && persistCurrent !== false) {
       currentSheet().rows = table.getData();
       captureLayout();
@@ -2502,10 +2547,15 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
         tableReady = true;
         table.setFilter(masterFilter);
         openSheet(activeSheetIndex, false);
+        updateHighlightedRevitButtons();
       });
       table.on("dataFiltered", function () {
         if (!restoringFilters) { scheduleFilterBar(); }
+        updateHighlightedRevitButtons();
       });
+      table.on("rangeAdded", updateHighlightedRevitButtons);
+      table.on("rangeChanged", updateHighlightedRevitButtons);
+      table.on("rangeRemoved", updateHighlightedRevitButtons);
       table.on("columnResized", function (gridColumn) {
         var column = findColumn(gridColumn.getField());
         if (column && currentSheet()) {
@@ -2578,6 +2628,12 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
   });
   document.getElementById("isolateButton").addEventListener("click", function () {
     sendRevitView("isolate");
+  });
+  document.getElementById("selectHighlightedButton").addEventListener("click", function () {
+    sendRevitView("select", "highlighted");
+  });
+  document.getElementById("isolateHighlightedButton").addEventListener("click", function () {
+    sendRevitView("isolate", "highlighted");
   });
   document.getElementById("resetViewButton").addEventListener("click", function () {
     sendRevitView("reset");
