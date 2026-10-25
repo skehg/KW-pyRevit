@@ -2,7 +2,7 @@
 
 import System
 
-from Autodesk.Revit.DB import ElementType, StorageType
+from Autodesk.Revit.DB import ElementType, FamilyInstance, StorageType
 
 from core.element_refs import (
     CONDITIONAL_HINTS,
@@ -264,6 +264,10 @@ def extract_rows(doc, elements, parameter_mode, selected_parameters, catalog=Non
             "UniqueId": instance_unique_id,
             "Category": category_name,
             "IsTypeRow": False,
+            "IsNested": (
+                isinstance(element, FamilyInstance)
+                and element.SuperComponent is not None
+            ),
             "TypeElementId": type_id,
             "TypeName": instance_name,
             "TypeKey": str(type_id if type_id is not None else instance_id),

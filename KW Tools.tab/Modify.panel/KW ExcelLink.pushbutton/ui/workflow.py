@@ -29,11 +29,11 @@ from ui.wizard import ChoiceWizardWindow, ParameterWizardWindow
 SELECTION_MODES = (
     "Selected Elements",
     "Current View",
-    "Entire Project File",
     "Entire Model",
+    "Entire Project File",
 )
-IMPORT_MODE = "Import edited XLSX..."
-LOAD_PRESET = "Load preset..."
+IMPORT_MODE = "Import XLSX..."
+LOAD_PRESET = "Load Preset..."
 MANAGE_PRESETS = "Manage presets..."
 DEFAULT_PRESET_PREFIX = "Open default preset: "
 PARAMETER_MODES = (
@@ -99,12 +99,11 @@ def _run_preset(uidoc, doc, item, selection_mode=None):
 
 
 def _step_one_options():
-    options = []
+    options = list(SELECTION_MODES)
+    options.extend((IMPORT_MODE, LOAD_PRESET, MANAGE_PRESETS))
     default_item = find_preset(default_preset_name())
     if default_item is not None:
         options.append(DEFAULT_PRESET_PREFIX + preset_label(default_item))
-    options.extend(SELECTION_MODES)
-    options.extend((LOAD_PRESET, IMPORT_MODE, MANAGE_PRESETS))
     return options, default_item
 
 
@@ -229,6 +228,7 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
             choices, default_item = _step_one_options()
             dialog = ChoiceWizardWindow(
                 choices, "Step 1 of 5 - Selection Mode", [selection_mode], back=False,
+                separator_before=(IMPORT_MODE, LOAD_PRESET),
                 context_text="Entire Project File includes all project types. Entire Model "
                 "includes placed elements and only their used types. Scope and category "
                 "counts are shown before parameter selection."
@@ -383,6 +383,7 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
                     len(elements), parameter_mode
                 ),
                 field_options=optional_fields,
+                combined_categories=combined,
             )
             dialog.ShowDialog()
             if dialog.action == "cancel":

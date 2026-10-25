@@ -36,7 +36,7 @@ class ParameterListItem(object):
 
 class ChoiceWizardWindow(forms.WPFWindow):
     def __init__(self, options, title, selected=None, multiple=False, back=True,
-                 context_text=None, grid_layout=None):
+                 context_text=None, grid_layout=None, separator_before=None):
         forms.WPFWindow.__init__(
             self, os.path.join(os.path.dirname(__file__), "choice.xaml")
         )
@@ -48,6 +48,7 @@ class ChoiceWizardWindow(forms.WPFWindow):
         self.action = "cancel"
         self.selected = []
         self._options = list(options)
+        self._separator_before = set(separator_before or [])
         self._chosen = set(selected or [])
         self._multiple = multiple
         self._refreshing = False
@@ -86,9 +87,24 @@ class ChoiceWizardWindow(forms.WPFWindow):
         try:
             query = str(self.txtSearch.Text or "").strip().lower()
             self.lstChoices.Items.Clear()
+            pending_separator = False
             for option in self._options:
+                if option in self._separator_before:
+                    pending_separator = True
                 if query not in option.lower():
                     continue
+                if pending_separator and self.lstChoices.Items.Count:
+                    from System.Windows import HorizontalAlignment, Thickness
+                    from System.Windows.Controls import ListBoxItem, Separator
+                    divider = ListBoxItem()
+                    divider.Content = Separator()
+                    divider.IsEnabled = False
+                    divider.Focusable = False
+                    divider.HorizontalContentAlignment = HorizontalAlignment.Stretch
+                    divider.Padding = Thickness(0)
+                    divider.Margin = Thickness(4, 6, 4, 6)
+                    self.lstChoices.Items.Add(divider)
+                pending_separator = False
                 self.lstChoices.Items.Add(option)
                 if option in self._chosen:
                     if self._multiple:
@@ -117,7 +133,8 @@ class ChoiceWizardWindow(forms.WPFWindow):
 
 class ParameterWizardWindow(forms.WPFWindow):
     def __init__(self, category_label, usage_map, parameter_mode,
-                 selected=None, last=True, context_text=None, field_options=None):
+                 selected=None, last=True, context_text=None, field_options=None,
+                 combined_categories=False):
         from core.optional_fields import field_options as normalize_options, select_usage
         xaml_path = os.path.join(os.path.dirname(__file__), "wizard.xaml")
         forms.WPFWindow.__init__(self, xaml_path)
@@ -152,6 +169,10 @@ class ParameterWizardWindow(forms.WPFWindow):
             self.lblMode.Text += " | Instance-only parameters are hidden."
         self.cboAvailability.SelectionChanged += self.on_filter_changed
         if hasattr(self, "cboCoverage"):
+            from System.Windows import Visibility
+            self.cboCoverage.Visibility = (
+                Visibility.Visible if combined_categories else Visibility.Collapsed
+            )
             self.cboCoverage.SelectionChanged += self.on_filter_changed
         for control, key in (("chkCoordinates", "coordinates"),
                              ("chkUsefulFields", "usefulFields"),

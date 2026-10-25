@@ -104,8 +104,8 @@
                 <CheckBox x:Name="chkUsefulFields" Content="Offer useful API fields (read-only)"
                           Margin="0,0,16,0"
                           ToolTip="Resolved category/family, host ID, pinned state, rotation and facing/hand vectors. Select fields below."/>
-                <CheckBox x:Name="chkFalsePositives" Content="Filter known false positives"
-                          ToolTip="Uncheck to restore all raw parameters. Filters built-in Category and empty read-only built-in Family Name/Type Name copies; keeps blank editable parameters."/>
+                <CheckBox x:Name="chkFalsePositives" Content="Hide redundant or empty system parameters"
+                          ToolTip="Hides duplicate Category fields and empty, read-only Family Name and Type Name fields. Blank editable parameters remain available. Uncheck to show all parameters."/>
             </WrapPanel>
         </StackPanel>
         <TextBlock Grid.Row="1"
@@ -138,7 +138,7 @@
                     <ComboBoxItem Content="Mixed-use parameters"/>
                 </ComboBox>
                 <ComboBox x:Name="cboCoverage" DockPanel.Dock="Top" MinHeight="27"
-                          Margin="0,0,0,7" SelectedIndex="0"
+                          Margin="0,0,0,7" SelectedIndex="0" Visibility="Collapsed"
                           ToolTip="Category coverage does not guarantee availability on every element">
                     <ComboBoxItem Content="Available in any selected category"/>
                     <ComboBoxItem Content="Common to all selected categories"/>
@@ -233,6 +233,8 @@
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,14,0,0">
+            <Button Content="Cancel" Width="90" Height="31" Margin="0,0,8,0"
+                    Click="on_cancel"/>
             <Button Width="90" Height="31" Margin="0,0,8,0"
                     Click="on_back" AutomationProperties.Name="Back">
                 <StackPanel Orientation="Horizontal">
@@ -242,10 +244,25 @@
                     <TextBlock Text="Back" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button Content="Cancel" Width="90" Height="31" Margin="0,0,8,0"
-                    Click="on_cancel"/>
             <Button x:Name="btnContinue" Content="Open Grid" Width="110" Height="31"
-                    Click="on_continue"/>
+                    Click="on_continue"
+                    AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}">
+                <Button.ContentTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                            <Path Data="M8 0 L0 5 L8 10 Z" Width="8" Height="10"
+                                  Stretch="Fill" VerticalAlignment="Center" Margin="6,0,0,0"
+                                  RenderTransformOrigin="0.5,0.5"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                                <Path.RenderTransform>
+                                    <RotateTransform Angle="180"/>
+                                </Path.RenderTransform>
+                            </Path>
+                        </StackPanel>
+                    </DataTemplate>
+                </Button.ContentTemplate>
+            </Button>
         </StackPanel>
     </Grid>
 </Window>

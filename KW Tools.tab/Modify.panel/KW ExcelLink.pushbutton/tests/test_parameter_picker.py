@@ -50,6 +50,9 @@ class FakeWindow(object):
             SelectionChanged=Event(),
             SelectedItem=types.SimpleNamespace(Content="All parameters"),
         )
+        self.cboCoverage = types.SimpleNamespace(
+            SelectionChanged=Event(), SelectedIndex=0, Visibility="Collapsed",
+        )
 
     def Close(self):
         pass
@@ -74,11 +77,82 @@ class ParameterPickerTests(unittest.TestCase):
             "Mark": {"isType": True, "isInstance": True},
         }
 
-    def window(self, mode="Instances Mode", selected=None):
-        return self.module.ParameterWizardWindow("Doors", self.usage, mode, selected)
+    def window(self, mode="Instances Mode", selected=None, combined_categories=False):
+        windows = types.ModuleType("System.Windows")
+        windows.Visibility = types.SimpleNamespace(Visible="Visible", Collapsed="Collapsed")
+        with patch.dict(sys.modules, {"System.Windows": windows}):
+            return self.module.ParameterWizardWindow(
+                "Doors", self.usage, mode, selected,
+                combined_categories=combined_categories,
+            )
+
+    def test_category_coverage_is_visible_only_for_combined_grids(self):
+        self.assertEqual(self.window().cboCoverage.Visibility, "Collapsed")
+        combined = self.window(combined_categories=True)
+        self.assertEqual(combined.cboCoverage.Visibility, "Visible")
+        self.assertEqual(combined.cboCoverage.SelectedIndex, 0)
 
     def names(self, collection):
         return [str(item) for item in collection]
+
+    def choice_window(self, query=""):
+        window = self.module.ChoiceWizardWindow.__new__(self.module.ChoiceWizardWindow)
+        window._options = [
+            "Selected Elements", "Current View", "Entire Model",
+            "Entire Project File", "Import XLSX...", "Load Preset...",
+            "Manage presets...",
+        ]
+        window._separator_before = {"Import XLSX...", "Load Preset..."}
+        window._chosen = {"Current View"}
+        window._multiple = False
+        window.grid_layout = None
+        window.txtSearch = types.SimpleNamespace(Text=query)
+        window.lstChoices = types.SimpleNamespace(
+            Items=Collection(), SelectedItems=Collection(), SelectedItem=None,
+        )
+        windows = types.ModuleType("System.Windows")
+        windows.HorizontalAlignment = types.SimpleNamespace(Stretch="Stretch")
+        windows.Thickness = lambda *values: values
+        controls = types.ModuleType("System.Windows.Controls")
+        controls.ListBoxItem = types.SimpleNamespace
+        controls.Separator = types.SimpleNamespace
+        with patch.dict(sys.modules, {
+            "System.Windows": windows, "System.Windows.Controls": controls,
+        }):
+            window._refresh_choices()
+        return window
+
+    def test_choice_groups_have_disabled_full_width_separators(self):
+        window = self.choice_window()
+        items = window.lstChoices.Items
+        self.assertEqual([item for item in items if isinstance(item, str)], window._options)
+        self.assertEqual(len(items), 9)
+        for index in (4, 6):
+            self.assertFalse(items[index].IsEnabled)
+            self.assertFalse(items[index].Focusable)
+            self.assertEqual(items[index].HorizontalContentAlignment, "Stretch")
+        self.assertEqual(window.lstChoices.SelectedItem, "Current View")
+        window.lstChoices.SelectedItems.Add("Current View")
+        window._capture()
+        self.assertEqual(window.selected, ["Current View"])
+
+    def test_filtered_choice_groups_have_no_orphan_separators(self):
+        for query, expected in (
+            ("xlsx", ["Import XLSX..."]),
+            ("preset", ["Load Preset...", "Manage presets..."]),
+            ("missing", []),
+        ):
+            window = self.choice_window(query)
+            self.assertEqual(window.lstChoices.Items, expected)
+        window = self.choice_window("s")
+        items = window.lstChoices.Items
+        self.assertEqual(items[0], "Selected Elements")
+        self.assertFalse(items[1].IsEnabled)
+        self.assertEqual(items[2], "Import XLSX...")
+        self.assertFalse(items[3].IsEnabled)
+        self.assertEqual(items[4], "Load Preset...")
+        self.assertEqual(items[5], "Manage presets...")
+        self.assertEqual(len(items), 6)
 
     def test_badges_separate_names_from_availability(self):
         window = self.window()
@@ -248,6 +322,37 @@ class ParameterPickerTests(unittest.TestCase):
             self.assertEqual(node.get("ItemTemplate"), "{StaticResource ParameterRowTemplate}")
             self.assertEqual(node.get("ItemContainerStyle"), "{StaticResource ParameterRowStyle}")
             self.assertEqual(node.get("ScrollViewer.HorizontalScrollBarVisibility"), "Disabled")
+
+    def test_navigation_buttons_are_grouped_in_cancel_back_next_order(self):
+        wpf = "{http://schemas.microsoft.com/winfx/2006/xaml/presentation}"
+        for filename in ("choice.xaml", "wizard.xaml"):
+            root = ET.parse(os.path.join(ROOT, "ui", filename)).getroot()
+            footer = next(node for node in root.iter(wpf + "StackPanel")
+                          if any(child.get("Click") == "on_continue" for child in node))
+            self.assertEqual(footer.get("Orientation"), "Horizontal")
+            self.assertEqual(footer.get("HorizontalAlignment"), "Right")
+            self.assertEqual([child.get("Click") for child in footer],
+                             ["on_cancel", "on_back", "on_continue"])
+
+    def test_forward_buttons_rotate_back_arrow_and_keep_dynamic_labels(self):
+        wpf = "{http://schemas.microsoft.com/winfx/2006/xaml/presentation}"
+        for filename, label in (("choice.xaml", "Next"), ("wizard.xaml", "Open Grid")):
+            root = ET.parse(os.path.join(ROOT, "ui", filename)).getroot()
+            back = next(node for node in root.iter(wpf + "Button")
+                        if node.get("Click") == "on_back")
+            forward = next(node for node in root.iter(wpf + "Button")
+                           if node.get("Click") == "on_continue")
+            self.assertEqual(forward.get("Content"), label)
+            self.assertIn("Binding Content", forward.get("AutomationProperties.Name"))
+            template = forward.find(wpf + "Button.ContentTemplate")
+            self.assertIsNotNone(template)
+            arrow = next(template.iter(wpf + "Path"))
+            back_arrow = next(back.iter(wpf + "Path"))
+            for attribute in ("Data", "Width", "Height", "Stretch", "Fill"):
+                self.assertEqual(arrow.get(attribute), back_arrow.get(attribute))
+            self.assertEqual(arrow.get("RenderTransformOrigin"), "0.5,0.5")
+            self.assertEqual(next(arrow.iter(wpf + "RotateTransform")).get("Angle"), "180")
+            self.assertEqual(next(template.iter(wpf + "TextBlock")).get("Text"), "{Binding}")
 
 
 if __name__ == "__main__":

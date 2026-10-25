@@ -49557,6 +49557,11 @@
 
 	var SHOW_OPTIONS = [
 	  { value: "all", label: "All rows" },
+	  {
+	    value: "topLevelInstances",
+	    label: "Top-level instances",
+	    tooltip: "Hides instances nested inside another family"
+	  },
 	  { value: "pending", label: "Rows with pending changes" },
 	  { value: "notPending", label: "Rows without pending changes" },
 	  { value: "editable", label: "Rows with editable cells" },
@@ -49848,6 +49853,7 @@
 	    case "readOnly": if (context.isEditable(row)) { return false; } break;
 	    case "typeRows": if (!row.IsTypeRow) { return false; } break;
 	    case "instanceRows": if (row.IsTypeRow) { return false; } break;
+	    case "topLevelInstances": if (row.IsNested) { return false; } break;
 	  }
 	  var titles = Object.keys(state.values);
 	  for (var v = 0; v < titles.length; v += 1) {
@@ -51487,6 +51493,7 @@
 	    items.forEach(function (item) {
 	      var option = el("option", null, item.label);
 	      option.value = item.value;
+	      if (item.tooltip) { option.title = item.tooltip; }
 	      select.appendChild(option);
 	    });
 	  }
@@ -51947,8 +51954,18 @@
 	    var rows = sheet.rows || [];
 	    var mixed = rows.some(function (row) { return row.IsTypeRow; }) &&
 	      rows.some(function (row) { return !row.IsTypeRow; });
+	    var instancesMode = workbook && workbook.parameterMode === "Instances Mode";
+	    var state = filtersFor(sheet);
+	    if (!instancesMode && state.show === "topLevelInstances") {
+	      state.show = "all";
+	    }
 	    Array.prototype.forEach.call(showSelect.options, function (option) {
-	      option.hidden = !mixed && (option.value === "typeRows" || option.value === "instanceRows");
+	      if (option.value === "topLevelInstances") {
+	        option.hidden = !instancesMode;
+	      } else {
+	        option.hidden = !mixed &&
+	          (option.value === "typeRows" || option.value === "instanceRows");
+	      }
 	    });
 	  }
 

@@ -25,6 +25,11 @@ export var OPERATORS = [
 
 export var SHOW_OPTIONS = [
   { value: "all", label: "All rows" },
+  {
+    value: "topLevelInstances",
+    label: "Top-level instances",
+    tooltip: "Hides instances nested inside another family"
+  },
   { value: "pending", label: "Rows with pending changes" },
   { value: "notPending", label: "Rows without pending changes" },
   { value: "editable", label: "Rows with editable cells" },
@@ -316,6 +321,7 @@ export function rowPasses(row, state, context, options) {
     case "readOnly": if (context.isEditable(row)) { return false; } break;
     case "typeRows": if (!row.IsTypeRow) { return false; } break;
     case "instanceRows": if (row.IsTypeRow) { return false; } break;
+    case "topLevelInstances": if (row.IsNested) { return false; } break;
     default: break;
   }
   var titles = Object.keys(state.values);

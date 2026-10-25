@@ -118,9 +118,29 @@ class WizardNavigationTests(unittest.TestCase):
 
     def test_selection_mode_options_distinguish_project_and_used_model(self):
         options, _ = self.flow._step_one_options()
-        self.assertIn("Entire Project File", options)
-        self.assertNotIn("Entire Project", options)
-        self.assertIn("Entire Model", options)
+        self.assertEqual(options, [
+            "Selected Elements", "Current View", "Entire Model",
+            "Entire Project File", "Import XLSX...", "Load Preset...",
+            "Manage presets...",
+        ])
+
+    def test_default_preset_stays_in_preset_group(self):
+        item = {"name": "Doors"}
+        self.flow.find_preset.return_value = item
+        self.flow.preset_label.return_value = "Doors"
+        options, default_item = self.flow._step_one_options()
+        self.assertIs(default_item, item)
+        self.assertEqual(options[-3:], [
+            "Load Preset...", "Manage presets...", "Open default preset: Doors",
+        ])
+
+    def test_step_one_passes_group_boundaries(self):
+        self.actions = [(1, "cancel", [])]
+        self.assertIsNone(self.flow.run_wizard(None, None))
+        self.assertEqual(
+            self.flow.ChoiceWizardWindow.call_args.kwargs["separator_before"],
+            ("Import XLSX...", "Load Preset..."),
+        )
 
     def launch_with_selection(self, category_ids):
         selected = [types.SimpleNamespace(Id=key) for key in category_ids]
@@ -195,6 +215,9 @@ class WizardNavigationTests(unittest.TestCase):
             types.SimpleNamespace(), None, self.workbook(), self.source, 1))
         self.flow.resolve_source_elements.assert_not_called()
         self.assertEqual(self.visits[0], ("Walls [2]", ["Width"], True))
+        self.assertFalse(
+            self.flow.ParameterWizardWindow.call_args.kwargs["combined_categories"]
+        )
 
     def test_combined_layout_uses_one_shared_parameter_picker_and_sheet(self):
         self.actions = [
@@ -210,6 +233,9 @@ class WizardNavigationTests(unittest.TestCase):
         self.assertEqual(workbook["sheets"][0]["parameters"], ["Mark", "Level"])
         self.assertEqual(len(workbook["sheets"][0]["categories"]), 2)
         self.assertIn(("Combined categories", [], True), self.visits)
+        self.assertTrue(
+            self.flow.ParameterWizardWindow.call_args.kwargs["combined_categories"]
+        )
 
     def test_grid_resume_starts_at_active_category_and_preserves_layout(self):
         previous = self.workbook()
@@ -229,7 +255,7 @@ class WizardNavigationTests(unittest.TestCase):
 
     def test_cancel_file_picker_returns_to_selection_mode(self):
         self.flow.pick_xlsx.return_value = None
-        self.actions = [(1, "next", ["Import edited XLSX..."]), (1, "cancel", [])]
+        self.actions = [(1, "next", ["Import XLSX..."]), (1, "cancel", [])]
         self.assertIsNone(self.flow.run_wizard(None, None))
         self.assertEqual([step for step, values in self.visits], [1, 1])
 

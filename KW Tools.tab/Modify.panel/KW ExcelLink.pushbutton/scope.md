@@ -33,6 +33,11 @@ separate mode, Back in Step 4 revisits the previous category; Back from the
 first category, or from the combined picker, returns to Step 3. Step 1 has
 Cancel (there is no preceding step).
 
+Wizard forward buttons (Next, Next category and Open Grid) show the Back arrow
+rotated 180 degrees, positioned after the label.
+Navigation buttons are grouped at the bottom right in Cancel, Back, Next order
+(with Open Grid replacing Next on the final step). Step 1 hides Back.
+
 The grid's **Back** button returns to Step 4 for the active sheet, with its
 current fields preselected. Finish the wizard to rebuild the workbook from
 current Revit values with the revised fields. Existing column widths, sorting,
@@ -50,14 +55,19 @@ User chooses:
 
 - Selected Elements
 - Current View
+- Entire Model
 - Entire Project File (all non-type elements and all element types, including unused
   types)
-- Entire Model
-- Entire Model includes non-type elements found in the project and only their
-  referenced element types. Unused types are excluded, so categories represented
-  only by unused types (such as unused tag types or ducts with no instances) do
-  not appear in the category picker.
-- Import edited XLSX... (see "Importing edited XLSX"; skips Steps 2–4)
+
+A horizontal rule separates the scope choices from **Import XLSX...** (see
+"Importing edited XLSX"; skips Steps 2–4). A second rule separates import from
+**Load Preset...** and **Manage presets...**. When configured, **Open default
+preset: <name>** appears at the end of the preset group. Rules cannot be selected.
+
+Entire Model includes non-type elements found in the project and only their
+referenced element types. Unused types are excluded, so categories represented
+only by unused types (such as unused tag types or ducts with no instances) do
+not appear in the category picker.
 
 When **Current View** is a schedule, Step 4 preselects its supported parameter
 fields in displayed schedule order. Hidden fields needed by schedule filters
@@ -99,6 +109,10 @@ User chooses:
 - Instances Mode
 
 ### Step 4 — Parameter Selection
+
+The category coverage dropdown is visible only for **Combined grid** selected
+in Step 2, including when returning from the grid. Separate category sheets
+hide this dropdown.
 
 For each selected category, or once across all selected categories for a
 combined grid:
@@ -167,7 +181,7 @@ Step 4 has three controls:
   and facing/hand unit-vector components. These supplement ordinary parameters;
   existing Level, dimensions, quantities, phases and IFC parameters stay in the
   normal parameter list.
-- **Filter known false positives** is on for new wizard sessions. Uncheck it
+- **Hide redundant or empty system parameters** is on for new wizard sessions. Uncheck it
   to restore raw parameter availability. Filtering targets exact built-in
   Category identities and empty, read-only built-in Family Name/Type Name
   records per scope. It never hides arbitrary blank editable or custom
@@ -416,7 +430,7 @@ Copilot must generate code that:
 
 ### Importing edited XLSX
 
-- Step 1 option **Import edited XLSX...** opens a file picker for a workbook
+- Step 1 option **Import XLSX...** opens a file picker for a workbook
   previously written by Export XLSX (the `_ExcelLink` sheet is required).
 - The parameter mode, categories, parameter order and elements are read from
   the file (`core/xlsx_import.read_import_plan`); elements are found by
@@ -450,7 +464,7 @@ Copilot must generate code that:
   personal preset hides a shared one of the same name. Saving asks which
   folder to use when a shared folder is set.
 - Step 1 lists **Open default preset: <name>** (when a default is set),
-  **Load preset...** and **Manage presets...** (set/clear default, delete,
+  **Load Preset...** and **Manage presets...** (set/clear default, delete,
   set/clear shared folder, open folder). Loading either a named or default
   preset first asks for a fresh selection mode, then skips Steps 2–4 and
   opens the grid (`workbook_builder.build_preset_workbook`). Its saved
@@ -644,6 +658,8 @@ the UI). The sheet list marks filtered sheets with "(filtered)".
 - **Search** box (Ctrl+F) matches any visible column.
 - **Show**: all rows, rows with/without pending changes, rows with editable
   cells, read-only rows, and type/instance rows when a sheet mixes both.
+  **Top-level instances** is available in Instances Mode; it hides instances
+  nested inside another family.
 - **Advanced filter...**: AND/OR rules with one level of nested groups.
 - A summary bar shows "Showing X of Y rows", the pending changes hidden by
   filters, and removable chips for every active filter; **Clear all**.

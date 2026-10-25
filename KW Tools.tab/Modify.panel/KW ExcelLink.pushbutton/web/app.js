@@ -1227,6 +1227,7 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
     items.forEach(function (item) {
       var option = el("option", null, item.label);
       option.value = item.value;
+      if (item.tooltip) { option.title = item.tooltip; }
       select.appendChild(option);
     });
   }
@@ -1687,8 +1688,18 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
     var rows = sheet.rows || [];
     var mixed = rows.some(function (row) { return row.IsTypeRow; }) &&
       rows.some(function (row) { return !row.IsTypeRow; });
+    var instancesMode = workbook && workbook.parameterMode === "Instances Mode";
+    var state = filtersFor(sheet);
+    if (!instancesMode && state.show === "topLevelInstances") {
+      state.show = "all";
+    }
     Array.prototype.forEach.call(showSelect.options, function (option) {
-      option.hidden = !mixed && (option.value === "typeRows" || option.value === "instanceRows");
+      if (option.value === "topLevelInstances") {
+        option.hidden = !instancesMode;
+      } else {
+        option.hidden = !mixed &&
+          (option.value === "typeRows" || option.value === "instanceRows");
+      }
     });
   }
 
