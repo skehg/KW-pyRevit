@@ -683,6 +683,23 @@ right-hand end of each column's filter input.
 Filters are per sheet (`web/filters.js` holds the matching logic; `app.js`
 the UI). The sheet list marks filtered sheets with "(filtered)".
 
+- The filter **Clear all** button and row count sit to the left of the sorting
+  controls in the grid's filter bar.
+- **Sort...** beside the filtering controls, or **Custom sort...** in a column
+  menu, opens an ordered list of **Sort by / Then by** levels. Each level shows
+  the grid letter and column name, Ascending/Descending, move up/down and
+  remove controls. **Add level** adds a column not already used. **Clear all**
+  clears the draft; **Apply** commits it, while **Cancel** leaves sorting
+  unchanged. The first level is primary; later levels break ties.
+- Active sorting shows numbered priorities beside header sort arrows and a
+  summary with **Edit** and **Clear all sorting**. Clicking a header sort icon
+  or choosing **Sort A-Z / Sort Z-A** replaces the whole sort with that column;
+  use the dialog to build a multi-column sort.
+- Sort priorities and directions are per sheet, saved with presets, and
+  restored in the same primary-first order when a preset is loaded. Layout
+  `sort` arrays use this order directly; there is no migration of legacy
+  sort-priority conventions. Sorting changes only displayed row order, not
+  row numbers, formula references, pending values or Revit elements.
 - **Header filter row** under every column. Syntax: text = contains, `=x`
   equals, `=` empty, `!=` not empty, `!x` excludes, `>5 >=5 <5 <=5`,
   `2..8` between, `^start`, `end$`, `* ?` wildcards, `/regex/`, `a|b`

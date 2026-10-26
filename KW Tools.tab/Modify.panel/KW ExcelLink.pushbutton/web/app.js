@@ -418,22 +418,27 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
     filtersFor(sheet).headers = headers;
   }
 
-  function captureLayout() {
-    var sheet = currentSheet();
+  function captureSort(sheet) {
     if (!tableReady || !sheet || !sheet.columns) { return; }
     layoutFor(sheet).sort = table.getSorters().map(function (sorter) {
       var column = columnForField(sorter.field);
       return column ? { title: column.title, dir: sorter.dir } : null;
     }).filter(Boolean);
+  }
+
+  function captureLayout() {
+    var sheet = currentSheet();
+    if (!tableReady || !sheet || !sheet.columns) { return; }
+    captureSort(sheet);
     syncHeaderFilters();
   }
 
   function applySort(sheet) {
-    var sorters = layoutFor(sheet).sort.map(function (item) {
+    var sorters = sortedLevels(sheet).map(function (item) {
       var column = columnByTitle(sheet, item.title);
       return column ? { column: column.field, dir: item.dir } : null;
     }).filter(Boolean);
-    if (sorters.length) { table.setSort(sorters); }
+    table.setSort(sorters);
   }
 
   function letterToIndex(letters) {
@@ -1144,6 +1149,183 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
     };
   }
 
+  function sortedLevels(sheet) {
+    if (!sheet) { return []; }
+    var seen = new Set();
+    return layoutFor(sheet).sort.filter(function (item) {
+      if (!columnByTitle(sheet, item.title) || seen.has(item.title) ||
+          (item.dir !== "asc" && item.dir !== "desc")) { return false; }
+      seen.add(item.title);
+      return true;
+    });
+  }
+
+  function sortColumnLabel(sheet, column) {
+    return column === ROW_NUMBER_COLUMN ? "# — Row number" :
+      indexToLetters(visibleColumns(sheet).indexOf(column)) + " — " + displayTitle(column);
+  }
+
+  function updateSortIndicators(levels) {
+    if (!tableReady || !currentSheet()) { return; }
+    var priorityByTitle = new Map();
+    levels.forEach(function (item, index) { priorityByTitle.set(item.title, index + 1); });
+    [ROW_NUMBER_COLUMN].concat(visibleColumns(currentSheet())).forEach(function (column) {
+      var component = table.getColumn(column.field);
+      var element = component && component.getElement();
+      var sorter = element && (element.querySelector(".tabulator-col-sorter") ||
+        element.querySelector(".col-title"));
+      if (!sorter) { return; }
+      var indicator = sorter.querySelector(".sort-priority");
+      var priority = priorityByTitle.get(column.title);
+      element.classList.toggle("has-sort-priority", !!priority);
+      if (!priority) {
+        if (indicator) { indicator.remove(); }
+        return;
+      }
+      if (!indicator) {
+        indicator = el("span", "sort-priority");
+        sorter.appendChild(indicator);
+      }
+      indicator.textContent = String(priority);
+      indicator.title = "Sort priority " + priority;
+      indicator.setAttribute("aria-label", indicator.title);
+    });
+  }
+
+  function updateSortSummary() {
+    var sheet = currentSheet();
+    var levels = sortedLevels(sheet);
+    sortButton.disabled = !tableReady || !sheet;
+    sortButton.hidden = !!levels.length;
+    sortSummary.hidden = !levels.length;
+    sortSummaryText.textContent = levels.length ? "Sort: " + levels.map(function (item) {
+      return sortColumnLabel(sheet, columnByTitle(sheet, item.title)) +
+        (item.dir === "asc" ? " ↑" : " ↓");
+    }).join(" → ") : "";
+    updateSortIndicators(levels);
+  }
+
+  function onDataSorted() {
+    if (!tableReady || restoringFilters || !currentSheet()) { return; }
+    captureSort(currentSheet());
+    updateSortSummary();
+  }
+
+  function openSortDialog() {
+    var sheet = currentSheet();
+    if (!sheet || !tableReady) { return; }
+    blurGridInput();
+    captureSort(sheet);
+    var columns = visibleColumns(sheet).concat([ROW_NUMBER_COLUMN]);
+    var levels = sortedLevels(sheet).map(function (item) {
+      return { title: item.title, dir: item.dir };
+    });
+    if (!levels.length) { levels.push({ title: columns[0].title, dir: "asc" }); }
+    var content = el("div", "sort-dialog");
+    var levelList = el("div", "sort-level-list");
+    var addLevel = makeButton("Add level", function () {
+      var used = new Set(levels.map(function (item) { return item.title; }));
+      var available = columns.find(function (column) { return !used.has(column.title); });
+      if (!available) { return; }
+      levels.push({ title: available.title, dir: "asc" });
+      renderLevels(levels.length - 1);
+    });
+    var clearLevels = makeButton("Clear all", function () {
+      levels = [];
+      renderLevels();
+      addLevel.focus();
+    });
+
+    function renderLevels(focusIndex) {
+      levelList.replaceChildren();
+      var used = new Set(levels.map(function (item) { return item.title; }));
+      var columnSelects = [];
+      levels.forEach(function (level, index) {
+        var row = el("div", "sort-level");
+        row.appendChild(el("span", "sort-level-label",
+          (index + 1) + (index === 0 ? " Sort by" : " Then by")));
+        var columnSelect = el("select", "sort-column-select");
+        columnSelect.setAttribute("aria-label", "Sort level " + (index + 1) + " column");
+        columns.forEach(function (column) {
+          if (column.title !== level.title && used.has(column.title)) { return; }
+          var option = el("option", null, sortColumnLabel(sheet, column));
+          option.value = column.title;
+          columnSelect.appendChild(option);
+        });
+        columnSelect.value = level.title;
+        columnSelect.addEventListener("change", function () {
+          level.title = columnSelect.value;
+          renderLevels(index);
+        });
+        columnSelects.push(columnSelect);
+        row.appendChild(columnSelect);
+
+        var directionSelect = el("select", "sort-direction-select");
+        directionSelect.setAttribute("aria-label", "Sort level " + (index + 1) + " direction");
+        fillOptions(directionSelect, [
+          { value: "asc", label: "Ascending" },
+          { value: "desc", label: "Descending" }
+        ]);
+        directionSelect.value = level.dir;
+        directionSelect.addEventListener("change", function () { level.dir = directionSelect.value; });
+        row.appendChild(directionSelect);
+
+        var actions = el("div", "sort-level-actions");
+        var moveUp = makeButton("↑", function () {
+          if (index === 0) { return; }
+          levels.splice(index - 1, 0, levels.splice(index, 1)[0]);
+          renderLevels(index - 1);
+        });
+        moveUp.title = "Move sort level up";
+        moveUp.setAttribute("aria-label", "Move sort level " + (index + 1) + " up");
+        moveUp.disabled = index === 0;
+        actions.appendChild(moveUp);
+        var moveDown = makeButton("↓", function () {
+          if (index >= levels.length - 1) { return; }
+          levels.splice(index + 1, 0, levels.splice(index, 1)[0]);
+          renderLevels(index + 1);
+        });
+        moveDown.title = "Move sort level down";
+        moveDown.setAttribute("aria-label", "Move sort level " + (index + 1) + " down");
+        moveDown.disabled = index >= levels.length - 1;
+        actions.appendChild(moveDown);
+        var remove = makeButton("×", function () {
+          levels.splice(index, 1);
+          renderLevels(Math.min(index, levels.length - 1));
+        });
+        remove.title = "Remove sort level";
+        remove.setAttribute("aria-label", "Remove sort level " + (index + 1));
+        actions.appendChild(remove);
+        row.appendChild(actions);
+        levelList.appendChild(row);
+      });
+      addLevel.disabled = levels.length >= columns.length;
+      clearLevels.disabled = !levels.length;
+      if (focusIndex != null && columnSelects[focusIndex]) { columnSelects[focusIndex].focus(); }
+    }
+
+    content.appendChild(levelList);
+    var controls = el("div", "sort-level-actions");
+    controls.appendChild(addLevel);
+    controls.appendChild(clearLevels);
+    content.appendChild(controls);
+    content.appendChild(el("div", "sort-hint",
+      "Sort priority runs from top to bottom. A column can appear only once. Sort order is saved with presets."));
+    renderLevels();
+    showModal("Sort", content, [
+      { label: "Apply", value: "apply", primary: true },
+      { label: "Cancel", value: null }
+    ]).then(function (choice) {
+      if (choice !== "apply") { return; }
+      if (currentSheet() !== sheet) {
+        showStatus("The active sheet changed. Reopen Sort to change its sorting.", true);
+        return;
+      }
+      layoutFor(sheet).sort = levels;
+      applySort(sheet);
+    });
+  }
+
   function makeColumns(sheet) {
     var widths = layoutFor(sheet).widths;
     var letterIndex = 0;
@@ -1511,6 +1693,11 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
   var filterChips = document.getElementById("filterChips");
   var filterCount = document.getElementById("filterCount");
   var clearFiltersButton = document.getElementById("clearFiltersButton");
+  var sortButton = document.getElementById("sortButton");
+  var sortSummary = document.getElementById("sortSummary");
+  var sortSummaryText = document.getElementById("sortSummaryText");
+  var sortEditButton = document.getElementById("sortEditButton");
+  var sortClearButton = document.getElementById("sortClearButton");
   var applyButton = document.getElementById("applyButton");
   var revitButtons = ["selectButton", "isolateButton", "resetViewButton"].map(function (id) {
     return document.getElementById(id);
@@ -1809,11 +1996,15 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
       table.setSort(field, "desc");
       closeColumnMenu();
     }));
-    sortRow.appendChild(makeButton("Clear sort", function () {
+    sortRow.appendChild(makeButton("Clear all sorting", function () {
       table.clearSort();
       closeColumnMenu();
     }));
     menu.appendChild(sortRow);
+    menu.appendChild(makeButton("Custom sort…", function () {
+      closeColumnMenu();
+      openSortDialog();
+    }));
 
     menu.appendChild(el("div", "col-menu-heading", "Condition"));
     var expression = state.headers[column.title] || "";
@@ -2486,6 +2677,7 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
       restoringFilters = false;
       if (currentSheet() === sheet) {
         applySort(sheet);
+        updateSortSummary();
         table.refreshFilter();
         updateFilterBar();
         configureFormulaBar();
@@ -2539,12 +2731,16 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
         selectableRangeFill: false,
         editTriggerEvent: "dblclick",
         headerSortClickElement: "icon",
+        columnHeaderSortMulti: false,
+        // Layouts and presets store sort levels in primary-first order.
+        sortOrderReverse: true,
         headerFilterLiveFilterDelay: 400,
         placeholder: "No rows match. Check the filters above."
       });
       // Tabulator builds asynchronously; setColumns/replaceData are ignored until then.
       table.on("tableBuilt", function () {
         tableReady = true;
+        restoringFilters = true;
         table.setFilter(masterFilter);
         openSheet(activeSheetIndex, false);
         updateHighlightedRevitButtons();
@@ -2553,6 +2749,7 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
         if (!restoringFilters) { scheduleFilterBar(); }
         updateHighlightedRevitButtons();
       });
+      table.on("dataSorted", onDataSorted);
       table.on("rangeAdded", updateHighlightedRevitButtons);
       table.on("rangeChanged", updateHighlightedRevitButtons);
       table.on("rangeRemoved", updateHighlightedRevitButtons);
@@ -2622,6 +2819,11 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
   });
   clearFiltersButton.addEventListener("click", clearAllFilters);
   document.getElementById("advancedButton").addEventListener("click", openAdvancedFilter);
+  sortButton.addEventListener("click", openSortDialog);
+  sortEditButton.addEventListener("click", openSortDialog);
+  sortClearButton.addEventListener("click", function () {
+    if (tableReady) { table.clearSort(); }
+  });
   document.getElementById("bulkButton").addEventListener("click", openBulkFill);
   document.getElementById("selectButton").addEventListener("click", function () {
     sendRevitView("select");

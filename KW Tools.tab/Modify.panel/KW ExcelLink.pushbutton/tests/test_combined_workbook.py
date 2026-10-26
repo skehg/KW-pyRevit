@@ -188,7 +188,13 @@ class CombinedWorkbookTests(unittest.TestCase):
                     {"categoryId": 20, "categoryKey": "OST_Walls", "name": "Walls"},
                 ],
                 "parameters": ["param-key"],
-                "layout": {"widths": {"Mark": 180}},
+                "layout": {
+                    "widths": {"Mark": 180},
+                    "sort": [
+                        {"title": "Mark", "dir": "desc"},
+                        {"title": "Category", "dir": "asc"},
+                    ],
+                },
             }],
         }
         with patch.dict(sys.modules, {"core.presets": presets}):

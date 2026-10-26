@@ -11,7 +11,9 @@ export var OPERATORS = [
   { op: "equals", label: "equals" },
   { op: "notEquals", label: "does not equal" },
   { op: "startsWith", label: "starts with" },
+  { op: "notStartsWith", label: "does not start with" },
   { op: "endsWith", label: "ends with" },
+  { op: "notEndsWith", label: "does not end with" },
   { op: "gt", label: ">" },
   { op: "gte", label: "≥" },
   { op: "lt", label: "<" },
@@ -170,8 +172,10 @@ export function testValue(op, cell, operand, operand2) {
     case "equals": return equalValues(cell, operand);
     case "notEquals": return !equalValues(cell, operand);
     case "startsWith": return text(cell).indexOf(operand.toLowerCase()) === 0;
+    case "notStartsWith": return !testValue("startsWith", cell, operand);
     case "endsWith":
       return text(cell).slice(-operand.length) === operand.toLowerCase();
+    case "notEndsWith": return !testValue("endsWith", cell, operand);
     case "gt": return operand === "" || (!isBlank(cell) && compare(cell, operand) > 0);
     case "gte": return operand === "" || (!isBlank(cell) && compare(cell, operand) >= 0);
     case "lt": return operand === "" || (!isBlank(cell) && compare(cell, operand) < 0);

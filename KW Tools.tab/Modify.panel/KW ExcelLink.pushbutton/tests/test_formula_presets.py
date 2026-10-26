@@ -100,9 +100,15 @@ class FormulaPresetTests(unittest.TestCase):
         parameters = ["Door Number", "Width", "Level"]
         filters = {"advanced": {"join": "and", "rules": [
             {"title": "Door Number (Instance)", "op": "startsWith", "value": "D", "value2": ""},
+            {"title": "Door Number (Instance)", "op": "notStartsWith", "value": "X", "value2": ""},
+            {"title": "Door Number (Instance)", "op": "notEndsWith", "value": "ZZ", "value2": ""},
             {"title": "Level (Instance)", "op": "equals", "value": "Level 01", "value2": ""},
         ]}, "show": "topLevelInstances"}
-        sort = [{"title": "Door Number (Instance)", "dir": "asc"}]
+        sort = [
+            {"title": "Level (Instance)", "dir": "asc"},
+            {"title": "Door Number (Instance)", "dir": "desc"},
+            {"title": "Width (Instance)", "dir": "asc"},
+        ]
         workbook = {
             "parameterMode": "Instances Mode",
             "sheets": [{
@@ -123,6 +129,31 @@ class FormulaPresetTests(unittest.TestCase):
         self.assertEqual(sheet["layout"]["filters"]["show"], "topLevelInstances")
         self.assertEqual(sheet["layout"]["filters"]["advanced"], filters["advanced"])
         self.assertEqual(sheet["layout"]["sort"], sort)
+
+    def test_each_sheet_keeps_its_own_sort_order_and_cleared_sort(self):
+        workbook = {
+            "parameterMode": "Instances Mode",
+            "sheets": [
+                {"categoryKey": key, "name": key, "parameters": ["Mark", "Level"]}
+                for key in ("Doors", "Walls", "Floors")
+            ],
+        }
+        sort_orders = [
+            [{"title": "Mark", "dir": "desc"}, {"title": "Level", "dir": "asc"}],
+            [{"title": "Level", "dir": "desc"}, {"title": "Mark", "dir": "asc"}],
+            [],
+        ]
+        data = presets.preset_from_workbook(
+            workbook, [{"sort": order} for order in sort_orders], "Sorts", "Current View"
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "sorts.json")
+            presets._write_json(path, data)
+            loaded = presets.load_preset(path)
+        self.assertEqual(
+            [sheet["layout"]["sort"] for sheet in loaded["sheets"]],
+            sort_orders,
+        )
 
 
 if __name__ == "__main__":

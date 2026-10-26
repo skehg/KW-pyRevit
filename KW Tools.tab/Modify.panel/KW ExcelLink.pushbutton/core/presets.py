@@ -2,8 +2,9 @@
 """Named grid presets in writable User and read-only Enterprise libraries.
 
 A preset records the wizard choices (selection mode, parameter mode,
-categories and ordered parameters) plus column layout, filters and formula
-templates. It contains no element data, so it can be reused in any project.
+categories and ordered parameters) plus column layout, primary-first sort
+levels, filters and formula templates. It contains no element data, so it can
+be reused in any project.
 """
 
 import io
@@ -388,8 +389,9 @@ _SHOW_OPTIONS = (
     "readOnly", "typeRows", "instanceRows",
 )
 _FILTER_OPERATORS = (
-    "contains", "notContains", "equals", "notEquals", "startsWith", "endsWith",
-    "gt", "gte", "lt", "lte", "between", "empty", "notEmpty", "wildcard", "regex",
+    "contains", "notContains", "equals", "notEquals", "startsWith", "notStartsWith",
+    "endsWith", "notEndsWith", "gt", "gte", "lt", "lte", "between", "empty",
+    "notEmpty", "wildcard", "regex",
 )
 
 

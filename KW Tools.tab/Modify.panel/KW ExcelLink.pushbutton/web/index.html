@@ -57,6 +57,12 @@
     <button id="advancedButton" title="Build AND/OR rules across columns">Advanced filter…</button>
     <button id="clearFiltersButton" title="Clear every filter on this sheet" disabled>Clear all</button>
     <span id="filterCount" aria-live="polite"></span>
+    <button id="sortButton" title="Sort rows by one or more columns" disabled>Sort…</button>
+    <span id="sortSummary" class="sort-summary" hidden aria-live="polite">
+      <span id="sortSummaryText"></span>
+      <button id="sortEditButton">Edit</button>
+      <button id="sortClearButton">Clear all sorting</button>
+    </span>
   </section>
   <div id="filterChips" class="chips" aria-label="Active filters"></div>
   <section id="formulaPanel" class="formula-bar" aria-label="Column formulas" hidden>
