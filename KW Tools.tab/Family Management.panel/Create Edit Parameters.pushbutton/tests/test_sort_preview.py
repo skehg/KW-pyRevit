@@ -351,11 +351,36 @@ class GridReorderTests(unittest.TestCase):
         named = {e.get(name_key): e for e in root.iter() if e.get(name_key)}
         parent = {child: node for node in root.iter() for child in node}
         grid_container = parent[named["lstParameters"]]
+        reorder_bar = parent[named["btnReorderTop"]]
+        self.assertEqual(named["btnReorderUp"].get("Content"), "\u25b2")
+        self.assertEqual(named["btnReorderDown"].get("Content"), "\u25bc")
+        for name, geometry in (
+                ("btnReorderTop", "M 0,0 H 12 V 2 H 0 Z M 6,4 L 12,12 H 0 Z"),
+                ("btnReorderBottom", "M 0,10 H 12 V 12 H 0 Z M 0,0 H 12 L 6,8 Z")):
+            self.assertEqual(named[name].get("Padding"), "0")
+            self.assertEqual(named[name].get("HorizontalContentAlignment"), "Center")
+            self.assertEqual(named[name].get("VerticalContentAlignment"), "Center")
+            icon = named[name].find("{http://schemas.microsoft.com/winfx/2006/xaml/presentation}Path")
+            self.assertIsNotNone(icon)
+            self.assertEqual(icon.get("Width"), "12")
+            self.assertEqual(icon.get("Height"), "12")
+            self.assertEqual(icon.get("Data"), geometry)
+            self.assertEqual(icon.get("Fill"),
+                             "{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}")
         for name in ("btnReorderTop", "btnReorderUp", "btnReorderDown", "btnReorderBottom"):
             button = named[name]
             self.assertIs(parent[parent[button]], grid_container)
             self.assertEqual(parent[button].get("Grid.Row"), "2")
             self.assertEqual(button.get("ToolTipService.ShowOnDisabled"), "True")
+            self.assertEqual(button.get("Width"), "28")
+            self.assertEqual(button.get("Height"), "24")
+        for name, handler in (("btnApplySorting", "on_apply_sorting"),
+                              ("btnResetSorting", "on_reset_sorting")):
+            button = named[name]
+            self.assertIs(parent[button], reorder_bar)
+            self.assertEqual(button.get("Click"), handler)
+            self.assertEqual(button.get("Height"), "24")
+            self.assertEqual(button.get("IsEnabled"), "False")
         self.assertEqual(named["txtStatus"].get("Grid.Row"), "2")
         self.assertFalse(any(e.get("Header") == "Reorder Parameters" for e in root.iter()))
         obsolete = {"_reorder_items", "lstReorderParams", "cmbReorderGroup",

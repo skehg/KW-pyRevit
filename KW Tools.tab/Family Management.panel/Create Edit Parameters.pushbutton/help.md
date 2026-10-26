@@ -43,14 +43,14 @@ other active tabs stay open.
 - Type then Instance options keep type parameters first, sorting names within each scope in the chosen direction.
 - Sorting applies to the entire group, including parameters hidden by search or filtering. Other groups keep their order.
 - Right-click sorting is a grid-only preview; it does not change Revit yet. Left-click still collapses or expands the group.
-- **Apply Sorting** at the bottom saves all pending sorting and manual reordering in one Undo-able transaction.
+- **Apply Sorting** beside the reorder arrows beneath the grid saves all pending sorting and manual reordering in one Undo-able transaction.
 - **Reset Sorting** discards all pending sorting and manual reordering and returns to the current saved Revit order. It does not undo ordering that has already been applied.
 - Closing with pending sorting prompts to apply, discard, or cancel closing.
 - Other edits still save immediately. Pending sort choices are reapplied to the current parameters after those edits; deleted or unchanged groups no longer need applying.
 
 ## Reorder Parameters
 
-- Select rows in the grid and use **Top**, **Up**, **Down**, or **Bottom** beneath the grid.
+- Select rows in the grid and use the compact arrow buttons beneath it: up with a bar above for **Top**, up for **Up**, down for **Down**, and down with a bar below for **Bottom**. Hover over an arrow for its action.
 - Multiple selections move within each group independently; parameters never move between groups. Up/Down moves each selected block one position, preserving selection order.
 - Reordering is a preview, saved or discarded with the same **Apply Sorting** and **Reset Sorting** buttons.
 - Preview moves update an observable collection in place, keeping the grid view and loaded rows without a full view reset, parameter-value reload, or editor rebuild for each selected row.
