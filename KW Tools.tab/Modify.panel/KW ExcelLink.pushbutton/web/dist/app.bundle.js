@@ -50304,6 +50304,8 @@
 	  // Pending changes held back because their rows were filtered out at Apply time.
 	  var carryOver = [];
 	  var columnMenu = null;
+	  var columnMenuResizeHandler = null;
+	  var columnMenuObserver = null;
 	  var ROW_NUMBER_COLUMN = {
 	    title: ROW_NUMBER_TITLE,
 	    field: ROW_NUMBER_FIELD,
@@ -51111,13 +51113,13 @@
 	    }));
 	  }
 
-	  function stagePlannedChanges(plan, label) {
+	  function stagePlannedChanges(plan, label, confirmSharedTypes) {
 	    if (clipboardBusy) { throw new Error("A grid edit is already in progress."); }
 	    if (!plan.changes.length) {
 	      showStatus("No values changed; skipped " + plan.skipped + " locked or unsupported cell(s).");
 	      return Promise.resolve();
 	    }
-	    if (plan.types && !window.confirm(label + " changes " + plan.types +
+	    if (confirmSharedTypes !== false && plan.types && !window.confirm(label + " changes " + plan.types +
 	        " shared type(s), including instances outside the selected range or hidden by filters. Continue?")) {
 	      return Promise.resolve();
 	    }
@@ -51164,14 +51166,14 @@
 	      rows, columns, rows.indexOf(first.getRow().getData()),
 	      columns.findIndex(function (column) { return column.field === first.getField(); }),
 	      cellEditable, rowChangeKey);
-	    return stagePlannedChanges(plan, "Paste");
+	    return stagePlannedChanges(plan, "Paste", false);
 	  }
 
 	  function fillDown() {
 	    try {
 	      var plan = planFillDown(selectedRangeCells(), columnForField, cellEditable, rowChangeKey,
 	        function (row, column) { return formulaTexts.has(row.UniqueId + "|" + column.field); });
-	      return stagePlannedChanges(plan, "Fill down").catch(reportGridError);
+	      return stagePlannedChanges(plan, "Fill down", false).catch(reportGridError);
 	    } catch (error) { showStatus("Fill down not applied: " + error.message, true); }
 	  }
 
@@ -51944,15 +51946,14 @@
 	    }, revit);
 	    action("Reset view", function () { sendRevitView("reset"); }, revit);
 	    menu.appendChild(revit);
-	    document.body.appendChild(menu);
-	    menu.style.left = Math.max(8, Math.min(event.clientX, window.innerWidth - menu.offsetWidth - 8)) + "px";
-	    menu.style.top = Math.max(8, Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 8)) + "px";
-	    cases.addEventListener("toggle", function () {
-	      menu.style.top = Math.max(8, Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 8)) + "px";
+	    var repositionMenu = function () {
+	      positionMenu(menu, event.clientX, event.clientY);
+	    };
+	    menu.querySelectorAll("details").forEach(function (details) {
+	      details.addEventListener("toggle", repositionMenu);
 	    });
-	    columnMenu = menu;
-	    document.addEventListener("mousedown", onMenuOutside, true);
-	    document.addEventListener("keydown", onMenuKey, true);
+	    document.body.appendChild(menu);
+	    activateColumnMenu(menu, repositionMenu);
 	    menu.querySelector("button").focus();
 	  }
 
@@ -52176,6 +52177,26 @@
 
 	  // ------------------------------------------------------------ column menu
 
+	  function positionMenu(menu, left, top) {
+	    var maxLeft = Math.max(8, window.innerWidth - menu.offsetWidth - 8);
+	    var maxTop = Math.max(8, window.innerHeight - menu.offsetHeight - 8);
+	    menu.style.left = Math.max(8, Math.min(left, maxLeft)) + "px";
+	    menu.style.top = Math.max(8, Math.min(top, maxTop)) + "px";
+	  }
+
+	  function activateColumnMenu(menu, reposition) {
+	    columnMenu = menu;
+	    columnMenuResizeHandler = reposition;
+	    window.addEventListener("resize", reposition);
+	    if (typeof ResizeObserver === "function") {
+	      columnMenuObserver = new ResizeObserver(reposition);
+	      columnMenuObserver.observe(menu);
+	    }
+	    document.addEventListener("mousedown", onMenuOutside, true);
+	    document.addEventListener("keydown", onMenuKey, true);
+	    reposition();
+	  }
+
 	  function onMenuOutside(event) {
 	    if (columnMenu && !columnMenu.contains(event.target)) { closeColumnMenu(); }
 	  }
@@ -52188,6 +52209,14 @@
 	    if (!columnMenu) { return; }
 	    columnMenu.remove();
 	    columnMenu = null;
+	    if (columnMenuResizeHandler) {
+	      window.removeEventListener("resize", columnMenuResizeHandler);
+	      columnMenuResizeHandler = null;
+	    }
+	    if (columnMenuObserver) {
+	      columnMenuObserver.disconnect();
+	      columnMenuObserver = null;
+	    }
 	    document.removeEventListener("mousedown", onMenuOutside, true);
 	    document.removeEventListener("keydown", onMenuKey, true);
 	  }
@@ -52384,17 +52413,15 @@
 	    renderValues();
 
 	    document.body.appendChild(menu);
-	    var rect = anchor.getBoundingClientRect();
-	    var left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
-	    var top = rect.bottom + 4;
-	    if (top + menu.offsetHeight > window.innerHeight - 8) {
-	      top = Math.max(8, window.innerHeight - menu.offsetHeight - 8);
+	    function positionColumnMenu() {
+	      var rect = anchor.getBoundingClientRect();
+	      var top = rect.bottom + 4;
+	      if (top + menu.offsetHeight > window.innerHeight - 8) {
+	        top = rect.top - menu.offsetHeight - 4;
+	      }
+	      positionMenu(menu, rect.left, top);
 	    }
-	    menu.style.left = Math.max(8, left) + "px";
-	    menu.style.top = top + "px";
-	    columnMenu = menu;
-	    document.addEventListener("mousedown", onMenuOutside, true);
-	    document.addEventListener("keydown", onMenuKey, true);
+	    activateColumnMenu(menu, positionColumnMenu);
 	    valueSearch.focus();
 	  }
 

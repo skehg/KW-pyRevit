@@ -610,7 +610,7 @@ right-hand end of each column's filter input.
   Formula sources supply calculated values, not relative formula copies.
   Locked destinations are skipped and counted; unchanged cells are not
   staged unless their active formula is being replaced by a literal value.
-  Validation, shared-type confirmation/propagation and pending-change
+  Validation, shared-type propagation and pending-change
   safeguards are the same as paste. A fill is one grid undo step and never
   writes to Revit until Apply Changes.
 - The whole block is validated before staging any edits. Locked cells,
@@ -621,9 +621,11 @@ right-hand end of each column's filter input.
   expressions are rejected, including when pasted into an open cell editor.
   Excel normally supplies calculated results on its plain-text clipboard.
 - Conflicting values for the same shared type parameter reject the entire
-  paste. Matching shared values are staged once per type; confirmation warns
-  that all instances of that type, including filtered/unselected ones, share
-  the change. Corresponding grid rows are updated consistently.
+  paste. Matching shared values are staged once per type. Paste and fill down
+  do not show a shared-type confirmation dialog; all instances of that type,
+  including filtered/unselected ones, share the change. Corresponding grid
+  rows are updated consistently, with pending-change highlighting and Undo
+  available before Apply Changes.
 - Pasting replaces affected cell formulas with literal values and recalculates
   dependent grid formulas. Pasted edits use the existing pending-change
   highlighting and **Apply Changes** pipeline; clipboard operations never
@@ -638,6 +640,9 @@ right-hand end of each column's filter input.
   outside the range targets the clicked cell instead. Clipboard menu actions
   use browser clipboard access; a denied/unavailable permission is reported
   with guidance to use Ctrl+C/Ctrl+V instead.
+- Right-click and column menus stay inside the WebView window, reposition when
+  expanded or resized, and scroll internally when their contents exceed the
+  available window height.
 - **Edit > Find / Replace...** or **Ctrl+H** opens the same dialog. Default
   scope is **Selected range**; **All visible cells (this sheet)** includes
   only visible columns/rows after the current filters, not other sheets.
