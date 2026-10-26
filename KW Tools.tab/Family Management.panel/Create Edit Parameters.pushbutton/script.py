@@ -9,6 +9,7 @@ Formula autocomplete suggests existing family parameter names while typing.
 import re
 import sys
 import os
+import io
 import clr
 import System
 
@@ -17,12 +18,17 @@ clr.AddReference("PresentationCore")
 clr.AddReference("WindowsBase")
 
 from Autodesk.Revit.DB import (
+    Category,
+    Element,
     ElementId,
+    FamilyParameter,
     FilteredElementCollector,
     LabelUtils,
     Material,
+    NestedFamilyTypeReference,
     StorageType,
     Transaction,
+    TransactionStatus,
     UnitUtils,
 )
 
@@ -52,20 +58,46 @@ from family_param_utils import (
 from sort_param_utils import (
     get_current_parameter_order as _sort_get_current_order,
     group_parameters as _sort_group_parameters,
-    is_other_group as _sort_is_other_group,
     supports_reorder as _sort_supports_reorder,
-    apply_parameter_sort as _sort_apply_parameter_sort,
+    build_reordered_list as _sort_build_reordered_list,
 )
+from System.Collections.Generic import List
 from System.Collections.ObjectModel import ObservableCollection
-from System.Windows.Controls import CheckBox
+from System.Windows.Data import ListCollectionView, PropertyGroupDescription
+from System.Windows.Controls import CheckBox, ComboBox, ContentControl, TextBox, DataGridEditAction
 from System.Windows import Thickness
 from System.Windows.Input import Key
+from System.Windows.Media import VisualTreeHelper
 
 
 doc = revit.doc
 uiapp = __revit__  # noqa: F821
 app = uiapp.Application
 SCRIPT_DIR = os.path.dirname(__file__)
+
+def _load_parameter_group_display_order(path):
+    with io.open(path, "r", encoding="utf-8-sig") as stream:
+        labels = tuple(line.strip() for line in stream if line.strip())
+    if not labels:
+        raise ValueError("Parameter group order file is empty: {}".format(path))
+    if len(set(label.lower() for label in labels)) != len(labels):
+        raise ValueError("Parameter group order file contains duplicate names: {}".format(path))
+    return labels
+
+
+_PARAMETER_GROUP_DISPLAY_ORDER = _load_parameter_group_display_order(
+    os.path.join(os.path.dirname(sys.modules["family_param_utils"].__file__), "RevitGroupOrder.txt"))
+_PARAMETER_GROUP_DISPLAY_RANK = {
+    label.lower(): index
+    for index, label in enumerate(_PARAMETER_GROUP_DISPLAY_ORDER)
+}
+
+
+def _parameter_group_display_key(label):
+    normalized = (label or "").strip().lower()
+    return (_PARAMETER_GROUP_DISPLAY_RANK.get(
+        normalized, len(_PARAMETER_GROUP_DISPLAY_ORDER)), normalized)
+
 
 _DEFAULT_VISIBLE_GROUP_LABELS_NORMALIZED = set(
     normalize_group_label(x) for x in DEFAULT_VISIBLE_GROUP_LABELS
@@ -88,11 +120,23 @@ class OptionItem(object):
         return self.Label
 
 
-class ReorderItem(object):
-    def __init__(self, fp):
-        self.Param = fp
-        self.Name = _param_name(fp)
-        self.InstanceTypeLabel = "Instance" if bool(getattr(fp, "IsInstance", False)) else "Type"
+def _move_parameter_items(items, selected_ids, action):
+    moved = list(items)
+    if action in ("top", "bottom"):
+        selected = [p for p in moved if p.Id in selected_ids]
+        remaining = [p for p in moved if p.Id not in selected_ids]
+        return selected + remaining if action == "top" else remaining + selected
+    if action == "up":
+        for index in range(1, len(moved)):
+            if moved[index].Id in selected_ids and moved[index - 1].Id not in selected_ids:
+                moved[index - 1], moved[index] = moved[index], moved[index - 1]
+    elif action == "down":
+        for index in range(len(moved) - 2, -1, -1):
+            if moved[index].Id in selected_ids and moved[index + 1].Id not in selected_ids:
+                moved[index], moved[index + 1] = moved[index + 1], moved[index]
+    else:
+        raise ValueError("Unknown reorder action: {}".format(action))
+    return moved
 
 
 class FormulaAnalysisWindow(forms.WPFWindow):
@@ -470,10 +514,15 @@ class ParameterItem(object):
 
 class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
     def __init__(self, family_manager):
+        self._ui_ready = False
+        self._refreshing_order = False
         forms.WPFWindow.__init__(self, "ParameterEditor.xaml")
         self.fm = family_manager
+        self._pending_group_sorts = {}
+        self._pending_group_orders = {}
         self._all_groups_label = "All Groups"
         self._all_items = []
+        self._saved_parameter_order = []
         self._filtered_items = ObservableCollection[object]()
         self._autocomplete_names = []
         self._shared_options = []
@@ -481,12 +530,42 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         self._active_new_token_range = None
         self._highlighting = False
 
-        self.lstParameters.ItemsSource = self._filtered_items
+        self._param_view = None
 
-        self._all_types_by_discipline = _build_all_type_options_by_discipline()
-        self._discipline_options = sorted(self._all_types_by_discipline.keys())
+        self._all_types_by_discipline = {}
+        self._discipline_options = []
         self._group_options = _build_group_options(self.fm)
         self._build_group_option_indexes()
+
+        self._bind_combo_options(self.cmbNewGroup, self._group_options)
+        self._bind_combo_options(self.cmbEditGroup, self._group_options)
+        self._bind_combo_options(self.cmbBatchGroup, self._group_options)
+
+        self._set_shared_mode(False)
+        self._restore_window_position()
+        self._restore_column_layout()
+        self._set_status(_group_options_debug_message(), "neutral")
+        self.Loaded += self._on_window_loaded
+        self.Closing += self._on_editor_closing
+        self._ui_ready = True
+
+    def _on_window_loaded(self, sender, args):
+        # Let the empty window paint first, then fill the grid and the
+        # expensive option lists.
+        from System import Action
+        from System.Windows.Threading import DispatcherPriority
+        self.Dispatcher.BeginInvoke(DispatcherPriority.Background, Action(self._populate_initial_data))
+
+    def _populate_initial_data(self):
+        self._reload_parameter_items(select_name=None)
+        self._update_batch_panel()
+        from System import Action
+        from System.Windows.Threading import DispatcherPriority
+        self.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, Action(self._init_new_param_options))
+
+    def _init_new_param_options(self):
+        self._all_types_by_discipline = _build_all_type_options_by_discipline()
+        self._discipline_options = sorted(self._all_types_by_discipline.keys())
         self._shared_options = _build_shared_definition_options()
 
         self.cmbNewDiscipline.ItemsSource = self._discipline_options
@@ -496,22 +575,7 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         if _default_disc:
             self.cmbNewDiscipline.SelectedItem = _default_disc
         self._bind_combo_options(self.cmbNewType, self._type_options_for_discipline(_default_disc or ""))
-        self._bind_combo_options(self.cmbNewGroup, self._group_options)
         self._bind_combo_options(self.cmbSharedDefinition, self._shared_options)
-        self._bind_combo_options(self.cmbEditGroup, self._group_options)
-        self._bind_combo_options(self.cmbBatchGroup, self._group_options)
-
-        self._set_shared_mode(False)
-        self._reload_parameter_items(select_name=None)
-        self._sort_group_checkboxes = []
-        self._populate_sort_groups()
-        self._reorder_items = ObservableCollection[object]()
-        self.lstReorderParams.ItemsSource = self._reorder_items
-        self._populate_reorder_groups()
-        self._restore_window_position()
-        self._restore_column_layout()
-        self._update_batch_panel()
-        self._set_status(_group_options_debug_message(), "neutral")
 
     def _bind_combo_options(self, combo, options):
         combo.ItemsSource = options
@@ -555,7 +619,10 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
 
     def _reload_parameter_items(self, select_name=None):
         current_type = self.fm.CurrentType
-        self._all_items = [ParameterItem(p, current_type) for p in _get_family_parameters(self.fm)]
+        self._saved_parameter_order = _get_family_parameters(self.fm)
+        parameters = self._preview_parameter_order(self._saved_parameter_order)
+        self._all_items = [ParameterItem(p, current_type) for p in parameters]
+        self._update_sort_buttons()
         self._autocomplete_names = sorted({item.Name for item in self._all_items if item.Name})
         self._refresh_group_filter_options()
         self._apply_parameter_filter()
@@ -574,8 +641,6 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         if selected is None:
             selected = self._all_items[0]
         self.lstParameters.SelectedItem = selected
-        if hasattr(self, '_reorder_items'):
-            self._populate_reorder_groups()
 
     def _apply_parameter_filter(self):
         search = (self.txtSearch.Text or "").strip().lower()
@@ -584,8 +649,9 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         if selected_group and selected_group != self._all_groups_label:
             group_filter = str(selected_group).strip().lower()
 
-        self._filtered_items.Clear()
-        for item in self._all_items:
+        self._filtered_items = ObservableCollection[object]()
+        for item in sorted(
+                self._all_items, key=lambda item: _parameter_group_display_key(item.GroupLabel)):
             hay_name = (item.Name or "").lower()
             hay_formula = (item.Formula or "").lower()
             hay_group = (item.GroupLabel or "").strip().lower()
@@ -600,13 +666,24 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
 
             self._filtered_items.Add(item)
 
+        # One-shot rebind avoids per-item regroup/resort notifications.
+        view = ListCollectionView(self._filtered_items)
+        grouping = PropertyGroupDescription("GroupLabel")
+        for label in sorted(set(item.GroupLabel for item in self._filtered_items),
+                            key=_parameter_group_display_key):
+            grouping.GroupNames.Add(label)
+        view.GroupDescriptions.Add(grouping)
+        self._param_view = view
+        self.lstParameters.ItemsSource = view
+        self._update_reorder_buttons()
+
     def _refresh_group_filter_options(self):
         current_selection = self.cmbGroupFilter.SelectedItem
         groups = sorted({
             (item.GroupLabel or "").strip()
             for item in self._all_items
             if (item.GroupLabel or "").strip()
-        })
+        }, key=_parameter_group_display_key)
         options = [self._all_groups_label] + groups
         self.cmbGroupFilter.ItemsSource = options
 
@@ -617,10 +694,11 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
 
     def _set_editor_from_selected(self):
         item = self.lstParameters.SelectedItem
+        self.currentValueEditor.Content = None
+        self.btnApplyValue.IsEnabled = False
         if item is None:
             self.txtSelectedParamName.Text = ""
             self.txtSelectedParamDataType.Text = ""
-            self.txtSelectedParamValue.Text = ""
             self.txtRenameTo.Text = ""
             self._formula_set_text("")
             self.txtFormulaBracketStatus.Text = ""
@@ -632,13 +710,113 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
 
         self.txtSelectedParamName.Text = item.Name
         self.txtSelectedParamDataType.Text = item.DataTypeLabel
-        self.txtSelectedParamValue.Text = item.Value
+        try:
+            self.currentValueEditor.Content = self._create_value_editor(item)
+            self.btnApplyValue.IsEnabled = self._can_edit_value(item)
+        except Exception as ex:
+            self._set_status("Could not load value editor: {}".format(ex), "error")
         self.txtRenameTo.Text = item.Name
         self._formula_set_text(item.Formula or "")
         self._set_edit_group_selection(item.Param)
         self.btnToggleInstanceType.Content = item.InstanceTypeLabel
         self.btnToggleInstanceType.IsEnabled = True
         self._update_formula_bracket_feedback()
+
+    def _can_edit_value(self, item):
+        return (self.fm.CurrentType is not None
+                and not item.Param.IsReadOnly
+                and not item.Param.IsDeterminedByFormula
+                and item.Param.StorageType in (
+                    StorageType.String, StorageType.Double,
+                    StorageType.Integer, StorageType.ElementId))
+
+    def _create_value_editor(self, item):
+        editable = self._can_edit_value(item)
+        if not editable:
+            editor = TextBox()
+            editor.Text = item.Value
+            editor.IsReadOnly = True
+            editor.ToolTip = "This value is formula-driven, read-only, or has no current family type."
+        elif _is_family_type_parameter(item.Param):
+            editor = ComboBox()
+            editor.Tag = "reference"
+            options = _family_type_value_options(self.fm, item.Param)
+            editor.DisplayMemberPath = "Label"
+            editor.SelectedValuePath = "Value"
+            editor.ItemsSource = options
+            current_id = self.fm.CurrentType.AsElementId(item.Param)
+            if current_id is None:
+                current_id = ElementId.InvalidElementId
+            for option in options:
+                if option.Value == current_id:
+                    editor.SelectedItem = option
+                    break
+        elif item.Param.StorageType == StorageType.Integer and _is_yesno_parameter(item.Param):
+            editor = CheckBox()
+            editor.Tag = "yesno"
+            editor.Content = "Yes / No"
+            editor.IsChecked = self.fm.CurrentType.AsInteger(item.Param) != 0
+        else:
+            editor = TextBox()
+            editor.Text = item.Value
+        editor.IsEnabled = editable
+        return editor
+
+    def _value_editor_value(self, editor):
+        if editor.Tag == "reference":
+            if editor.SelectedItem is None:
+                raise ValueError("Select a family type.")
+            return editor.SelectedItem.Value
+        if editor.Tag == "yesno":
+            return "Yes" if bool(editor.IsChecked) else "No"
+        return editor.Text
+
+    def on_value_beginning_edit(self, sender, args):
+        if not self._can_edit_value(args.Row.Item):
+            args.Cancel = True
+            self._set_status("This value is formula-driven, read-only, or has no current family type.", "neutral")
+
+    def on_grid_value_editor_loaded(self, sender, args):
+        if sender.Content is not None:
+            return
+        try:
+            editor = self._create_value_editor(sender.DataContext)
+            sender.Content = editor
+            sender.Tag = self._value_editor_value(editor)
+            editor.Focus()
+            if isinstance(editor, TextBox):
+                editor.SelectAll()
+        except Exception as ex:
+            self._set_status("Could not load grid value editor: {}".format(ex), "error")
+
+    def on_value_cell_edit_ending(self, sender, args):
+        if args.EditAction != DataGridEditAction.Commit:
+            return
+        try:
+            host = _find_value_editor_host(args.EditingElement)
+            if host is None or host.Content is None:
+                raise ValueError("The value editor could not be loaded.")
+            value = self._value_editor_value(host.Content)
+            if value == host.Tag:
+                return
+            if not self._save_parameter_value(args.Row.Item, value):
+                args.Cancel = True
+                return
+        except Exception as ex:
+            args.Cancel = True
+            self._set_status("Value update failed: {}".format(ex), "error")
+            return
+
+        # Rebind only after WPF has completed the cell/row commit.
+        from System import Action
+        from System.Windows.Threading import DispatcherPriority
+        self.Dispatcher.BeginInvoke(
+            DispatcherPriority.DataBind,
+            Action(self._refresh_after_grid_value_edit))
+
+    def _refresh_after_grid_value_edit(self):
+        selected = self.lstParameters.SelectedItem
+        self._reload_parameter_items(select_name=selected.Name if selected else None)
 
     def _set_edit_group_selection(self, family_param):
         try:
@@ -682,7 +860,19 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         items = self._selected_parameter_items()
         count = len(items)
 
+        from System.Windows import Visibility
         from System.Windows.Media import SolidColorBrush, Color
+
+        if count >= 2:
+            self.tabBatchEdit.Visibility = Visibility.Visible
+            if self.tabEditExisting.IsSelected:
+                self.tabBatchEdit.IsSelected = True
+            self.tabEditExisting.Visibility = Visibility.Collapsed
+        else:
+            self.tabEditExisting.Visibility = Visibility.Visible
+            if self.tabBatchEdit.IsSelected:
+                self.tabEditExisting.IsSelected = True
+            self.tabBatchEdit.Visibility = Visibility.Collapsed
 
         if count == 0:
             self.tabBatchEdit.Background = SolidColorBrush(Color.FromRgb(0xF0, 0xF0, 0xF0))
@@ -1203,9 +1393,14 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         self._apply_parameter_filter()
 
     def on_param_selected(self, sender, args):
+        if self._refreshing_order:
+            return
+        if args.OriginalSource != self.lstParameters:
+            return
         self._set_editor_from_selected()
         self.popupSuggestions.IsOpen = False
         self._update_batch_panel()
+        self._update_reorder_buttons()
 
     def on_formula_changed(self, sender, args):
         if self._highlighting:
@@ -1592,7 +1787,6 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         tone = "error" if (error_names and not ok_names) else ("ok" if ok_names else "neutral")
         self._set_status(u"  ".join(parts) if parts else u"Nothing to toggle.", tone)
         self._reload_parameter_items(select_name=None)
-        self._populate_sort_groups()
         self._update_batch_panel()
 
     def on_toggle_instance_type(self, sender, args):
@@ -1680,7 +1874,6 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
             self._set_status("Duplicated parameter '{}' as '{}'.".format(item.Name, new_name), "ok")
 
         self._reload_parameter_items(select_name=new_name)
-        self._populate_sort_groups()
 
     def on_delete_parameter(self, sender, args):
         item = self._selected_parameter_item()
@@ -1737,7 +1930,6 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
 
         self._set_status("Deleted parameter '{}'.".format(name), "ok")
         self._reload_parameter_items(select_name=None)
-        self._populate_sort_groups()
 
     def on_apply_value(self, sender, args):
         item = self._selected_parameter_item()
@@ -1745,20 +1937,35 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
             self._set_status("Select a parameter first.", "error")
             return
 
-        raw_value = self.txtSelectedParamValue.Text
-        raw_value = raw_value if raw_value is not None else ""
-
         try:
-            with revit.Transaction("Set Parameter Value"):
-                ok, reason = _apply_initial_value(self.fm, item.Param, raw_value)
-                if not ok:
-                    raise Exception(reason)
+            editor = self.currentValueEditor.Content
+            if editor is None:
+                raise ValueError("The value editor is unavailable.")
+            raw_value = self._value_editor_value(editor)
         except Exception as ex:
             self._set_status("Value update failed: {}".format(ex), "error")
             return
 
+        if self._save_parameter_value(item, raw_value):
+            self._reload_parameter_items(select_name=item.Name)
+
+    def _save_parameter_value(self, item, raw_value):
+        try:
+            if not self._can_edit_value(item):
+                raise ValueError("This value is formula-driven, read-only, or has no current family type.")
+            with revit.Transaction("Set Parameter Value"):
+                if isinstance(raw_value, ElementId):
+                    self.fm.Set(item.Param, raw_value)
+                else:
+                    ok, reason = _apply_initial_value(self.fm, item.Param, raw_value)
+                    if not ok:
+                        raise ValueError(reason)
+        except Exception as ex:
+            self._set_status("Value update failed: {}".format(ex), "error")
+            return False
+
         self._set_status("Value updated for '{}'.".format(item.Name), "ok")
-        self._reload_parameter_items(select_name=item.Name)
+        return True
 
     def on_apply_formula(self, sender, args):
         item = self._selected_parameter_item()
@@ -2053,190 +2260,227 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         else:
             self._set_status("Created parameter '{}'.".format(new_name), "ok")
         self._reload_parameter_items(select_name=new_name)
-        self._populate_sort_groups()
 
     # ------------------------------------------------------------------
-    # Sort Parameters tab
+    # Group-header sorting
     # ------------------------------------------------------------------
 
-    def _populate_sort_groups(self):
-        """Rebuild the group checkbox list in the Sort Parameters tab."""
-        self.sortGroupPanel.Children.Clear()
-        self._sort_group_checkboxes = []
+    def on_group_header_right_click(self, sender, args):
+        from System.Windows.Controls import ContextMenu, MenuItem
 
+        args.Handled = True
         if not _sort_supports_reorder(self.fm):
-            from System.Windows.Controls import TextBlock as _WpfTextBlock
-            tb = _WpfTextBlock()
-            tb.Text = "ReorderParameters API is not available in this Revit version."
-            tb.TextWrapping = System.Windows.TextWrapping.Wrap
-            self.sortGroupPanel.Children.Add(tb)
+            self._set_status(
+                "ReorderParameters API is not available in this Revit version.", "error")
             return
 
-        all_params = _sort_get_current_order(self.fm)
-        if not all_params:
-            return
-
-        grouped, labels = _sort_group_parameters(all_params)
-        for key in sorted(grouped.keys(), key=lambda k: labels.get(k, "").lower()):
-            label = labels.get(key, key)
-            cb = CheckBox()
-            cb.Content = "{} ({})".format(label, len(grouped[key]))
-            cb.Tag = key
-            cb.Margin = Thickness(0, 2, 0, 2)
-            cb.IsChecked = _sort_is_other_group(key, label)
-            self.sortGroupPanel.Children.Add(cb)
-            self._sort_group_checkboxes.append(cb)
-
-    def on_sort_refresh(self, sender, args):
-        self._populate_sort_groups()
-        self._set_status("Group list refreshed.", "neutral")
-
-    def on_sort_select_all(self, sender, args):
-        for cb in self._sort_group_checkboxes:
-            cb.IsChecked = True
-
-    def on_sort_select_none(self, sender, args):
-        for cb in self._sort_group_checkboxes:
-            cb.IsChecked = False
-
-    def on_sort_apply(self, sender, args):
-        selected_keys = set(
-            cb.Tag for cb in self._sort_group_checkboxes if bool(cb.IsChecked)
-        )
+        grouped, labels = _sort_group_parameters(
+            [item.Param for item in sender.DataContext.Items])
+        selected_keys = set(grouped)
         if not selected_keys:
-            self._set_status("Select at least one group to sort.", "error")
+            self._set_status("No parameters found in this group.", "error")
             return
 
-        sort_mode = "Type then Instance" if bool(self.rbSortTypeThenInstance.IsChecked) else "Name Only"
-        descending = bool(self.rbSortDescending.IsChecked)
+        menu = ContextMenu()
+        for label, mode, descending in (
+                ("Sort Name A-Z", "Name Only", False),
+                ("Sort Name Z-A", "Name Only", True),
+                ("Sort Type then Instance A-Z", "Type then Instance", False),
+                ("Sort Type then Instance Z-A", "Type then Instance", True)):
+            item = MenuItem()
+            item.Header = label
+            item.Tag = (selected_keys, mode, descending)
+            item.Click += self.on_group_sort
+            menu.Items.Add(item)
+        menu.PlacementTarget = sender
+        sender.ContextMenu = menu
+        menu.IsOpen = True
 
-        success, result_code, changed_labels, count = _sort_apply_parameter_sort(
-            doc, self.fm, selected_keys, sort_mode, descending
-        )
-
-        if not success:
-            self._set_status("Sort failed: {}".format(result_code), "error")
-            return
-
-        if result_code == "already_sorted":
-            self._set_status("Selected groups are already in alphabetical order.", "neutral")
-            return
-
+    def on_group_sort(self, sender, args):
+        selected_keys, sort_mode, descending = sender.Tag
+        for key in selected_keys:
+            self._pending_group_orders.pop(key, None)
+            self._pending_group_sorts[key] = (sort_mode, descending)
+        self._refresh_sort_preview()
         self._set_status(
-            "Sorted {} group(s): {}.".format(len(changed_labels), ", ".join(changed_labels)),
-            "ok",
-        )
-        selected_name = None
-        item = self._selected_parameter_item()
-        if item:
-            selected_name = item.Name
-        self._reload_parameter_items(select_name=selected_name)
-        self._populate_sort_groups()
+            "Sorting preview only. Apply Sorting to save, or Reset Sorting to discard."
+            if self._has_pending_order() else "Sorting matches the saved Revit order.",
+            "neutral")
 
-    # ── Reorder Parameters tab ────────────────────────────────────────────
+    def _preview_parameter_order(self, parameters):
+        """Rebase pending sorts and manual orders after other parameter edits."""
+        grouped, labels = _sort_group_parameters(parameters)
+        ordered = list(parameters)
+        for key, (mode, descending) in list(self._pending_group_sorts.items()):
+            sorted_groups, candidate = _sort_build_reordered_list(
+                ordered, set([key]), mode, descending)
+            if ([p.Id for p in grouped.get(key, [])]
+                    == [p.Id for p in sorted_groups.get(key, [])]):
+                del self._pending_group_sorts[key]
+            else:
+                ordered = candidate
+        for key, pending_ids in list(self._pending_group_orders.items()):
+            current = grouped.get(key, [])
+            by_id = {p.Id: p for p in current}
+            manual = [by_id[identifier] for identifier in pending_ids if identifier in by_id]
+            known = set(pending_ids)
+            manual.extend(p for p in current if p.Id not in known)
+            if [p.Id for p in current] == [p.Id for p in manual]:
+                del self._pending_group_orders[key]
+                continue
+            self._pending_group_orders[key] = [p.Id for p in manual]
+            replacements = iter(manual)
+            group_ids = set(by_id)
+            ordered = [next(replacements) if p.Id in group_ids else p for p in ordered]
+        return ordered
 
-    def _populate_reorder_groups(self):
-        """Rebuild the group dropdown in the Reorder Parameters tab."""
+    def _has_pending_order(self):
+        return bool(self._pending_group_sorts or self._pending_group_orders)
+
+    def _update_sort_buttons(self):
+        pending = self._has_pending_order()
+        self.btnApplySorting.IsEnabled = pending
+        self.btnResetSorting.IsEnabled = pending
+
+    def _refresh_sort_preview(self):
+        selected = self._selected_parameter_items()
+        current = self._selected_parameter_item()
+        parameters = self._preview_parameter_order(self._saved_parameter_order)
+        by_id = {item.Param.Id: item for item in self._all_items}
+        self._all_items = [by_id[parameter.Id] for parameter in parameters]
+        visible_ids = set(id(item) for item in self._filtered_items)
+        target = [item for item in sorted(
+            self._all_items, key=lambda item: _parameter_group_display_key(item.GroupLabel))
+            if id(item) in visible_ids]
+        # Collection Move events update grouped WPF rows without a full view reset.
+        self._refreshing_order = True
+        try:
+            for index, item in enumerate(target):
+                if self._filtered_items[index] is not item:
+                    self._filtered_items.Move(self._filtered_items.IndexOf(item), index)
+            # WPF normally preserves selection on Move; restore only missing rows.
+            if current is not None and not self.lstParameters.SelectedItems.Contains(current):
+                self.lstParameters.SelectedItems.Add(current)
+            for item in selected:
+                if not self.lstParameters.SelectedItems.Contains(item):
+                    self.lstParameters.SelectedItems.Add(item)
+        finally:
+            self._refreshing_order = False
+        if current is not None:
+            self.lstParameters.ScrollIntoView(current)
+        self._update_sort_buttons()
+        self._update_reorder_buttons()
+
+    def on_reset_sorting(self, sender, args):
+        self._pending_group_sorts.clear()
+        self._pending_group_orders.clear()
+        self._refresh_sort_preview()
+        self._set_status("Pending sorting discarded. Showing saved Revit order.", "neutral")
+
+    def on_apply_sorting(self, sender, args):
+        if not self._has_pending_order():
+            return True
+        parameters = _sort_get_current_order(self.fm)
+        if parameters is None or not _sort_supports_reorder(self.fm):
+            self._set_status("Cannot apply sorting: parameter ordering is unavailable.", "error")
+            return False
+        ordered = self._preview_parameter_order(parameters)
+        if not self._has_pending_order():
+            self._saved_parameter_order = list(parameters)
+            self._refresh_sort_preview()
+            self._set_status("Sorting already matches the saved Revit order.", "neutral")
+            return True
+        parameter_list = List[FamilyParameter]()
+        for parameter in ordered:
+            parameter_list.Add(parameter)
+        transaction = Transaction(doc, "Apply Parameter Sorting")
+        try:
+            transaction.Start()
+            self.fm.ReorderParameters(parameter_list)
+            if transaction.Commit() != TransactionStatus.Committed:
+                self._set_status(
+                    "Apply sorting was not committed. Pending sorting has been kept.", "error")
+                return False
+        except Exception as ex:
+            if transaction.GetStatus() == TransactionStatus.Started:
+                transaction.RollBack()
+            self._set_status("Apply sorting failed: {}".format(ex), "error")
+            return False
+        finally:
+            transaction.Dispose()
+        self._pending_group_sorts.clear()
+        self._pending_group_orders.clear()
+        self._saved_parameter_order = list(ordered)
+        self._refresh_sort_preview()
+        self._set_status("Sorting applied to the family.", "ok")
+        return True
+
+    def _on_editor_closing(self, sender, args):
+        if not self._has_pending_order():
+            return
+        choice = forms.CommandSwitchWindow.show(
+            ["Apply Sorting", "Discard Sorting", "Cancel"],
+            message="There is unapplied sorting. Apply it before closing?")
+        if choice == "Apply Sorting":
+            args.Cancel = not self.on_apply_sorting(None, None)
+        elif choice == "Discard Sorting":
+            self._pending_group_sorts.clear()
+            self._pending_group_orders.clear()
+        else:
+            args.Cancel = True
+
+    # Grid reorder controls
+
+    def _update_reorder_buttons(self):
+        if not self._ui_ready:
+            return
+        actions = (
+            (self.btnReorderTop, "top"), (self.btnReorderUp, "up"),
+            (self.btnReorderDown, "down"), (self.btnReorderBottom, "bottom"))
+        reason = None
         if not _sort_supports_reorder(self.fm):
-            self.btnReorderApply.IsEnabled = False
-            self.txtReorderApiWarning.Text = (
-                u"FamilyManager.ReorderParameters is not available in this Revit version."
-            )
-            self.txtReorderApiWarning.Visibility = System.Windows.Visibility.Visible
-            return
-        self.btnReorderApply.IsEnabled = True
-        self.txtReorderApiWarning.Visibility = System.Windows.Visibility.Collapsed
-
-        all_params = _sort_get_current_order(self.fm)
-        if not all_params:
-            return
-
-        grouped, labels = _sort_group_parameters(all_params)
-        options = sorted(
-            [OptionItem(labels[k], k) for k in grouped],
-            key=lambda o: o.Label.lower()
-        )
-        self.cmbReorderGroup.ItemsSource = options
-        self.cmbReorderGroup.DisplayMemberPath = "Label"
-        self.cmbReorderGroup.SelectedValuePath = "Value"
-
-        # Default to Dimensions; fall back to first item
-        target = next((o for o in options if o.Label.lower() == "dimensions"), None)
-        if target is None and options:
-            target = options[0]
-        if target is not None:
-            self.cmbReorderGroup.SelectedItem = target
-        self._populate_reorder_list()
-
-    def _populate_reorder_list(self):
-        """Fill lstReorderParams with the current group's params in Revit order."""
-        self._reorder_items.Clear()
-        selected_option = self.cmbReorderGroup.SelectedItem
-        if selected_option is None:
-            return
-        group_key = selected_option.Value
-
-        all_params = _sort_get_current_order(self.fm)
-        if not all_params:
-            return
-
-        grouped, _ = _sort_group_parameters(all_params)
-        for fp in grouped.get(group_key, []):
-            self._reorder_items.Add(ReorderItem(fp))
-
-    def on_reorder_group_changed(self, sender, args):
-        self._populate_reorder_list()
-
-    def on_reorder_refresh(self, sender, args):
-        self._populate_reorder_groups()
+            reason = "Parameter reordering is unavailable in this Revit version."
+        elif (self.txtSearch.Text or "").strip():
+            reason = "Clear the search to reorder parameters. Group filtering is allowed."
+        selected_ids = set(item.Param.Id for item in self._selected_parameter_items())
+        if not selected_ids and reason is None:
+            reason = "Select parameters in the grid to move them within their groups."
+        grouped, labels = _sort_group_parameters([item.Param for item in self._all_items])
+        for button, action in actions:
+            can_move = any(
+                [p.Id for p in items] != [p.Id for p in _move_parameter_items(
+                    items, selected_ids, action)]
+                for items in grouped.values())
+            button.IsEnabled = reason is None and can_move
+            button.ToolTip = reason or (
+                "Preview moving selected parameters {} within each group. Apply Sorting to save."
+                .format(action) if can_move else
+                "Selected parameters are already at this boundary in their groups.")
 
     def _reorder_move(self, action):
-        count = self._reorder_items.Count
-        if count < 2:
+        if (self.txtSearch.Text or "").strip():
+            self._set_status("Clear the search before reordering parameters.", "error")
             return
-
-        # Identify selected items by identity so they survive a Clear+re-Add
-        selected_ids = set(id(it) for it in self.lstReorderParams.SelectedItems)
+        if not _sort_supports_reorder(self.fm):
+            self._set_status("Parameter reordering is unavailable in this Revit version.", "error")
+            return
+        selected_ids = set(item.Param.Id for item in self._selected_parameter_items())
         if not selected_ids:
+            self._set_status("Select parameters in the grid to reorder.", "error")
             return
-
-        items = list(self._reorder_items)
-        selected_indices = sorted(i for i, it in enumerate(items) if id(it) in selected_ids)
-
-        if action == 'top':
-            shift = -selected_indices[0]
-        elif action == 'up':
-            shift = -1 if selected_indices[0] > 0 else 0
-        elif action == 'down':
-            shift = 1 if selected_indices[-1] < count - 1 else 0
-        else:  # bottom
-            shift = (count - 1) - selected_indices[-1]
-
-        if shift == 0:
-            return
-
-        sel_set = set(selected_indices)
-        selected_items = [items[i] for i in selected_indices]
-        remaining = [items[i] for i in range(count) if i not in sel_set]
-
-        if shift < 0:
-            insert_at = max(0, selected_indices[0] + shift)
-        else:
-            # Number of non-selected items before the first selected item
-            prefix_count = sum(1 for i in range(selected_indices[0]) if i not in sel_set)
-            insert_at = min(len(remaining), prefix_count + shift)
-
-        new_items = remaining[:insert_at] + selected_items + remaining[insert_at:]
-
-        self._reorder_items.Clear()
-        for it in new_items:
-            self._reorder_items.Add(it)
-
-        # Restore selection on the moved block
-        self.lstReorderParams.SelectedItems.Clear()
-        for i in range(insert_at, insert_at + len(selected_items)):
-            self.lstReorderParams.SelectedItems.Add(self._reorder_items[i])
-        self.lstReorderParams.ScrollIntoView(self._reorder_items[insert_at])
+        grouped, labels = _sort_group_parameters([item.Param for item in self._all_items])
+        changed = False
+        for key, items in grouped.items():
+            moved = _move_parameter_items(items, selected_ids, action)
+            if [p.Id for p in moved] != [p.Id for p in items]:
+                self._pending_group_sorts.pop(key, None)
+                self._pending_group_orders[key] = [p.Id for p in moved]
+                changed = True
+        if changed:
+            self._refresh_sort_preview()
+            self._set_status(
+                "Reordering preview only. Apply Sorting to save, or Reset Sorting to discard.",
+                "neutral")
 
     def on_reorder_top(self, sender, args):
         self._reorder_move("top")
@@ -2250,63 +2494,12 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
     def on_reorder_bottom(self, sender, args):
         self._reorder_move("bottom")
 
-    def on_reorder_apply(self, sender, args):
-        selected_option = self.cmbReorderGroup.SelectedItem
-        if selected_option is None:
-            self._set_status(u"Select a group to reorder.", "error")
-            return
-        group_key = selected_option.Value
-
-        if self._reorder_items.Count == 0:
-            self._set_status(u"No parameters in the selected group.", "neutral")
-            return
-
-        all_params = _sort_get_current_order(self.fm)
-        if all_params is None:
-            self._set_status(u"GetParameters API unavailable.", "error")
-            return
-
-        grouped, _ = _sort_group_parameters(all_params)
-        group_names_new = {ri.Name for ri in self._reorder_items}
-
-        # Build the new full order: replace the selected group's slice with
-        # the user's arranged order; all other groups keep their positions.
-        new_order_fps = []
-        reorder_iter = iter(list(self._reorder_items))
-        for fp in all_params:
-            from sort_param_utils import get_group_info as _get_group_info
-            key, _ = _get_group_info(fp)
-            if key == group_key:
-                try:
-                    new_order_fps.append(next(reorder_iter).Param)
-                except StopIteration:
-                    pass  # shouldn't happen
-            else:
-                new_order_fps.append(fp)
-
-        from System.Collections.Generic import List as _DotNetList
-        from Autodesk.Revit.DB import FamilyParameter as _FamilyParameter
-        dotnet_list = _DotNetList[_FamilyParameter]()
-        for fp in new_order_fps:
-            dotnet_list.Add(fp)
-
-        try:
-            with revit.Transaction(u"Reorder Parameters"):
-                self.fm.ReorderParameters(dotnet_list)
-        except Exception as ex:
-            self._set_status(u"Reorder failed: {}".format(ex), "error")
-            return
-
-        self._set_status(
-            u"Reordered '{}' group ({} parameter(s)).".format(
-                selected_option.Label, self._reorder_items.Count
-            ), "ok"
-        )
-        self._populate_reorder_list()  # refresh from new Revit order to confirm
-
     # ── Batch Edit tab handlers ───────────────────────────────────────────
 
     def on_tab_selection_changed(self, sender, args):
+        # XAML's initial IsSelected fires before controls and editor state are ready.
+        if not self._ui_ready:
+            return
         # SelectionChanged bubbles up from ALL child controls (ComboBox, ListBox, etc.)
         # Only respond when an actual TabItem was added to the selection.
         from System.Windows.Controls import TabItem
@@ -2500,7 +2693,6 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         tone = "error" if errors else "ok"
         self._set_status(u"  ".join(parts) if parts else u"Nothing renamed.", tone if parts else "neutral")
         self._reload_parameter_items(select_name=None)
-        self._populate_sort_groups()
         self._update_batch_panel()
 
     def on_batch_duplicate(self, sender, args):
@@ -2550,7 +2742,6 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         tone = "error" if errors else "ok"
         self._set_status(u"  ".join(parts) if parts else u"Nothing duplicated.", tone if parts else "neutral")
         self._reload_parameter_items(select_name=None)
-        self._populate_sort_groups()
         self._update_batch_panel()
 
     def on_batch_delete(self, sender, args):
@@ -2627,7 +2818,6 @@ class ParameterEditorWindow(FormulaEditorHighlightMixin, forms.WPFWindow):
         tone = "error" if errors else "ok"
         self._set_status(u"  ".join(parts) if parts else u"Nothing deleted.", tone if parts else "neutral")
         self._reload_parameter_items(select_name=None)
-        self._populate_sort_groups()
         self._update_batch_panel()
 
     def _restore_column_layout(self):
@@ -3035,12 +3225,83 @@ def _is_shared_parameter(fp):
         return False
 
 
+def _find_value_editor_host(element):
+    if isinstance(element, ContentControl) and isinstance(element.Content, (TextBox, CheckBox, ComboBox)):
+        return element
+    for index in range(VisualTreeHelper.GetChildrenCount(element)):
+        found = _find_value_editor_host(VisualTreeHelper.GetChild(element, index))
+        if found is not None:
+            return found
+    return None
+
+
+def _is_family_type_parameter(fp):
+    if fp.StorageType != StorageType.ElementId:
+        return False
+    if _PT_AVAILABLE:
+        return fp.Definition.ParameterType == ParameterType.FamilyType
+    return Category.IsBuiltInCategory(fp.Definition.GetDataType())
+
+
+def _family_type_value_options(fm, fp):
+    options = []
+    current_id = fm.CurrentType.AsElementId(fp)
+    if current_id is None:
+        current_id = ElementId.InvalidElementId
+    ids = set(doc.OwnerFamily.GetFamilyTypeParameterValues(fp.Id))
+    ids.add(current_id)
+    for element_id in ids:
+        if element_id == ElementId.InvalidElementId:
+            options.append(OptionItem("<None>", element_id))
+            continue
+        element = doc.GetElement(element_id)
+        if element is None:
+            raise ValueError("Could not resolve family type reference '{}'.".format(element_id))
+        label = _element_display_name(element)
+        if not label:
+            raise ValueError("Family type reference '{}' has no display name.".format(element_id))
+        options.append(OptionItem(label, element_id))
+    return sorted(options, key=lambda option: option.Label.lower())
+
+
+def _element_display_name(elem):
+    """Return 'Family : Type' for family references, otherwise the element name."""
+    if isinstance(elem, NestedFamilyTypeReference):
+        family_name = elem.FamilyName
+        type_name = elem.TypeName
+    else:
+        family_name = getattr(elem, "FamilyName", None)
+        # Use the base getter to bypass ElementType's write-only Name in IronPython.
+        type_name = Element.Name.GetValue(elem)
+
+    if family_name and type_name:
+        return u"{} : {}".format(family_name, type_name)
+    return type_name or family_name or ""
+
+
 def _read_value_for_display(current_type, fp):
     """Return a human-readable value string for the parameter in the current type."""
     if current_type is None:
         return "<No current type>"
 
     storage = getattr(fp, "StorageType", None)
+
+    if storage == StorageType.ElementId:
+        try:
+            eid = current_type.AsElementId(fp)
+            if eid is None or eid == ElementId.InvalidElementId:
+                return "<None>"
+            elem = doc.GetElement(eid)
+            if elem is not None:
+                label = _element_display_name(elem)
+                if label:
+                    return label
+            try:
+                return "ElementId({})".format(eid.Value)
+            except Exception:
+                return "ElementId({})".format(eid.IntegerValue)
+        except Exception:
+            pass
 
     # Prefer Revit's formatted display string when available.
     try:
@@ -3091,6 +3352,17 @@ def _read_value_for_display(current_type, fp):
     return ""
 
 
+_GROUP_LABEL_CACHE = {}
+_DATATYPE_LABEL_CACHE = {}
+
+
+def _cache_key(value):
+    type_id = getattr(value, "TypeId", None)
+    if isinstance(type_id, str) and type_id:
+        return type_id
+    return str(value)
+
+
 def _group_label(fp):
     try:
         g = _get_group_type(fp.Definition)
@@ -3099,7 +3371,12 @@ def _group_label(fp):
 
     if g is None:
         return ""
-    return _label_for_group(g)
+    key = _cache_key(g)
+    label = _GROUP_LABEL_CACHE.get(key)
+    if label is None:
+        label = _label_for_group(g)
+        _GROUP_LABEL_CACHE[key] = label
+    return label
 
 
 def _pretty_type_text(text):
@@ -3120,6 +3397,19 @@ def _parameter_data_type_label(fp):
     if definition is None:
         return "Unknown"
 
+    try:
+        key = _cache_key(_get_data_type(definition))
+    except Exception:
+        key = None
+    if key is not None and key in _DATATYPE_LABEL_CACHE:
+        return _DATATYPE_LABEL_CACHE[key]
+    label = _parameter_data_type_label_uncached(fp, definition)
+    if key is not None:
+        _DATATYPE_LABEL_CACHE[key] = label
+    return label
+
+
+def _parameter_data_type_label_uncached(fp, definition):
     get_data_type = getattr(definition, "GetDataType", None)
     if callable(get_data_type):
         try:

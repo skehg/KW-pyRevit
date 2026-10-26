@@ -6,7 +6,7 @@ Shared utilities for sorting family parameters alphabetically within groups.
 
 Consumed by:
   - Family Management.panel / Sort Other Parameters.pushbutton
-  - Family Management.panel / Create Edit Parameters.pushbutton  (Sort tab)
+  - Family Management.panel / Create Edit Parameters.pushbutton  (group-header menu)
 
 Import pattern:
 

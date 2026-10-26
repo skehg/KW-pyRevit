@@ -2,6 +2,10 @@ title: Parameter Editor
 tooltip: >
   Create new family/shared parameters and edit formulas on existing family parameters.
   Includes automatic formula autocomplete from family parameter names while typing.
+  Edit current-type values in the Value column (double-click or F2) or the Edit pane.
+  Family-type values use a Family : Type selector; Yes/No values use a checkbox.
+  Commit grid edits with Enter, Tab, or leaving the cell; Escape cancels.
+  Formula-driven and read-only values cannot be edited.
   Works only in the Family Editor.
 author: Kent + Copilot
 highlight: False

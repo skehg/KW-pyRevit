@@ -1,0 +1,50 @@
+Sub-division
+Constraints
+Construction
+Rebar Set
+Set
+Graphics
+Text
+Materials and Finishes
+Division Geometry
+Electrical
+Electrical Engineering
+Electrical - Lighting
+Electrical - Loads
+Segments and Fittings
+Plumbing
+Secondary End
+Structural
+Layers
+Slab Shape Edit
+Dimensions
+Mechanical
+Mechanical - Flow
+Mechanical - Loads
+Analytical Model
+Analytical Alignment
+Releases / Member Forces
+Structural Analysis
+Forces
+Moments
+Phasing
+Energy Analysis
+IFC Parameters
+Fire Protection
+Title Text
+Green Building Properties
+Photometrics
+Analysis Results
+Model Properties
+General
+Electrical - Circuiting
+Data
+Visibility
+Overall Legend
+Electrical Analysis
+Life Safety
+Structural Section Dimensions
+View to Sheet Positioning
+Visualization
+Other
+Identity Data

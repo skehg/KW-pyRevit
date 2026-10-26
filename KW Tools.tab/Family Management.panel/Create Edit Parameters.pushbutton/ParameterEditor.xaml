@@ -10,6 +10,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0">
@@ -34,6 +35,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0 0 0 8">
@@ -63,7 +65,9 @@
 
                     <DataGrid x:Name="lstParameters" Grid.Row="1" SelectionChanged="on_param_selected"
                               AutoGenerateColumns="False"
-                              IsReadOnly="True"
+                              IsReadOnly="False"
+                              BeginningEdit="on_value_beginning_edit"
+                              CellEditEnding="on_value_cell_edit_ending"
                               CanUserReorderColumns="True"
                               CanUserResizeColumns="True"
                               CanUserSortColumns="False"
@@ -71,24 +75,195 @@
                               HeadersVisibility="Column"
                               GridLinesVisibility="None"
                               RowHeaderWidth="0"
+                              VirtualizingPanel.IsVirtualizing="False"
+                              EnableRowVirtualization="False"
+                              EnableColumnVirtualization="False"
+                              ScrollViewer.CanContentScroll="False"
                               BorderThickness="0">
+                        <DataGrid.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.ContainerStyle>
+                                    <Style TargetType="GroupItem">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="GroupItem">
+                                                    <StackPanel>
+                                                        <ToggleButton x:Name="grpToggle" IsChecked="True" Cursor="Hand"
+                                                                      PreviewMouseRightButtonUp="on_group_header_right_click"
+                                                                      ToolTip="Right-click to preview sorting. Use Apply Sorting below to save."
+                                                                      Background="#EEF1F5" BorderBrush="#D0D5DD"
+                                                                      BorderThickness="0,0,0,1" Padding="0"
+                                                                      HorizontalContentAlignment="Stretch">
+                                                            <ToggleButton.Template>
+                                                                <ControlTemplate TargetType="ToggleButton">
+                                                                    <Border Background="{TemplateBinding Background}"
+                                                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                                                            Padding="4,1">
+                                                                        <ContentPresenter/>
+                                                                    </Border>
+                                                                </ControlTemplate>
+                                                            </ToggleButton.Template>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Width="12" Foreground="#555555" FontSize="9"
+                                                                           VerticalAlignment="Center" Text="&#x25BC;">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsChecked, ElementName=grpToggle}" Value="False">
+                                                                                    <Setter Property="Text" Value="&#x25B6;"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                                                <TextBlock Text="{Binding ItemCount, StringFormat=' ({0})'}"
+                                                                           Foreground="#666666"/>
+                                                            </StackPanel>
+                                                        </ToggleButton>
+                                                        <ItemsPresenter>
+                                                            <ItemsPresenter.Style>
+                                                                <Style TargetType="ItemsPresenter">
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsChecked, ElementName=grpToggle}" Value="False">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </ItemsPresenter.Style>
+                                                        </ItemsPresenter>
+                                                    </StackPanel>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </GroupStyle.ContainerStyle>
+                            </GroupStyle>
+                        </DataGrid.GroupStyle>
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Name"      Width="160" Binding="{Binding Name}"/>
-                            <DataGridTextColumn Header="Group"     Width="110" Binding="{Binding GroupLabel}"/>
-                            <DataGridTextColumn Header="Value"     Width="120" Binding="{Binding Value}"/>
-                            <DataGridTextColumn Header="Formula"   Width="200" Binding="{Binding Formula}"/>
-                            <DataGridTextColumn Header="Inst/Type" Width="68"  Binding="{Binding InstanceTypeLabel}"/>
+                            <DataGridTextColumn Header="Name"      Width="160" Binding="{Binding Name}" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Group"     Width="110" Binding="{Binding GroupLabel}" Visibility="Collapsed" IsReadOnly="True"/>
+                            <DataGridTemplateColumn Header="Value" Width="160">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Value}" Margin="3,0" VerticalAlignment="Center"
+                                                   ToolTip="Double-click or press F2 to edit this value for the current family type."/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                                <DataGridTemplateColumn.CellEditingTemplate>
+                                    <DataTemplate>
+                                        <ContentControl Loaded="on_grid_value_editor_loaded"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellEditingTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Formula"   Width="200" Binding="{Binding Formula}" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Inst/Type" Width="68"  Binding="{Binding InstanceTypeLabel}" IsReadOnly="True"/>
                         </DataGrid.Columns>
                     </DataGrid>
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0 8 0 0">
+                        <Button x:Name="btnReorderTop" Content="&#x25B2;&#x25B2; Top" Width="72" Height="28"
+                                Margin="0 0 4 0" Click="on_reorder_top" IsEnabled="False" ToolTipService.ShowOnDisabled="True"/>
+                        <Button x:Name="btnReorderUp" Content="&#x25B2; Up" Width="64" Height="28"
+                                Margin="0 0 4 0" Click="on_reorder_up" IsEnabled="False" ToolTipService.ShowOnDisabled="True"/>
+                        <Button x:Name="btnReorderDown" Content="&#x25BC; Down" Width="64" Height="28"
+                                Margin="0 0 4 0" Click="on_reorder_down" IsEnabled="False" ToolTipService.ShowOnDisabled="True"/>
+                        <Button x:Name="btnReorderBottom" Content="&#x25BC;&#x25BC; Bottom" Width="72" Height="28"
+                                Click="on_reorder_bottom" IsEnabled="False" ToolTipService.ShowOnDisabled="True"/>
+                    </StackPanel>
                 </Grid>
             </Border>
 
             <TabControl Grid.Column="2" SelectionChanged="on_tab_selection_changed">
 
+                <TabItem x:Name="tabBatchEdit" Header="Batch Edit" Visibility="Collapsed">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Selection summary -->
+                        <Border Grid.Row="0" Background="#F0F4FF" BorderBrush="#90CAF9" BorderThickness="1" CornerRadius="3" Padding="8 6" Margin="0 0 0 10">
+                            <TextBlock x:Name="txtBatchSummary"
+                                       Text="Select multiple parameters from the list on the left."
+                                       Foreground="#1565C0" TextWrapping="Wrap"/>
+                        </Border>
+
+                        <!-- Toggle Instance/Type -->
+                        <GroupBox Grid.Row="1" Header="Instance / Type" Margin="0 0 0 8" Padding="8 4 8 8">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="txtBatchToggleInfo" Text="" VerticalAlignment="Center"
+                                           Margin="0 0 10 0" Foreground="#5A5A5A" FontStyle="Italic"
+                                           TextWrapping="Wrap" MaxWidth="320"/>
+                                <Button x:Name="btnBatchToggle" Content="Toggle" Width="110" Height="28"
+                                        Click="on_batch_toggle" IsEnabled="False"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- Change Group -->
+                        <GroupBox Grid.Row="2" Header="Change Group" Margin="0 0 0 8" Padding="8 4 8 8">
+                            <StackPanel Orientation="Horizontal">
+                                <ComboBox x:Name="cmbBatchGroup" Width="220" Height="26" Margin="0 0 8 0"/>
+                                <Button x:Name="btnBatchChangeGroup" Content="Apply" Width="70" Height="26"
+                                        Click="on_batch_change_group" IsEnabled="False"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- Rename (Find / Replace) -->
+                        <GroupBox Grid.Row="3" Header="Rename" Margin="0 0 0 8" Padding="8 4 8 8">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="6"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="6"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Find:" VerticalAlignment="Center" Margin="0 0 6 0"/>
+                                <TextBox x:Name="txtBatchFind" Grid.Row="0" Grid.Column="1" Height="26" Margin="0 0 10 0"/>
+                                <TextBlock Grid.Row="0" Grid.Column="2" Text="Replace:" VerticalAlignment="Center" Margin="0 0 6 0"/>
+                                <TextBox x:Name="txtBatchReplace" Grid.Row="0" Grid.Column="3" Height="26" Margin="0 0 10 0"/>
+                                <Button x:Name="btnBatchRename" Grid.Row="0" Grid.Column="4" Content="Apply Rename"
+                                        Width="100" Height="26" Click="on_batch_prefix_suffix" IsEnabled="False"/>
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Prefix:" VerticalAlignment="Center" Margin="0 0 6 0"/>
+                                <TextBox x:Name="txtBatchPrefix" Grid.Row="2" Grid.Column="1" Height="26" Margin="0 0 10 0"/>
+                                <TextBlock Grid.Row="2" Grid.Column="2" Text="Suffix:" VerticalAlignment="Center" Margin="0 0 6 0"/>
+                                <TextBox x:Name="txtBatchSuffix" Grid.Row="2" Grid.Column="3" Height="26" Margin="0 0 10 0"/>
+                                <CheckBox x:Name="chkBatchRegex" Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="5"
+                                          Content="Use regular expression (regex) for Find"
+                                          VerticalAlignment="Center" IsChecked="False"/>
+                            </Grid>
+                        </GroupBox>
+
+                        <!-- Duplicate / Delete -->
+                        <GroupBox Grid.Row="4" Header="Other Actions" Margin="0 0 0 8" Padding="8 4 8 8">
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="btnBatchDuplicate" Content="Duplicate All" Width="100" Height="28"
+                                        Margin="0 0 8 0" Click="on_batch_duplicate" IsEnabled="False"/>
+                                <Button x:Name="btnBatchDelete" Content="Delete All" Width="90" Height="28"
+                                        Click="on_batch_delete" IsEnabled="False"
+                                        Background="#FFEBEE" Foreground="#B71C1C" BorderBrush="#EF9A9A"/>
+                            </StackPanel>
+                        </GroupBox>
+                    </Grid>
+                </TabItem>
+
                 <!-- ═══════════════════════════════════════════════════════ -->
                 <!-- TAB 1: Edit Existing Parameter                         -->
                 <!-- ═══════════════════════════════════════════════════════ -->
-                <TabItem Header="Edit Existing Parameter">
+                <TabItem x:Name="tabEditExisting" Header="Edit Existing Parameter" IsSelected="True">
                     <Grid Margin="10">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -143,8 +318,9 @@
 
                         <TextBlock Grid.Row="3" Grid.Column="0" Text="Current Value:" VerticalAlignment="Center" Margin="0 0 8 8"/>
                         <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0 0 0 8">
-                            <TextBox x:Name="txtSelectedParamValue" Width="260" Height="26" Margin="0 0 8 0"
-                                     ToolTip="Edit current type value. Supports number, integer, yes/no, string, and element name/id for ElementId parameters."/>
+                            <ContentControl x:Name="currentValueEditor" Width="260" MinHeight="26" Margin="0 0 8 0"
+                                            HorizontalContentAlignment="Stretch"
+                                            ToolTip="Edit the value for the current family type, then click Apply Value."/>
                             <Button x:Name="btnApplyValue" Content="Apply Value" Width="95" Height="26" Click="on_apply_value"/>
                         </StackPanel>
 
@@ -307,214 +483,6 @@
                             <Button Content="Clear Formula" Width="100" Height="30" Margin="0 0 8 0" Click="on_clear_new_formula"/>
                             <Button x:Name="btnCreateParameter" Content="Create Parameter" Width="130" Height="30" Click="on_create_parameter"/>
                         </StackPanel>
-                    </Grid>
-                </TabItem>
-
-                <!-- ═══════════════════════════════════════════════════════ -->
-                <!-- TAB 3: Sort Parameters                                 -->
-                <!-- ═══════════════════════════════════════════════════════ -->
-                <TabItem Header="Sort Parameters">
-                    <Grid Margin="10">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Grid.Row="0" TextWrapping="Wrap" Foreground="#6A6A6A" Margin="0 0 0 10"
-                                   Text="Sort parameters alphabetically within selected groups. Unselected groups keep their current order."/>
-
-                        <GroupBox Grid.Row="1" Header="Sort Mode" Margin="0 0 0 6" Padding="8 4 8 6">
-                            <StackPanel Orientation="Horizontal">
-                                <RadioButton x:Name="rbSortNameOnly" Content="Name only" IsChecked="True" Margin="0 0 16 0"/>
-                                <RadioButton x:Name="rbSortTypeThenInstance" Content="Type then Instance"/>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <GroupBox Grid.Row="2" Header="Sort Direction" Margin="0 0 0 8" Padding="8 4 8 6">
-                            <StackPanel Orientation="Horizontal">
-                                <RadioButton x:Name="rbSortAscending" Content="Ascending (A–Z)" IsChecked="True" Margin="0 0 16 0"/>
-                                <RadioButton x:Name="rbSortDescending" Content="Descending (Z–A)"/>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <DockPanel Grid.Row="3" Margin="0 0 0 4">
-                            <TextBlock Text="Parameter groups:" FontWeight="SemiBold" VerticalAlignment="Center" DockPanel.Dock="Left"/>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
-                                <Button Content="All" Width="44" Height="22" Margin="0 0 4 0" Click="on_sort_select_all"/>
-                                <Button Content="None" Width="44" Height="22" Click="on_sort_select_none"/>
-                            </StackPanel>
-                        </DockPanel>
-
-                        <Border Grid.Row="4" BorderBrush="#CFCFCF" BorderThickness="1" CornerRadius="3" Margin="0 0 0 8">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="6">
-                                <StackPanel x:Name="sortGroupPanel"/>
-                            </ScrollViewer>
-                        </Border>
-
-                        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button Content="Refresh Groups" Width="110" Height="28" Margin="0 0 8 0" Click="on_sort_refresh"/>
-                            <Button Content="Sort" Width="80" Height="28" Click="on_sort_apply"/>
-                        </StackPanel>
-                    </Grid>
-                </TabItem>
-
-                <!-- ═══════════════════════════════════════════════════════ -->
-                <!-- TAB 4: Reorder Parameters                              -->
-                <!-- ═══════════════════════════════════════════════════════ -->
-                <TabItem Header="Reorder Parameters">
-                    <Grid Margin="8">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <!-- Row 0: group picker -->
-                        <DockPanel Grid.Row="0" Margin="0 0 0 6">
-                            <TextBlock Text="Group:" VerticalAlignment="Center" Margin="0 0 8 0" DockPanel.Dock="Left"/>
-                            <Button Content="Refresh" Width="64" Height="24" DockPanel.Dock="Right"
-                                    Click="on_reorder_refresh"/>
-                            <ComboBox x:Name="cmbReorderGroup" Height="24" Margin="0 0 6 0"
-                                      SelectionChanged="on_reorder_group_changed"/>
-                        </DockPanel>
-
-                        <!-- Row 1: parameter list -->
-                        <Border Grid.Row="1" BorderBrush="#CFCFCF" BorderThickness="1" CornerRadius="3" Margin="0 0 0 6">
-                            <ListBox x:Name="lstReorderParams"
-                                     SelectionMode="Extended"
-                                     BorderThickness="0"
-                                     Padding="4">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{Binding Name}"
-                                                       VerticalAlignment="Center"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding InstanceTypeLabel}"
-                                                       VerticalAlignment="Center"
-                                                       Foreground="#6A6A6A" FontSize="10"
-                                                       Margin="10 0 0 0"/>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </Border>
-
-                        <!-- Row 2: move buttons -->
-                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0 0 0 6">
-                            <Button x:Name="btnReorderTop"    Content="&#x25B2;&#x25B2; Top"    Width="72" Height="28" Margin="0 0 4 0" Click="on_reorder_top"    ToolTip="Move to top"/>
-                            <Button x:Name="btnReorderUp"     Content="&#x25B2; Up"             Width="64" Height="28" Margin="0 0 4 0" Click="on_reorder_up"     ToolTip="Move up one"/>
-                            <Button x:Name="btnReorderDown"   Content="&#x25BC; Down"           Width="64" Height="28" Margin="0 0 4 0" Click="on_reorder_down"   ToolTip="Move down one"/>
-                            <Button x:Name="btnReorderBottom" Content="&#x25BC;&#x25BC; Bottom" Width="72" Height="28" Click="on_reorder_bottom" ToolTip="Move to bottom"/>
-                        </StackPanel>
-
-                        <!-- Row 3: apply + API warning -->
-                        <DockPanel Grid.Row="3">
-                            <TextBlock x:Name="txtReorderApiWarning"
-                                       Foreground="#B00020" TextWrapping="Wrap"
-                                       Visibility="Collapsed"
-                                       DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0 0 8 0"/>
-                            <Button x:Name="btnReorderApply" Content="Apply Order"
-                                    Width="100" Height="28"
-                                    HorizontalAlignment="Right"
-                                    Click="on_reorder_apply"
-                                    DockPanel.Dock="Right"/>
-                        </DockPanel>
-                    </Grid>
-                </TabItem>
-
-                <!-- ═══════════════════════════════════════════════════════ -->
-                <!-- TAB 5: Batch Edit                                       -->
-                <!-- ═══════════════════════════════════════════════════════ -->
-                <TabItem x:Name="tabBatchEdit" Header="Batch Edit">
-                    <Grid Margin="10">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-
-                        <!-- Selection summary -->
-                        <Border Grid.Row="0" Background="#F0F4FF" BorderBrush="#90CAF9" BorderThickness="1" CornerRadius="3" Padding="8 6" Margin="0 0 0 10">
-                            <TextBlock x:Name="txtBatchSummary"
-                                       Text="Select multiple parameters from the list on the left."
-                                       Foreground="#1565C0" TextWrapping="Wrap"/>
-                        </Border>
-
-                        <!-- Toggle Instance/Type -->
-                        <GroupBox Grid.Row="1" Header="Instance / Type" Margin="0 0 0 8" Padding="8 4 8 8">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock x:Name="txtBatchToggleInfo" Text="" VerticalAlignment="Center"
-                                           Margin="0 0 10 0" Foreground="#5A5A5A" FontStyle="Italic"
-                                           TextWrapping="Wrap" MaxWidth="320"/>
-                                <Button x:Name="btnBatchToggle" Content="Toggle" Width="110" Height="28"
-                                        Click="on_batch_toggle" IsEnabled="False"/>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <!-- Change Group -->
-                        <GroupBox Grid.Row="2" Header="Change Group" Margin="0 0 0 8" Padding="8 4 8 8">
-                            <StackPanel Orientation="Horizontal">
-                                <ComboBox x:Name="cmbBatchGroup" Width="220" Height="26" Margin="0 0 8 0"/>
-                                <Button x:Name="btnBatchChangeGroup" Content="Apply" Width="70" Height="26"
-                                        Click="on_batch_change_group" IsEnabled="False"/>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <!-- Rename (Find / Replace) -->
-                        <GroupBox Grid.Row="3" Header="Rename" Margin="0 0 0 8" Padding="8 4 8 8">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="6"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="6"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Find:" VerticalAlignment="Center" Margin="0 0 6 0"/>
-                                <TextBox x:Name="txtBatchFind" Grid.Row="0" Grid.Column="1" Height="26" Margin="0 0 10 0"/>
-                                <TextBlock Grid.Row="0" Grid.Column="2" Text="Replace:" VerticalAlignment="Center" Margin="0 0 6 0"/>
-                                <TextBox x:Name="txtBatchReplace" Grid.Row="0" Grid.Column="3" Height="26" Margin="0 0 10 0"/>
-                                <Button x:Name="btnBatchRename" Grid.Row="0" Grid.Column="4" Content="Apply Rename"
-                                        Width="100" Height="26" Click="on_batch_prefix_suffix" IsEnabled="False"/>
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Prefix:" VerticalAlignment="Center" Margin="0 0 6 0"/>
-                                <TextBox x:Name="txtBatchPrefix" Grid.Row="2" Grid.Column="1" Height="26" Margin="0 0 10 0"/>
-                                <TextBlock Grid.Row="2" Grid.Column="2" Text="Suffix:" VerticalAlignment="Center" Margin="0 0 6 0"/>
-                                <TextBox x:Name="txtBatchSuffix" Grid.Row="2" Grid.Column="3" Height="26" Margin="0 0 10 0"/>
-                                <CheckBox x:Name="chkBatchRegex" Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="5"
-                                          Content="Use regular expression (regex) for Find"
-                                          VerticalAlignment="Center" IsChecked="False"/>
-                            </Grid>
-                        </GroupBox>
-
-                        <!-- Duplicate / Delete -->
-                        <GroupBox Grid.Row="4" Header="Other Actions" Margin="0 0 0 8" Padding="8 4 8 8">
-                            <StackPanel Orientation="Horizontal">
-                                <Button x:Name="btnBatchDuplicate" Content="Duplicate All" Width="100" Height="28"
-                                        Margin="0 0 8 0" Click="on_batch_duplicate" IsEnabled="False"/>
-                                <Button x:Name="btnBatchDelete" Content="Delete All" Width="90" Height="28"
-                                        Click="on_batch_delete" IsEnabled="False"
-                                        Background="#FFEBEE" Foreground="#B71C1C" BorderBrush="#EF9A9A"/>
-                            </StackPanel>
-                        </GroupBox>
                     </Grid>
                 </TabItem>
 
@@ -723,12 +691,19 @@
 
         <Border Grid.Row="1" Background="#F7F7F7" CornerRadius="3" Padding="8" Margin="0 10 0 0">
             <DockPanel>
-                <TextBlock x:Name="txtStatus" Foreground="#2A2A2A" Text="Ready." TextWrapping="Wrap" DockPanel.Dock="Left"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
+                    <Button x:Name="btnApplySorting" Content="Apply Sorting" Width="100" Height="28"
+                            Margin="10 0 0 0" Click="on_apply_sorting" IsEnabled="False"
+                            ToolTip="Save all pending sorting and manual reordering to Revit in one transaction."/>
+                    <Button x:Name="btnResetSorting" Content="Reset Sorting" Width="100" Height="28"
+                            Margin="10 0 0 0" Click="on_reset_sorting" IsEnabled="False"
+                            ToolTip="Discard pending sorting and manual reordering and show the saved Revit order."/>
                     <Button Content="Help" Width="88" Height="28" Margin="10 0 0 0" Click="on_help"/>
                     <Button Content="Close" Width="88" Height="28" Margin="10 0 0 0" Click="on_close"/>
                 </StackPanel>
             </DockPanel>
         </Border>
+        <TextBlock x:Name="txtStatus" Grid.Row="2" Foreground="#2A2A2A" Text="Ready."
+                   TextWrapping="Wrap" Margin="8 6 8 0"/>
     </Grid>
 </Window>
