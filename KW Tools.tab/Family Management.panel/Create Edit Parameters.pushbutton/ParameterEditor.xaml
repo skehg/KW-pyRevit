@@ -142,7 +142,38 @@
                             </GroupStyle>
                         </DataGrid.GroupStyle>
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Name"      Width="160" Binding="{Binding Name}" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Name" Width="160" Binding="{Binding Name}" IsReadOnly="True">
+                                <DataGridTextColumn.HeaderStyle>
+                                    <Style TargetType="DataGridColumnHeader">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    </Style>
+                                </DataGridTextColumn.HeaderStyle>
+                                <DataGridTextColumn.HeaderTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Name" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="8,0,0,0"
+                                                       ToolTip="Instance parameter names are dark blue and italic; type parameter names are normal."><Run FontStyle="Italic" Foreground="#0D47A1" Text="Inst"/><Run Text="/Type"/></TextBlock>
+                                        </Grid>
+                                    </DataTemplate>
+                                </DataGridTextColumn.HeaderTemplate>
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Margin" Value="2,0"/>
+                                        <Setter Property="FontStyle" Value="Normal"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding InstanceTypeLabel}" Value="Instance">
+                                                <Setter Property="FontStyle" Value="Italic"/>
+                                                <Setter Property="Foreground" Value="#0D47A1"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
                             <DataGridTextColumn Header="Group"     Width="110" Binding="{Binding GroupLabel}" Visibility="Collapsed" IsReadOnly="True"/>
                             <DataGridTemplateColumn Header="Value" Width="160">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -158,7 +189,7 @@
                                 </DataGridTemplateColumn.CellEditingTemplate>
                             </DataGridTemplateColumn>
                             <DataGridTextColumn Header="Formula"   Width="200" Binding="{Binding Formula}" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Inst/Type" Width="68"  Binding="{Binding InstanceTypeLabel}" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Inst/Type" Width="68"  Binding="{Binding InstanceTypeLabel}" Visibility="Collapsed" IsReadOnly="True"/>
                         </DataGrid.Columns>
                     </DataGrid>
                     <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0 8 0 0">
@@ -505,7 +536,7 @@
                 <!-- ═══════════════════════════════════════════════════════ -->
                 <!-- TAB 6: Import Parameters                               -->
                 <!-- ═══════════════════════════════════════════════════════ -->
-                <TabItem x:Name="tabImport" Header="Import Parameters">
+                <TabItem x:Name="tabImport" Header="Import">
                     <Grid Margin="10">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>

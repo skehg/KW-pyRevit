@@ -5,12 +5,13 @@ Parameter Editor lets you create, edit, sort, reorder, batch edit, and import fa
 ## Main areas
 
 - Left panel: searchable parameter grid with collapsible groups, optional formula search, and group filtering.
+  - Instance parameter names are dark blue and italic; type parameter names are normal. The Name header shows a matching *Inst*/Type legend at the right instead of a separate Inst/Type column.
   - Groups follow the names in `lib/RevitGroupOrder.txt` in all supported Revit versions, not alphabetical or internal ID order. Only groups present in the family appear; unlisted groups follow the known sequence alphabetically. Reopen the tool after changing that file.
   - The group filter uses the same sequence. Parameter order within each grid group is preserved.
 - Tabs on right:
   - Edit Existing Parameter / Batch Edit (leftmost, depending on selection)
   - Create New Parameter
-  - Import Parameters
+  - Import
 
 The Edit Existing Parameter tab is shown for a single selection (or no selection).
 Selecting multiple parameters hides it and shows Batch Edit instead. If either
@@ -66,9 +67,10 @@ other active tabs stay open.
 - Find/replace plus prefix/suffix rename.
 - Duplicate or delete selected parameters.
 
-## Import Parameters
+## Import
 
 - Import parameters, nested families, and object styles from a source family.
+- Parameters start unchecked when a source family is loaded. Select individual parameters or use **Select All** to choose what to import.
 - Filter import lists and choose transfer options.
 
 ## Tips

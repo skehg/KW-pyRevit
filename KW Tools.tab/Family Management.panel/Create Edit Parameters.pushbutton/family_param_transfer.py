@@ -79,8 +79,7 @@ class SourceParamItem(_NotifyBase):
         self.IsShared = fp.IsShared
         self.SharedLabel = u"Yes" if fp.IsShared else u""
         self.IsLikelyNonTransferable = _is_likely_nontransferable(fp)
-        # Non-transferable (built-in) params default to unselected
-        self._is_selected = not self.IsLikelyNonTransferable
+        self._is_selected = False
         try:
             self.Guid = fp.GUID
         except Exception:
