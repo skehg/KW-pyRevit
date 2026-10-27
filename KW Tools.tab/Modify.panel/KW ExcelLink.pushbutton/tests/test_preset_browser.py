@@ -103,6 +103,28 @@ class PresetBrowserTests(unittest.TestCase):
         window._refresh()
         self.assertTrue(window.treePresets.Items[0].Items[0].IsExpanded)
 
+    def test_refresh_does_not_compare_tree_node_dictionaries(self):
+        class NonComparableNode(dict):
+            def __eq__(self, other):
+                raise AssertionError("Tree nodes must not be compared by value")
+
+            def __ne__(self, other):
+                raise AssertionError("Tree nodes must not be compared by value")
+
+        roots = [
+            NonComparableNode(node) for node in self.module.library_tree(self.items)
+        ]
+        window = self.window()
+        with patch.object(self.module, "library_tree", return_value=roots):
+            window._refresh()
+
+        for root in window.treePresets.Items:
+            self.assertTrue(root.IsExpanded)
+            for child in root.Items:
+                self.assertFalse(child.IsExpanded)
+        leaf = window.treePresets.Items[0].Items[0].Items[0].Items[0]
+        self.assertIs(leaf.Tag, self.items[0])
+
     def test_xaml_wires_search_selection_and_buttons(self):
         tree = ET.parse(os.path.join(ROOT, "ui", "preset_browser.xaml"))
         attributes = [node.attrib for node in tree.iter()]

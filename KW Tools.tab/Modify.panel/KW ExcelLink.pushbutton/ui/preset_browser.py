@@ -54,12 +54,12 @@ class PresetBrowserWindow(forms.WPFWindow):
     def _refresh(self):
         from System.Windows.Controls import TreeViewItem
 
-        def add_nodes(collection, nodes):
+        def add_nodes(collection, nodes, is_root=False):
             for node in nodes:
                 control = TreeViewItem()
                 control.Header = node["label"]
                 control.Tag = node["item"]
-                control.IsExpanded = bool(query) or node in roots
+                control.IsExpanded = bool(query) or is_root
                 if node["item"]:
                     control.ToolTip = presets.preset_label(node["item"])
                 collection.Add(control)
@@ -70,7 +70,7 @@ class PresetBrowserWindow(forms.WPFWindow):
         self.treePresets.Items.Clear()
         self.btnSelect.IsEnabled = False
         self.lblSelected.Text = "Select a preset. Folders cannot be loaded."
-        add_nodes(self.treePresets.Items, roots)
+        add_nodes(self.treePresets.Items, roots, is_root=True)
 
     def on_search_changed(self, sender, args):
         if hasattr(self, "treePresets") and hasattr(self, "btnSelect"):
