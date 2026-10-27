@@ -66,11 +66,63 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBox x:Name="txt_pattern" Grid.Column="0"
                          Height="28" FontSize="12" FontFamily="Courier New"/>
-                <TextBlock Text="Final Case:" Grid.Column="1" Margin="12,0,6,0"/>
-                <ComboBox x:Name="combo_final_case" Grid.Column="2" Width="105"
+                <ToggleButton x:Name="btn_use_orig" Grid.Column="1" MinWidth="110"
+                              Margin="5,0" Padding="5,3" IsChecked="False">
+                    <ToggleButton.Style>
+                        <Style TargetType="ToggleButton">
+                            <Setter Property="Content" Value="Source"/>
+                            <Setter Property="ToolTip" Value="Switch to Source ({orig}, the complete source value)."/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="switch_border" CornerRadius="4"
+                                                BorderThickness="1" BorderBrush="Transparent"
+                                                Background="Transparent" Padding="{TemplateBinding Padding}">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Border x:Name="switch_track" Width="36" Height="20"
+                                                        CornerRadius="10" Background="#777777"
+                                                        Margin="0,0,7,0">
+                                                    <Ellipse x:Name="switch_thumb" Width="16" Height="16"
+                                                             Fill="White" Margin="2"
+                                                             HorizontalAlignment="Left"/>
+                                                </Border>
+                                                <ContentPresenter VerticalAlignment="Center"
+                                                                  RecognizesAccessKey="True"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="switch_track" Property="Background" Value="#287D46"/>
+                                                <Setter TargetName="switch_thumb" Property="HorizontalAlignment" Value="Right"/>
+                                            </Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="switch_border" Property="Background" Value="#E8EEF4"/>
+                                            </Trigger>
+                                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                                <Setter TargetName="switch_border" Property="BorderBrush" Value="#0078D4"/>
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter TargetName="switch_border" Property="Opacity" Value="0.5"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter Property="Content" Value="Pattern"/>
+                                    <Setter Property="ToolTip" Value="Restore your previous pattern."/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ToggleButton.Style>
+                </ToggleButton>
+                <TextBlock Text="Final Case:" Grid.Column="2" Margin="12,0,6,0"/>
+                <ComboBox x:Name="combo_final_case" Grid.Column="3" Width="105"
                           ToolTip="Convert the complete generated value after Find/Replace.">
                     <ComboBoxItem Content="None"/>
                     <ComboBoxItem Content="upper"/>
@@ -262,7 +314,7 @@
                     Background="#E67E22" Foreground="White" BorderBrush="#C96A12" FontWeight="Bold"/>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                 <Button x:Name="btn_apply" Content="Apply Re-Value" Width="140"/>
-                <Button x:Name="btn_cancel" Content="Cancel" Width="80"/>
+                <Button x:Name="btn_close" Content="Close" Width="80"/>
             </StackPanel>
         </DockPanel>
     </Grid>

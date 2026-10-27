@@ -27,7 +27,8 @@ def load_preview_classes():
                       'populate_source_parameters', 'get_original_source_text',
                       'get_selected_original_param_name', 'refresh_preview_filters',
                       '_selected_combo_text', '_pattern_uses_counter',
-                      'commit_preview_edits',
+                      'commit_preview_edits', 'OnApply', 'OnClose',
+                      'OnUseOriginal', 'OnSettingsChanged', 'update_preview',
                       'OnClearFilters', 'OnEditFilters')
     for node in SCRIPT_TREE.body:
         if isinstance(node, ast.Assign) and any(
@@ -359,6 +360,193 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual('auto', self.dialog.settings_row.Height)
         self.assertEqual(3, self.dialog.preview_row.Height.Value)
         self.assertEqual('star', self.dialog.preview_row.Height.GridUnitType)
+
+
+class RepeatedApplyTests(unittest.TestCase):
+    def setUp(self):
+        self.dialog = ReValueDialog()
+        self.dialog.window = mock.Mock()
+        self.dialog.is_instance_mode = True
+        self.dialog._suspend_events = False
+        self.dialog._parameter_filter_error = ''
+        self.dialog.txt_pattern = TextBox('{orig}')
+        self.dialog.btn_use_orig = types.SimpleNamespace(IsChecked=False)
+        self.dialog._pattern_before_original = None
+        self.dialog.txt_find = TextBox('Door')
+        self.dialog.txt_replace = TextBox('Entry')
+        self.dialog.chk_match_case = types.SimpleNamespace(IsChecked=True)
+        self.dialog.chk_match_whole_word = types.SimpleNamespace(IsChecked=False)
+        self.dialog._selected_final_case = lambda: 'None'
+        self.dialog.get_selected_original_param_name = lambda: ''
+        self.dialog.get_tokenizer_func = lambda: lambda value: value.split('-')
+        self.dialog.get_counter_generator = lambda: (None, None)
+        self.dialog.get_selected_param_values = lambda element: []
+        self.dialog.update_tokenization_display = mock.Mock()
+        self.dialog.persist_settings = mock.Mock()
+        self.dialog.preview_items = []
+        for name in ('Door-A', 'Door-B'):
+            element = LayoutPart()
+            element.name = name
+            self.dialog.preview_items.append(PreviewItem(element, name))
+        self.dialog.txt_filter_current = TextBox()
+        self.dialog.txt_filter_new = TextBox()
+        self.dialog.preview_grid = Grid(
+            self.dialog.preview_items, self.dialog.matches_preview_filters)
+        self.dialog.refresh_preview_filters = mock.Mock(
+            side_effect=self.dialog.preview_grid.Items.Refresh)
+        self.globals = ReValueDialog.OnApply.__globals__
+        patch = mock.patch.dict(self.globals, {
+            'forms': mock.Mock(),
+            'revalue_elements': mock.Mock(side_effect=self.apply_to_model),
+            '_sequence_source_refs': lambda pattern: [],
+            'apply_pattern': load_pattern_function()['apply_pattern'],
+        })
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.dialog.update_preview()
+
+    def apply_to_model(self, changes, is_instance_mode, target):
+        for element, value in changes.items():
+            element.name = value
+        return True
+
+    def test_apply_stays_open_reloads_values_and_clears_find_replace(self):
+        self.dialog.preview_items[0].final = True
+        self.dialog.OnApply(None, None)
+        self.dialog.window.Close.assert_not_called()
+        self.assertEqual('', self.dialog.txt_find.Text)
+        self.assertEqual('', self.dialog.txt_replace.Text)
+        self.assertFalse(self.dialog._suspend_events)
+        self.assertTrue(all(not row.final for row in self.dialog.preview_items))
+        self.assertEqual(['Entry-A', 'Entry-B'],
+                         [row.CurrentName for row in self.dialog.preview_items])
+        self.assertTrue(all(not row.HasChanges for row in self.dialog.preview_items))
+        self.dialog.persist_settings.assert_called_once_with()
+        self.dialog.update_tokenization_display.assert_called()
+        self.assertEqual('{orig}', self.dialog.txt_pattern.Text)
+        self.assertTrue(self.dialog.chk_match_case.IsChecked)
+
+        self.dialog.txt_find.Text = 'Entry'
+        self.dialog.txt_replace.Text = 'Opening'
+        self.dialog.update_preview()
+        self.dialog.OnApply(None, None)
+        self.assertEqual(['Opening-A', 'Opening-B'],
+                         [row.CurrentName for row in self.dialog.preview_items])
+        self.assertEqual(2, self.globals['revalue_elements'].call_count)
+
+    def test_only_visible_rows_are_written_and_filters_are_preserved(self):
+        self.dialog.txt_filter_current.Text = 'Door-A'
+        self.dialog.preview_grid.Items.Refresh()
+        self.dialog.OnApply(None, None)
+        self.assertEqual(['Entry-A', 'Door-B'],
+                         [row.CurrentName for row in self.dialog.preview_items])
+        self.assertEqual('Door-A', self.dialog.txt_filter_current.Text)
+        self.assertEqual(0, self.dialog.preview_grid.Items.Count)
+
+    def test_parameter_target_reloads_actual_parameter_values(self):
+        self.dialog.get_selected_original_param_name = lambda: '[Code]'
+        self.dialog.get_param_value = lambda element, name: element.name
+        self.dialog.OnApply(None, None)
+        self.assertEqual('[Code]', self.globals['revalue_elements'].call_args[0][2])
+        self.assertEqual('Entry-A', self.dialog.preview_items[0].CurrentName)
+
+    def test_partial_failure_reloads_actual_values_not_proposed_values(self):
+        def partial_apply(changes, is_instance_mode, target):
+            element, value = next(iter(changes.items()))
+            element.name = value
+            return True
+        self.globals['revalue_elements'].side_effect = partial_apply
+        self.dialog.OnApply(None, None)
+        self.assertEqual(['Entry-A', 'Door-B'],
+                         [row.CurrentName for row in self.dialog.preview_items])
+        self.assertTrue(all(not row.HasChanges for row in self.dialog.preview_items))
+        self.assertEqual('', self.dialog.txt_find.Text)
+
+    def test_transaction_error_preserves_inputs_and_preview(self):
+        self.globals['revalue_elements'].side_effect = None
+        self.globals['revalue_elements'].return_value = False
+        self.dialog.OnApply(None, None)
+        self.assertEqual('Door', self.dialog.txt_find.Text)
+        self.assertEqual('Entry', self.dialog.txt_replace.Text)
+        self.assertEqual('Door-A', self.dialog.preview_items[0].CurrentName)
+        self.dialog.persist_settings.assert_not_called()
+        self.dialog.window.Close.assert_not_called()
+
+    def test_no_changes_preserves_inputs_without_writing(self):
+        for row in self.dialog.preview_items:
+            row.NewName = row.CurrentName
+        self.dialog.OnApply(None, None)
+        self.globals['revalue_elements'].assert_not_called()
+        self.globals['forms'].alert.assert_called_once_with("No changes to apply.")
+        self.assertEqual('Door', self.dialog.txt_find.Text)
+
+    def test_invalid_filter_prevents_writes(self):
+        self.dialog._parameter_filter_error = 'Invalid filter'
+        self.dialog.OnApply(None, None)
+        self.globals['revalue_elements'].assert_not_called()
+        self.globals['forms'].alert.assert_called_once_with('Invalid filter')
+
+    def test_pending_cell_and_row_edits_are_committed_before_writing(self):
+        self.dialog.OnApply(None, None)
+        self.assertEqual([('cell', True), ('row', True)],
+                         self.dialog.preview_grid.commits)
+
+    def test_uncommittable_edit_prevents_writes_and_reset(self):
+        self.dialog.preview_grid.CommitEdit = mock.Mock(return_value=False)
+        self.dialog.OnApply(None, None)
+        self.globals['revalue_elements'].assert_not_called()
+        self.assertEqual('Door', self.dialog.txt_find.Text)
+
+    def test_close_does_not_apply_pending_changes(self):
+        self.dialog.OnClose(None, None)
+        self.dialog.window.Close.assert_called_once_with()
+        self.globals['revalue_elements'].assert_not_called()
+
+    def test_original_toggle_restores_pattern_across_repeated_cycles(self):
+        self.dialog.txt_pattern.Text = '{val1}-{count}'
+        for _ in range(2):
+            self.dialog.btn_use_orig.IsChecked = True
+            self.dialog.OnUseOriginal(None, None)
+            self.assertEqual('{orig}', self.dialog.txt_pattern.Text)
+            self.dialog.btn_use_orig.IsChecked = False
+            self.dialog.OnUseOriginal(None, None)
+            self.assertEqual('{val1}-{count}', self.dialog.txt_pattern.Text)
+        self.assertEqual('Door', self.dialog.txt_find.Text)
+
+    def test_original_toggle_restores_empty_pattern(self):
+        self.dialog.txt_pattern.Text = ''
+        self.dialog.btn_use_orig.IsChecked = True
+        self.dialog.OnUseOriginal(None, None)
+        self.dialog.btn_use_orig.IsChecked = False
+        self.dialog.OnUseOriginal(None, None)
+        self.assertEqual('', self.dialog.txt_pattern.Text)
+
+    def test_original_toggle_preserves_saved_pattern_after_apply(self):
+        self.dialog.txt_pattern.Text = '{val1}-{count}'
+        self.dialog.btn_use_orig.IsChecked = True
+        self.dialog.OnUseOriginal(None, None)
+        self.dialog.OnApply(None, None)
+        self.assertTrue(self.dialog.btn_use_orig.IsChecked)
+        self.dialog.btn_use_orig.IsChecked = False
+        self.dialog.OnUseOriginal(None, None)
+        self.assertEqual('{val1}-{count}', self.dialog.txt_pattern.Text)
+
+    def test_editing_original_pattern_turns_toggle_off_and_keeps_edit(self):
+        self.dialog.txt_pattern.Text = '{val1}'
+        self.dialog.btn_use_orig.IsChecked = True
+        self.dialog.OnUseOriginal(None, None)
+        self.dialog.txt_pattern.Text = '{orig}-edited'
+        self.dialog.OnSettingsChanged(self.dialog.txt_pattern, None)
+        self.assertFalse(self.dialog.btn_use_orig.IsChecked)
+        self.assertIsNone(self.dialog._pattern_before_original)
+        self.assertEqual('{orig}-edited', self.dialog.txt_pattern.Text)
+        self.dialog.btn_use_orig.IsChecked = True
+        self.dialog.OnUseOriginal(None, None)
+        self.dialog.OnSettingsChanged(self.dialog.txt_pattern, None)
+        self.assertTrue(self.dialog.btn_use_orig.IsChecked)
+        self.dialog.btn_use_orig.IsChecked = False
+        self.dialog.OnUseOriginal(None, None)
+        self.assertEqual('{orig}-edited', self.dialog.txt_pattern.Text)
 
 
 class FindReplaceTests(unittest.TestCase):

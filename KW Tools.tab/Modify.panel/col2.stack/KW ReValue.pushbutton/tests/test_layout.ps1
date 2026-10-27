@@ -20,7 +20,39 @@ $settingsRow = $window.FindName('settings_row')
 $previewRow = $window.FindName('preview_row')
 $help = $window.FindName('btn_help')
 $apply = $window.FindName('btn_apply')
-$cancel = $window.FindName('btn_cancel')
+$close = $window.FindName('btn_close')
+if ($close.Content -ne 'Close') { throw 'The main dialog exit button must say Close.' }
+$useOrig = $window.FindName('btn_use_orig')
+if ($useOrig -isnot [System.Windows.Controls.Primitives.ToggleButton]) {
+    throw 'The original-pattern shortcut must be a toggle.'
+}
+if ($useOrig.IsChecked) { throw 'The original-pattern toggle must start off.' }
+if ($useOrig.Content -ne 'Source') { throw 'The switch must offer Source when off.' }
+$null = $useOrig.ApplyTemplate()
+$track = $useOrig.Template.FindName('switch_track', $useOrig)
+$thumb = $useOrig.Template.FindName('switch_thumb', $useOrig)
+if ($null -eq $track -or $null -eq $thumb) { throw 'The switch track and thumb are missing.' }
+if ($thumb.HorizontalAlignment -ne 'Left' -or $track.Background.Color.ToString() -ne '#FF777777') {
+    throw 'The off switch must have a grey track and left-aligned thumb.'
+}
+$useOrig.IsChecked = $true
+if ($useOrig.Content -ne 'Pattern') { throw 'The switch must offer Pattern when on.' }
+if ($thumb.HorizontalAlignment -ne 'Right' -or $track.Background.Color.ToString() -ne '#FF287D46') {
+    throw 'The on switch must have a green track and right-aligned thumb.'
+}
+if ($useOrig.ToolTip -ne 'Restore your previous pattern.') { throw 'The on tooltip must describe restoring the pattern.' }
+$useOrig.IsChecked = $false
+if ($useOrig.Content -ne 'Source') { throw 'The switch must return to offering Source when off.' }
+if ($thumb.HorizontalAlignment -ne 'Left') { throw 'The thumb must return to the left when off.' }
+if ($useOrig.ToolTip -notlike 'Switch to Source*') { throw 'The off tooltip must describe switching to Source.' }
+$switchPeer = [System.Windows.Automation.Peers.UIElementAutomationPeer]::CreatePeerForElement($useOrig)
+$toggleProvider = $switchPeer.GetPattern([System.Windows.Automation.Peers.PatternInterface]::Toggle)
+$toggleProvider.Toggle()
+if (-not $useOrig.IsChecked -or $useOrig.Content -ne 'Pattern') {
+    throw 'The switch must support accessible toggle actions.'
+}
+$toggleProvider.Toggle()
+Write-Output 'PASS: switch appearance, destination labels, tooltips and accessible toggling.'
 $splitter = $root.Children | Where-Object { $_ -is [System.Windows.Controls.GridSplitter] }
 $scroll = $more.Content
 $filterSummary = $window.FindName('txt_filter_summary')
@@ -55,15 +87,15 @@ function Measure-Layout([double]$width, [double]$height) {
 function Assert-Footer {
     $helpPosition = $help.TranslatePoint([System.Windows.Point]::new(0, 0), $root)
     $applyPosition = $apply.TranslatePoint([System.Windows.Point]::new(0, 0), $root)
-    $cancelPosition = $cancel.TranslatePoint([System.Windows.Point]::new(0, 0), $root)
+    $closePosition = $close.TranslatePoint([System.Windows.Point]::new(0, 0), $root)
     if ([Math]::Abs($helpPosition.Y - $applyPosition.Y) -gt 1 -or
-        [Math]::Abs($applyPosition.Y - $cancelPosition.Y) -gt 1) {
+        [Math]::Abs($applyPosition.Y - $closePosition.Y) -gt 1) {
         throw 'Footer buttons do not share the same horizontal row.'
     }
     if ($helpPosition.X -gt 10 -or $applyPosition.X -le $root.ActualWidth / 2) {
-        throw 'Help must be left justified and Apply/Cancel right justified.'
+        throw 'Help must be left justified and Apply/Close right justified.'
     }
-    if ($cancelPosition.Y + $cancel.ActualHeight -gt $root.ActualHeight) {
+    if ($closePosition.Y + $close.ActualHeight -gt $root.ActualHeight) {
         throw 'Footer buttons extend below the dialog.'
     }
 }
@@ -81,6 +113,11 @@ foreach ($size in @(@(1010, 880), @(720, 430))) {
         throw 'Divider should be hidden when More Settings is collapsed.'
     }
     Assert-Footer
+    $pattern = $window.FindName('txt_pattern')
+    if ($pattern.ActualWidth -lt 100 -or
+        $useOrig.ActualWidth + $useOrig.Margin.Left + $useOrig.Margin.Right + 0.1 -lt $useOrig.DesiredSize.Width) {
+        throw 'Pattern and the original-pattern shortcut must remain usable.'
+    }
     Write-Output ("PASS: collapsed {0}x{1}, preview height {2:N0} ({3:P0})." -f
         $size[0], $size[1], $preview.ActualHeight,
         ($preview.ActualHeight / $root.ActualHeight))

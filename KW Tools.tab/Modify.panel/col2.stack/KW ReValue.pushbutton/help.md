@@ -32,10 +32,12 @@ The **Final Case** dropdown converts the complete generated value, including lit
 4. Expand **More Settings** to adjust token delimiters if required.
 5. Choose a source parameter, or keep the bracketed **Default** option to use the element/type name.
 6. In **More Settings**, pick up to 5 parameters for substitution.
-7. Enter a pattern.
+7. Enter a pattern. The sliding switch beside Pattern is labelled with the action it will perform: click **Source** to use `{orig}` (the complete source value), then click **Pattern** to restore your previous pattern (kept while the dialog is open, including after applying changes). The switch is grey with its thumb on the left when off, and green with its thumb on the right while Source is enabled. Editing the pattern while Source is enabled turns the switch off, changes its label back to **Source**, and keeps your edit; the next switch remembers that new pattern.
 8. Optionally set the counter in **More Settings** and final find/replace in the main controls.
 9. Review Current Value and New Value in the preview. Rows with different values are highlighted pale yellow.
 10. Optionally type into the Current Value and New Value header filters, then click Apply Re-Value. Only rows remaining in the filtered preview are eligible to be changed, including rows below the scroll area.
+11. After the result message, the dialog stays open and reloads current values from the model. Find and Replace are cleared, and Final rows are unfrozen so the next preview is recalculated. Pattern, mode, parameter choices, counter settings, case options and filters are preserved. Filters are re-evaluated against the updated values, so changed rows may no longer be visible.
+12. Repeat as needed, then click **Close**. Closing does not apply pending changes or undo earlier applies.
 
 ## Choosing elements
 
@@ -55,7 +57,7 @@ The **Final Case** dropdown converts the complete generated value, including lit
 - **More Settings** starts collapsed and contains parameter mappings, token delimiters, the counter and the token display. Collapsing it does not reset any values.
 - When expanded, drag the horizontal divider to adjust the balance between More Settings and Preview. The settings area scrolls independently when space is limited.
 - Collapsing More Settings returns the available space to the preview; reopening it restores the default settings/preview split.
-- **Help** is at the bottom left, on the same row as **Apply Re-Value** and **Cancel** at the bottom right.
+- **Help** is at the bottom left, on the same row as **Apply Re-Value** and **Close** at the bottom right.
 
 ## Default source
 
@@ -70,6 +72,7 @@ The **Final Case** dropdown converts the complete generated value, including lit
 - **Match Case** requires matching uppercase/lowercase letters. It starts checked to preserve the existing behavior; uncheck it to ignore case.
 - **Match Whole Word** prevents matches inside longer words. Letters, digits and underscores count as word characters; spaces and hyphens separate words. For example, finding `Door` matches `Door-A` but not `Doorway` or `Door_A`.
 - Both options can be combined and are remembered for the current Revit session. Changing either option updates the preview immediately, except for frozen Final rows.
+- Find and Replace text is cleared after each completed apply (including an apply with individual failed rows); the matching options are preserved. If there are no changes, editing is incomplete, or the operation errors out, the text is kept for correction or retry.
 
 ## Preview filters
 

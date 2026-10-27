@@ -1096,8 +1096,8 @@ class ReValueDialog(object):
         self.preview_items = ObservableCollection[object]()
         self.available_params = []
         self.param_values_map = {}
-        self.result = False
         self._suspend_events = False
+        self._pattern_before_original = None
         
         # Get controls - mode toggle
         self.radio_type = self.window.FindName('radio_type')
@@ -1120,6 +1120,7 @@ class ReValueDialog(object):
         
         # Get controls - pattern
         self.txt_pattern = self.window.FindName('txt_pattern')
+        self.btn_use_orig = self.window.FindName('btn_use_orig')
         self.combo_final_case = self.window.FindName('combo_final_case')
 
         # Get controls - optional counter
@@ -1141,7 +1142,7 @@ class ReValueDialog(object):
         self.txt_filter_new = self.window.FindName('txt_filter_new')
         self.btn_help = self.window.FindName('btn_help')
         self.btn_apply = self.window.FindName('btn_apply')
-        self.btn_cancel = self.window.FindName('btn_cancel')
+        self.btn_close = self.window.FindName('btn_close')
         self.more_settings = self.window.FindName('more_settings')
         self.settings_row = self.window.FindName('settings_row')
         self.preview_row = self.window.FindName('preview_row')
@@ -1183,6 +1184,7 @@ class ReValueDialog(object):
             checkbox.Unchecked += self.OnSettingsChanged
         
         self.txt_pattern.TextChanged += self.OnSettingsChanged
+        self.btn_use_orig.Click += self.OnUseOriginal
         self.preview_grid.SelectedCellsChanged += self.OnGridSelectionChanged
         self.txt_filter_current.TextChanged += self.OnPreviewFilterChanged
         self.txt_filter_new.TextChanged += self.OnPreviewFilterChanged
@@ -1195,7 +1197,7 @@ class ReValueDialog(object):
             self.btn_help.Click += self.OnHelp
         
         self.btn_apply.Click += self.OnApply
-        self.btn_cancel.Click += self.OnCancel
+        self.btn_close.Click += self.OnClose
         
         # Initialize data
         self.initialize_data()
@@ -1651,6 +1653,9 @@ class ReValueDialog(object):
         """Called when patterns or parameters change"""
         if self._suspend_events:
             return
+        if self.btn_use_orig.IsChecked and self.txt_pattern.Text != '{orig}':
+            self.btn_use_orig.IsChecked = False
+            self._pattern_before_original = None
         self.persist_settings()
         self.update_preview()
     
@@ -1708,10 +1713,10 @@ class ReValueDialog(object):
 
     def commit_preview_edits(self):
         if not self.preview_grid.CommitEdit(DataGridEditingUnit.Cell, True):
-            forms.alert("Finish editing the preview cell before filtering.")
+            forms.alert("Finish editing the preview cell before continuing.")
             return False
         if not self.preview_grid.CommitEdit(DataGridEditingUnit.Row, True):
-            forms.alert("Finish editing the preview row before filtering.")
+            forms.alert("Finish editing the preview row before continuing.")
             return False
         return True
 
@@ -1754,24 +1759,49 @@ class ReValueDialog(object):
             forms.alert("Could not open Help window: {}".format(str(ex)))
     
     def OnApply(self, sender, args):
-        """Apply button clicked"""
+        """Apply changes and reload the preview without closing the dialog."""
+        if not self.commit_preview_edits():
+            return
         if self._parameter_filter_error:
             forms.alert(self._parameter_filter_error)
             return
-        self.result = True
-        self.window.DialogResult = True
-        self.window.Close()
-    
-    def OnCancel(self, sender, args):
-        """Cancel button clicked"""
-        self.result = False
-        self.window.DialogResult = False
+        revalue_map = self.get_revalue_map()
+        if not revalue_map:
+            forms.alert("No changes to apply.")
+            return
+        target_param_name = _resolve_target_param_name(
+            self.get_selected_original_param_name())
+        if not revalue_elements(revalue_map, self.is_instance_mode, target_param_name):
+            return
+
+        self._suspend_events = True
+        try:
+            self.txt_find.Text = ''
+            self.txt_replace.Text = ''
+            for item in self.preview_items:
+                item.final = False
+        finally:
+            self._suspend_events = False
+        self.persist_settings()
+        self.update_preview()
+
+    def OnUseOriginal(self, sender, args):
+        """Temporarily use the source value, or restore the previous pattern."""
+        if self.btn_use_orig.IsChecked:
+            self._pattern_before_original = self.txt_pattern.Text
+            self.txt_pattern.Text = '{orig}'
+        elif self._pattern_before_original is not None:
+            pattern = self._pattern_before_original
+            self._pattern_before_original = None
+            self.txt_pattern.Text = pattern
+
+    def OnClose(self, sender, args):
+        """Close without applying pending changes."""
         self.window.Close()
     
     def show_dialog(self):
-        """Show the dialog and return result"""
+        """Show the dialog for repeated re-value actions."""
         self.window.ShowDialog()
-        return self.result
     
     def get_revalue_map(self):
         """Get changes only for rows included in the filtered preview."""
@@ -1821,7 +1851,8 @@ def get_selected_elements():
 def revalue_elements(revalue_map, is_instance_mode, target_param_name=''):
     """Re-value elements based on the revalue map (name or parameter target)."""
     if not revalue_map:
-        forms.alert("No elements to re-value.", exitscript=True)
+        forms.alert("No elements to re-value.")
+        return False
 
     try:
         success_count = 0
@@ -1916,9 +1947,11 @@ def revalue_elements(revalue_map, is_instance_mode, target_param_name=''):
             message += "\n{} element(s) failed (see output for details).".format(failed_count)
         
         forms.alert(message)
+        return True
         
     except Exception as e:
-        forms.alert("Error during re-value: {}".format(str(e)), exitscript=True)
+        forms.alert("Error during re-value: {}".format(str(e)))
+        return False
 
 
 def _resolve_target_param_name(selected_source_name):
@@ -1956,15 +1989,4 @@ if __name__ == '__main__':
         forms.alert("No elements selected.", exitscript=True)
     
     dialog = ReValueDialog(elements, is_instance_mode=False)
-    result = dialog.show_dialog()
-    
-    if result:
-        revalue_map = dialog.get_revalue_map()
-        is_inst_mode = dialog.is_instance_mode
-        target_param_name = _resolve_target_param_name(
-            dialog.get_selected_original_param_name())
-        
-        if revalue_map:
-            revalue_elements(revalue_map, is_inst_mode, target_param_name)
-        else:
-            forms.alert("No changes to apply.")
+    dialog.show_dialog()
