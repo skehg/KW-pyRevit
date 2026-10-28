@@ -29,7 +29,7 @@ def load_preview_classes():
                       '_selected_combo_text', '_pattern_uses_counter',
                       'commit_preview_edits', 'OnApply', 'OnClose',
                       'OnUseOriginal', 'OnSettingsChanged', 'update_preview',
-                      'OnClearFilters', 'OnEditFilters')
+                      'OnClearFilters', 'OnEditFilters', 'get_token_sample_item')
     for node in SCRIPT_TREE.body:
         if isinstance(node, ast.Assign) and any(
                 isinstance(target, ast.Name) and target.id in (
@@ -184,6 +184,9 @@ class GridItems(object):
 
     def __iter__(self):
         return iter(self.visible)
+
+    def __getitem__(self, index):
+        return self.visible[index]
 
     @property
     def Count(self):
@@ -709,6 +712,7 @@ class PreviewTests(unittest.TestCase):
         self.dialog._decimal_separator = '.'
         self.dialog._group_separator = ','
         self.dialog._parameter_filter_error = ''
+        self.dialog.update_tokenization_display = mock.Mock()
         self.dialog.get_param_value = lambda element, parameter: {
             'a': '900 mm', 'b': '1200 mm', 'c': '1500 mm',
             'd': '', 'e': 'not numeric',
@@ -872,6 +876,45 @@ class PreviewTests(unittest.TestCase):
         self.dialog.OnClearFilters(None, None)
         self.assertEqual({'a': 'Entry-01', 'b': 'Entry-02'},
                          self.dialog.get_revalue_map())
+
+
+class TokenSampleSelectionTests(unittest.TestCase):
+    def setUp(self):
+        self.dialog = ReValueDialog()
+        self.rows = [PreviewItem(str(i), name) for i, name in enumerate(
+            ('Door_Internal_01', 'Wall_External_02', 'Floor_Slab_03'))]
+        self.dialog.preview_grid = Grid(self.rows, lambda row: True)
+        self.dialog.preview_grid.SelectedCells = []
+
+    def select(self, *indices):
+        self.dialog.preview_grid.SelectedCells = [
+            types.SimpleNamespace(Item=self.rows[index], IsValid=True) for index in indices]
+
+    def test_single_row_and_multiple_cells_in_same_row(self):
+        for indices in ((1,), (1, 1, 1)):
+            self.select(*indices)
+            self.assertIs(self.rows[1], self.dialog.get_token_sample_item())
+
+    def test_range_uses_topmost_row_not_selection_direction(self):
+        for indices in ((2, 1, 0), (0, 1, 2), (2, 1, 1)):
+            self.select(*indices)
+            self.assertIs(self.rows[min(indices)], self.dialog.get_token_sample_item())
+
+    def test_range_follows_display_order(self):
+        self.select(0, 2)
+        self.dialog.preview_grid.Items.visible.reverse()
+        self.assertIs(self.rows[2], self.dialog.get_token_sample_item())
+
+    def test_no_selection_uses_first_filtered_row(self):
+        self.dialog.preview_grid.Items.visible = self.rows[1:]
+        self.assertIs(self.rows[1], self.dialog.get_token_sample_item())
+
+    def test_empty_grid_and_invalid_cell(self):
+        self.dialog.preview_grid.SelectedCells = [
+            types.SimpleNamespace(Item=None, IsValid=False)]
+        self.assertIs(self.rows[0], self.dialog.get_token_sample_item())
+        self.dialog.preview_grid.Items.visible = []
+        self.assertIsNone(self.dialog.get_token_sample_item())
 
 
 class ParameterComparisonTests(unittest.TestCase):

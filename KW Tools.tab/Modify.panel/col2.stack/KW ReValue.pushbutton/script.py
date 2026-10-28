@@ -1201,6 +1201,8 @@ class ReValueDialog(object):
         
         # Initialize data
         self.initialize_data()
+        from token_editor import TokenEditor
+        self.token_editor = TokenEditor(self, build_counter_generator)
         
     def initialize_data(self):
         """Initialize parameter list and preview items"""
@@ -1494,20 +1496,33 @@ class ReValueDialog(object):
 
         return str(selected).strip()
     
+    def get_token_sample_item(self):
+        """Use displayed order, not the order in which cells were selected."""
+        grid = self.preview_grid
+        if not grid.Items.Count:
+            return None
+        selected = set(cell.Item for cell in grid.SelectedCells if cell.IsValid)
+        if len(selected) == 1:
+            return next(iter(selected))
+        if selected:
+            for item in grid.Items:
+                if item in selected:
+                    return item
+        return grid.Items[0]
+
     def update_tokenization_display(self):
-        """Update tokenization display for first selected item"""
-        if self.txt_tokenization and len(self.preview_items) > 0:
-            first_item = self.preview_items[0]
-            source_text = self.get_original_source_text(first_item.Element)
-            
-            tokenizer_func = self.get_tokenizer_func()
-            tokens = tokenizer_func(source_text)
-            
-            if tokens:
-                token_display = ', '.join(['[{0}] {1}'.format(i+1, t) for i, t in enumerate(tokens)])
-                self.txt_tokenization.Text = 'Tokens: {}'.format(token_display)
-            else:
-                self.txt_tokenization.Text = 'Tokens: (none)'
+        """Refresh only token samples; never recalculate preview values."""
+        if self._suspend_events:
+            return
+        editor = getattr(self, 'token_editor', None)
+        if editor is not None:
+            editor.refresh()
+        if self.txt_tokenization:
+            item = self.get_token_sample_item()
+            tokens = self.get_tokenizer_func()(item.CurrentName) if item is not None else []
+            token_display = ', '.join('[{0}] {1}'.format(i + 1, value)
+                                      for i, value in enumerate(tokens))
+            self.txt_tokenization.Text = 'Tokens: ' + (token_display or '(none)')
 
     def get_counter_generator(self):
         """Build counter generator only when pattern asks for a counter token."""
@@ -1710,6 +1725,7 @@ class ReValueDialog(object):
             status += (' {} row(s) excluded: blank/non-numeric or unsupported display '
                        'format (use decimal project units).').format(invalid_values)
         self.txt_filter_status.Text = status
+        self.update_tokenization_display()
 
     def commit_preview_edits(self):
         if not self.preview_grid.CommitEdit(DataGridEditingUnit.Cell, True):

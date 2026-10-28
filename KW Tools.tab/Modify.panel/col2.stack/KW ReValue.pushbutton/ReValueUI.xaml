@@ -46,6 +46,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,6">
@@ -60,7 +61,13 @@
                           ToolTip="The bracketed Default option uses the system name shown for this selection and mode. Select a parameter to use its value instead."/>
             </StackPanel>
 
-            <TextBlock Text="Pattern:" Grid.Row="1" Grid.Column="0" Margin="3,0,10,6"/>
+            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,8,6">
+                <ComboBox x:Name="combo_editor_mode" Width="130" SelectedIndex="0"
+                          ToolTip="Build a pattern with chips, or edit the existing syntax directly.">
+                    <ComboBoxItem Content="Tokens"/>
+                    <ComboBoxItem Content="Advanced Pattern"/>
+                </ComboBox>
+            </StackPanel>
             <Grid Grid.Row="1" Grid.Column="1" Margin="0,0,0,6">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -132,8 +139,32 @@
                 </ComboBox>
             </Grid>
 
-            <TextBlock Text="Find/Replace:" Grid.Row="2" Grid.Column="0" Margin="3,0,10,6"/>
-            <Grid Grid.Row="2" Grid.Column="1" Margin="0,0,0,6">
+            <StackPanel Grid.Row="2" Grid.ColumnSpan="2">
+                <StackPanel x:Name="token_editor_panel" Visibility="Visible">
+                    <TextBlock x:Name="token_sample" Text="Sample (selection / first visible row)" Foreground="DimGray"
+                               TextTrimming="CharacterEllipsis" Margin="3,0"/>
+                    <ScrollViewer MaxHeight="68" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <WrapPanel x:Name="token_palette"/>
+                    </ScrollViewer>
+                    <DockPanel Margin="0,3">
+                        <Button x:Name="btn_add_token" Content="+ Add" DockPanel.Dock="Right"
+                                VerticalAlignment="Top" Margin="3,0" Padding="6,4"/>
+                        <Border BorderBrush="LightSlateGray" BorderThickness="1" CornerRadius="3">
+                            <ScrollViewer x:Name="token_bar_scroll" MinHeight="38" MaxHeight="72"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <WrapPanel x:Name="token_bar" MinHeight="36" Background="Transparent"/>
+                            </ScrollViewer>
+                        </Border>
+                    </DockPanel>
+                </StackPanel>
+                <TextBlock x:Name="token_status" TextWrapping="Wrap" Foreground="DimGray"
+                           FontSize="11" Margin="3,0,3,4"/>
+            </StackPanel>
+
+            <TextBlock Text="Find/Replace:" Grid.Row="3" Grid.Column="0" Margin="3,0,10,6"/>
+            <Grid Grid.Row="3" Grid.Column="1" Margin="0,0,0,6">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
@@ -146,7 +177,7 @@
                 <TextBox x:Name="txt_replace" Grid.Column="3" FontSize="11" FontFamily="Courier New"/>
             </Grid>
 
-            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,3">
+            <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,3">
                 <CheckBox x:Name="chk_match_whole_word" Content="Match Whole Word"
                           IsChecked="False" Margin="0,0,20,0"
                           ToolTip="Match only when the surrounding characters are not letters, digits or underscores."/>
@@ -215,7 +246,7 @@
                             <TextBox x:Name="txt_counter_increment" Grid.Column="3" FontSize="11" FontFamily="Courier New"/>
                         </Grid>
                     </GroupBox>
-                    <GroupBox Header="Tokenization (from first selected item)">
+                    <GroupBox Header="Tokenization (first selected row, otherwise first visible row)">
                         <TextBox x:Name="txt_tokenization" MinHeight="40" FontSize="10" FontFamily="Courier New"
                                  IsReadOnly="True" VerticalContentAlignment="Top"
                                  TextWrapping="Wrap" Background="WhiteSmoke"/>

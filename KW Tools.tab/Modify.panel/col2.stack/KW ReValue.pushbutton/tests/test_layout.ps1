@@ -13,6 +13,13 @@ foreach ($match in [regex]::Matches($source, "FindName\('([^']+)'\)")) {
 }
 
 $root = $window.Content
+if ($window.FindName('combo_editor_mode').SelectedIndex -ne 0 -or
+    $window.FindName('token_editor_panel').Visibility -ne 'Visible') {
+    throw 'The token interface must be the default.'
+}
+Write-Output 'PASS: token interface is the default.'
+# Existing compact-layout checks cover Advanced Pattern mode.
+$window.FindName('token_editor_panel').Visibility = 'Collapsed'
 $window.Content = $null
 $preview = $window.FindName('preview_grid')
 $more = $window.FindName('more_settings')

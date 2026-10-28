@@ -32,12 +32,26 @@ The **Final Case** dropdown converts the complete generated value, including lit
 4. Expand **More Settings** to adjust token delimiters if required.
 5. Choose a source parameter, or keep the bracketed **Default** option to use the element/type name.
 6. In **More Settings**, pick up to 5 parameters for substitution.
-7. Enter a pattern. The sliding switch beside Pattern is labelled with the action it will perform: click **Source** to use `{orig}` (the complete source value), then click **Pattern** to restore your previous pattern (kept while the dialog is open, including after applying changes). The switch is grey with its thumb on the left when off, and green with its thumb on the right while Source is enabled. Editing the pattern while Source is enabled turns the switch off, changes its label back to **Source**, and keeps your edit; the next switch remembers that new pattern.
+7. Build a pattern in **Tokens**, or choose **Advanced Pattern** to enter syntax directly. The sliding switch beside the pattern is labelled with the action it will perform: click **Source** to use `{orig}` (the complete source value), then click **Pattern** to restore your previous pattern (kept while the dialog is open, including after applying changes). The switch is grey with its thumb on the left when off, and green with its thumb on the right while Source is enabled. Editing the pattern while Source is enabled turns the switch off, changes its label back to **Source**, and keeps your edit; the next switch remembers that new pattern.
 8. Optionally set the counter in **More Settings** and final find/replace in the main controls.
 9. Review Current Value and New Value in the preview. Rows with different values are highlighted pale yellow.
 10. Optionally type into the Current Value and New Value header filters, then click Apply Re-Value. Only rows remaining in the filtered preview are eligible to be changed, including rows below the scroll area.
 11. After the result message, the dialog stays open and reloads current values from the model. Find and Replace are cleared, and Final rows are unfrozen so the next preview is recalculated. Pattern, mode, parameter choices, counter settings, case options and filters are preserved. Filters are re-evaluated against the updated values, so changed rows may no longer be visible.
 12. Repeat as needed, then click **Close**. Closing does not apply pending changes or undo earlier applies.
+
+## Visual token editor
+
+- **Tokens is the default interface** when ReValue opens. The pattern field shows generated syntax and is read-only in this mode. **Advanced Pattern** makes it editable and hides the palette/bar. Unsupported saved expressions or unmatched braces open in Advanced Pattern with an explanation; the original text is never discarded or simplified. Return to Tokens after correcting the expression.
+- The palette and bar labels sample the **selected grid row**. For a selected cell range or multiple rows, they use the **topmost selected row in the displayed order**, regardless of selection direction. With no selection they use the first visible row after filtering; with no visible rows the palette has no sample values. The read-only token display in More Settings follows the same row. Source chips store token positions, not the sample words. Each row uses its own source values. Source, delimiter and mode changes refresh the labels without changing the pattern; `(missing in sample)` does not imply the token is missing in every row. Selection refreshes only sample labels, using the cached source text; it does not recalculate previews, counters or sequence seeds.
+- Drag a palette item into the ReValue bar to copy it. Drag a bar chip to reorder it. A blue edge marks the insertion gap, including on wrapped lines. Dropping outside the bar or pressing Esc cancels the drag. The bar scrolls when dragging near its top or bottom.
+- Clicking a palette item adds it after the selected chip, or at the end when no chip is selected. **+ Add** provides the same choices, including arbitrary source positions and ranges. Click a bar chip to select it; double-click to edit. Right-click (or Shift+F10) opens its menu, including **Duplicate**, **Move Left**, **Move Right**, and **Remove**. Delete removes a focused chip.
+- Separators are explicit **Text** chips: adjacent chips concatenate without automatic punctuation. Palette shortcuts add a space, hyphen or underscore. **Text...** opens an editor for other literal text, preserving leading/trailing spaces. Chip labels quote literal values; tooltips show their character count. Braces are reserved for expressions in Tokens mode; use Advanced Pattern for brace text.
+- Source settings accept `val1`, `val2`, `end` or `end-1` as Start. Leave End blank for a single token, or use `3`, `end`, `end-1` or `+2` for a range. Range menus offer hyphen, space, underscore or custom join separators. Use `space`, not a literal space, in the join field.
+- Non-text chips offer **Text Case**. **Progression** is available for absolute single `valN` chips and parameter chips, not ranges, joins or end-relative positions. **Increment Each Value...** with step `2` generates `{inc:val1:2}` for token 1; **Sequence from First Row...** generates `{seq:val1:2}`. Signed integer steps and existing alphabetic/prefixed numeric behavior are unchanged. The settings dialog validates unsupported combinations.
+- Parameter chips show both their slot and parameter name. There are **five shared slots**, matching More Settings. Choosing an already mapped parameter reuses its slot; otherwise an empty slot is selected. When all slots are occupied, explicitly choose a slot to reassign. Reassignment changes every chip using that slot. Unmapped/unavailable slots are reported above the bar; edit the chip or the mappings in More Settings.
+- Counter settings are **shared** with More Settings and all Counter chips. Repeated Counter chips insert the same counter value within a row, not independent counters. A new counter starts with the existing configured settings; double-click it to adjust them.
+- Settings dialogs edit a draft. **Cancel** or closing the dialog discards text, parameter mapping and counter changes together. Confirmed edits update the preview once; dragging/configuring chips never modifies the model.
+- Existing Find/Replace, Final Case, frozen Final rows, preview filters, sequence ordering and Apply behavior remain unchanged. The compact token area scrolls independently; Tokens mode uses a taller minimum window size to preserve preview space.
 
 ## Choosing elements
 
@@ -53,8 +67,8 @@ The **Final Case** dropdown converts the complete generated value, including lit
 
 ## Layout
 
-- Mode, Source Parameter, Pattern and Find/Replace stay visible above the full-width preview.
-- **More Settings** starts collapsed and contains parameter mappings, token delimiters, the counter and the token display. Collapsing it does not reset any values.
+- Mode, Source Parameter, the editor selector/generated pattern and Find/Replace stay visible above the full-width preview. Tokens mode adds the palette and composition bar.
+- **More Settings** starts collapsed and contains shared parameter mappings, token delimiters, the shared counter and the original read-only token display. Collapsing it does not reset any values.
 - When expanded, drag the horizontal divider to adjust the balance between More Settings and Preview. The settings area scrolls independently when space is limited.
 - Collapsing More Settings returns the available space to the preview; reopening it restores the default settings/preview split.
 - **Help** is at the bottom left, on the same row as **Apply Re-Value** and **Close** at the bottom right.
