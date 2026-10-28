@@ -18,6 +18,7 @@ from System.Windows.Controls import Button
 from System.Windows.Markup import XamlReader
 from token_editor import TokenEditor, TokenSettings
 from token_pattern import expression, parse_pattern, serialize_pattern, token
+from range_separator import decode_separator, split_case
 
 
 def pattern_engine():
@@ -39,7 +40,8 @@ def pattern_engine():
                   'DEFAULT_DELIMITERS') for target in node.targets)]
     module = ast.Module(nodes)
     ast.fix_missing_locations(module)
-    namespace = {'re': __import__('re')}
+    namespace = {'re': __import__('re'), 'decode_separator': decode_separator,
+                 'split_case': split_case}
     exec(compile(module, path, 'exec'), namespace)
     return namespace
 
@@ -265,6 +267,14 @@ def run_checks(capture=None):
         item, unused, unused_counter = settings.show()
         assert item['text'] == ' - '
         assert host.txt_counter_increment.Text == '1'
+        settings = TokenSettings(editor, token('source', start='val1', end='3'))
+        settings.fields['join'].Text = ' - '
+        settings.window.Loaded += lambda sender, args: settings.accept(None, None)
+        item, unused, unused_counter = settings.show()
+        assert expression(item) == '{val1:3|" - "}'
+        assert host.engine['apply_pattern'](
+            'Door_Internal_009', expression(item), {},
+            tokenizer_func=host.get_tokenizer_func()) == 'Door - Internal - 009'
         print('PASS: IronPython WPF token editing, menus, lossless advanced fallback, '
               'insertion/drop, progression, settings validation, shared slots and Cancel isolation.')
     finally:

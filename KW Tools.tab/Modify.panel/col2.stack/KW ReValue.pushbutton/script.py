@@ -31,6 +31,7 @@ from pyrevit.compat import get_elementid_value_func
 from filter_expression import (
     count_rules, evaluate_expression, serialize_expression, validate_expression,
 )
+from range_separator import decode_separator, split_case
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
@@ -155,7 +156,7 @@ def _parse_val_expression(expr):
     
     Delimiter can be:
       - Named: space, hyphen, underscore
-      - Literal: -, _, /, etc. (but NOT spaces as literals; use 'space' instead)
+      - Literal: -, _, /, etc.; quoted JSON strings preserve spaces and escapes.
     
     Returns:
       (start_idx, end_spec, delimiter_string_or_None)
@@ -164,13 +165,7 @@ def _parse_val_expression(expr):
     # Split off optional delimiter part: "core|delim"
     if '|' in expr:
         core, delim_part = expr.split('|', 1)
-        delim_part_stripped = delim_part.strip()
-        # Check named delimiters first
-        if delim_part_stripped in NAMED_DELIMS:
-            delimiter = NAMED_DELIMS[delim_part_stripped]
-        else:
-            # Use stripped version as literal fallback (handles most cases)
-            delimiter = delim_part_stripped if delim_part_stripped else None
+        delimiter = decode_separator(delim_part)
     else:
         core = expr
         delimiter = None
@@ -372,12 +367,9 @@ CASE_MODIFIERS = ('upper', 'lower', 'title', 'sentence')
 
 def _split_case_modifier(expression):
     """Split a recognized ~case suffix from a pattern placeholder."""
-    if '~' not in expression:
-        return expression, None
-    core, modifier = expression.rsplit('~', 1)
-    modifier = modifier.strip().lower()
+    core, modifier = split_case(expression)
     if modifier in CASE_MODIFIERS:
-        return core.strip(), modifier
+        return core, modifier
     return expression, None
 
 
@@ -421,6 +413,8 @@ def _sequence_source_refs(pattern):
     """Return distinct source references used by sequence expressions."""
     source_refs = []
     for match in VAL_EXPR_REGEX.finditer(pattern or ''):
+        if not re.match(r'^\s*seq\s*:', match.group(1), re.IGNORECASE):
+            continue
         expression, unused_case = _split_case_modifier(match.group(1).strip())
         parsed = _parse_progression_expression(expression)
         if parsed and parsed[0] == 'seq' and parsed[1] not in source_refs:

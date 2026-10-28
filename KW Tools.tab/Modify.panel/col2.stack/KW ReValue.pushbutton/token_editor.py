@@ -51,7 +51,7 @@ class TokenSettings(object):
                       'End: blank for a single token; otherwise 3, end, end-1 or +2.')
             self.text('Start', 'start', item.get('start', 'val1'))
             self.text('End', 'end', item.get('end', ''))
-            self.combo('Join separator (ranges)', 'join',
+            self.combo('Join separator (ranges; enter custom text exactly, without wrapping quotes)', 'join',
                        ['', 'hyphen', 'space', 'underscore', '/', '.'],
                        item.get('join', ''), editable=True)
         elif kind == 'parameter':
@@ -439,7 +439,7 @@ class TokenEditor(object):
 
     def set_join(self, index, join):
         items = copy.deepcopy(self.items)
-        items[index] = edited(items[index], join=join)
+        items[index] = edited(items[index], join=join, join_quoted=False)
         self.commit(items, index)
 
     def add_menu(self, sender, args):

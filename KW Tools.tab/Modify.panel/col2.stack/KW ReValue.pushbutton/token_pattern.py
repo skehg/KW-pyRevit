@@ -1,12 +1,13 @@
 """Lossless visual representation of the existing ReValue pattern language."""
 import copy
 import re
+from range_separator import decode_separator, encode_separator, split_case
 
 
 CASES = ('Unchanged', 'upper', 'lower', 'title', 'sentence')
 POSITIONS = r'(?:val[1-9]\d*|end(?:-[1-9]\d*)?)'
 ENDS = r'(?:[1-9]\d*|end(?:-[1-9]\d*)?|\+\d+)'
-SOURCE = re.compile(r'^(' + POSITIONS + r')(?::(' + ENDS + r'))?(?:\|([^{}~]+))?$')
+SOURCE = re.compile(r'^(' + POSITIONS + r')(?::(' + ENDS + r'))?$')
 PROGRESSION = re.compile(r'^(inc|seq):(val[1-9]\d*|param[1-5]):([+-]?\d+)$',
                          re.IGNORECASE)
 
@@ -31,11 +32,11 @@ def expression(item):
         source = item.get('start', '')
         end = item.get('end', '')
         join = item.get('join', '')
-        core = source + (':' + end if end else '') + ('|' + join if join else '')
-        if not SOURCE.match(core) or any(c in join for c in '{}~'):
+        core = source + (':' + end if end else '')
+        if not SOURCE.match(core):
             raise ValueError('Use val1, end or end-1 for Start; 3, end, end-1 or +2 for End.')
-        if join != join.strip():
-            raise ValueError('Use "space" for a space separator; leading/trailing spaces are not supported.')
+        if join or item.get('join_quoted'):
+            core += '|' + encode_separator(join, item.get('join_quoted', False))
     elif kind == 'parameter':
         slot = item.get('slot', 0)
         if slot not in range(1, 6):
@@ -67,10 +68,10 @@ def expression(item):
 
 def parse_placeholder(raw):
     inner = raw[1:-1].strip()
-    parts = inner.rsplit('~', 1)
+    inner, modifier = split_case(inner)
     case = 'Unchanged'
-    if len(parts) == 2:
-        inner, case = parts[0].strip(), parts[1].strip().lower()
+    if modifier is not None:
+        case = modifier
         if case not in CASES[1:]:
             raise ValueError('Unsupported text case in {}.'.format(raw))
     progression = PROGRESSION.match(inner)
@@ -85,11 +86,20 @@ def parse_placeholder(raw):
     elif re.match(r'^param[1-5]$', inner, re.IGNORECASE):
         item = token('parameter', slot=int(inner[-1]))
     else:
-        match = SOURCE.match(inner)
+        core, separator_marker, separator = inner.partition('|')
+        match = SOURCE.match(core)
         if not match:
             raise ValueError('Cannot represent {} as a chip. Keep editing in Advanced Pattern.'.format(raw))
-        start, end, join = match.groups()
-        item = token('source', start=start, end=end or '', join=join or '')
+        start, end = match.groups()
+        quoted = bool(separator_marker and separator.lstrip().startswith('"'))
+        if separator_marker:
+            decoded = decode_separator(separator)
+            if not quoted and separator != separator.strip():
+                raise ValueError('Quote separators containing surrounding spaces.')
+            join = decoded if quoted else separator
+        else:
+            join = ''
+        item = token('source', start=start, end=end or '', join=join, join_quoted=quoted)
     item.update(case=case, operation=operation, step=step)
     expression(item)
     item['raw'] = raw

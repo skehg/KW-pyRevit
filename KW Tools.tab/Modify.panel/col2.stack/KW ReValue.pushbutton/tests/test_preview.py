@@ -15,6 +15,7 @@ from filter_expression import (
     count_rules, evaluate_expression, parse_expression, rule,
     serialize_expression, validate_expression,
 )
+from range_separator import decode_separator, split_case
 with io.open(os.path.join(COMMAND_DIR, 'script.py'), encoding='utf-8') as source:
     SCRIPT_TREE = ast.parse(source.read())
 
@@ -84,6 +85,7 @@ def load_pattern_function():
         '_alpha_to_int', '_int_to_alpha', '_increment_value',
         '_parse_val_expression', '_resolve_window',
         '_parse_progression_expression', '_resolve_progression_source',
+        '_sequence_source_refs',
         '_split_case_modifier', 'apply_case_conversion', 'apply_pattern',
     }
     module = ast.Module(body=[
@@ -92,6 +94,8 @@ def load_pattern_function():
     ], type_ignores=[])
     ast.fix_missing_locations(module)
     namespace = {
+        'decode_separator': decode_separator,
+        'split_case': split_case,
         're': re,
         'basestring': str,
         'VAL_EXPR_REGEX': re.compile(r'\{([^{}]+)\}'),
