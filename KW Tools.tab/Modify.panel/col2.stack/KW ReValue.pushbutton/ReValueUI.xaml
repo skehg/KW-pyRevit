@@ -5,6 +5,80 @@
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResize">
     <Window.Resources>
+        <LinearGradientBrush x:Key="TokenRaisedFill" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#9BDFFA" Offset="0"/>
+            <GradientStop Color="#38BDF8" Offset="0.45"/>
+            <GradientStop Color="#0EA5E9" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="TokenHoverFill" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#BAEAFE" Offset="0"/>
+            <GradientStop Color="#7DD3FC" Offset="0.45"/>
+            <GradientStop Color="#38BDF8" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="TokenPressedFill" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#0284C7" Offset="0"/>
+            <GradientStop Color="#38BDF8" Offset="1"/>
+        </LinearGradientBrush>
+        <Style x:Key="TokenPillStyle" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource TokenRaisedFill}"/>
+            <Setter Property="Foreground" Value="#082F49"/>
+            <Setter Property="BorderBrush" Value="#0284C7"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="MinHeight" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid x:Name="pill_surface">
+                            <Border x:Name="pill" CornerRadius="11"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#0C4A6E" BlurRadius="3"
+                                                      ShadowDepth="1" Direction="270" Opacity="0.3"/>
+                                </Border.Effect>
+                            </Border>
+                            <Border x:Name="pill_highlight" CornerRadius="10" Margin="1"
+                                    BorderThickness="0,1,0,1" IsHitTestVisible="False">
+                                <Border.BorderBrush>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#BFFFFFFF" Offset="0"/>
+                                        <GradientStop Color="#00FFFFFF" Offset="0.45"/>
+                                        <GradientStop Color="#40075A86" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.BorderBrush>
+                            </Border>
+                            <Border Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="pill" Property="Background"
+                                        Value="{StaticResource TokenHoverFill}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="pill" Property="Background"
+                                        Value="{StaticResource TokenPressedFill}"/>
+                                <Setter TargetName="pill" Property="Effect" Value="{x:Null}"/>
+                                <Setter TargetName="pill_highlight" Property="Opacity" Value="0.35"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="pill" Property="BorderBrush" Value="#082F49"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="pill_surface" Property="Opacity" Value="0.5"/>
+                                <Setter TargetName="pill" Property="Effect" Value="{x:Null}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style TargetType="GroupBox">
             <Setter Property="Margin" Value="0,3"/>
             <Setter Property="Padding" Value="5"/>

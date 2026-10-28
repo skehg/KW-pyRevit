@@ -101,6 +101,16 @@ def run_checks(capture=None):
         assert editor.panel.Visibility == Visibility.Visible
         assert len(editor.items) == 3
         first_button = editor.bar.Children[0]
+        for chip in (first_button, editor.palette.Children[0]):
+            chip.ApplyTemplate()
+            border = chip.Template.FindName('pill', chip)
+            assert border.CornerRadius.TopLeft == 11
+            assert chip.Height == border.CornerRadius.TopLeft * 2
+            assert chip.Background.GradientStops[1].Color.ToString() == '#FF38BDF8'
+            assert border.Effect.ShadowDepth == 1
+            assert chip.Padding.Top == 1 and chip.Padding.Bottom == 1
+            chip.Measure(Size(1000, 100))
+            assert chip.DesiredSize.Height <= 28
         editor.select(0)
         assert editor.bar.Children[0] is first_button  # Preserve double-click target.
         editor.set_case(0, 'upper')

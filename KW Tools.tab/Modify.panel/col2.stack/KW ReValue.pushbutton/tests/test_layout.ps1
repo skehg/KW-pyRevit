@@ -18,6 +18,39 @@ if ($window.FindName('combo_editor_mode').SelectedIndex -ne 0 -or
     throw 'The token interface must be the default.'
 }
 Write-Output 'PASS: token interface is the default.'
+$chip = New-Object System.Windows.Controls.Button
+$chip.Style = $window.FindResource('TokenPillStyle')
+$chip.Padding = [System.Windows.Thickness]::new(9, 1, 9, 1)
+$chip.Content = 'Token 1: Door'
+$null = $chip.ApplyTemplate()
+$pill = $chip.Template.FindName('pill', $chip)
+$chip.Measure([System.Windows.Size]::new(300, 100))
+if ($pill.CornerRadius.TopLeft -ne 11 -or
+    $chip.Background.GradientStops[1].Color.ToString() -ne '#FF38BDF8' -or
+    $chip.DesiredSize.Height -gt 24) {
+    throw 'Tokens must use compact sky-blue pill styling.'
+}
+Write-Output 'PASS: compact sky-blue pill template and height.'
+foreach ($width in @(60, 140, 280)) {
+    $chip.Arrange([System.Windows.Rect]::new(0, 0, $width, 22))
+    $chip.UpdateLayout()
+    if ($pill.ActualHeight -ne 22 -or
+        $pill.CornerRadius.TopLeft * 2 -ne $pill.ActualHeight) {
+        throw 'Pill end radius must equal half its height at every width.'
+    }
+}
+Write-Output 'PASS: semicircular pill ends at narrow and wide token widths.'
+$highlight = $chip.Template.FindName('pill_highlight', $chip)
+if ($chip.Background -isnot [System.Windows.Media.LinearGradientBrush] -or
+    $pill.Effect -isnot [System.Windows.Media.Effects.DropShadowEffect] -or
+    $pill.Effect.ShadowDepth -gt 1 -or $highlight.IsHitTestVisible) {
+    throw 'Raised tokens require a gradient, restrained shadow and non-interactive highlight.'
+}
+$chip.IsEnabled = $false
+if ($null -ne $pill.Effect) { throw 'Disabled tokens must not cast a raised shadow.' }
+$chip.IsEnabled = $true
+if ($null -eq $pill.Effect) { throw 'Enabled tokens must restore their raised shadow.' }
+Write-Output 'PASS: raised token gradient, highlight, shadow and disabled-state restoration.'
 # Existing compact-layout checks cover Advanced Pattern mode.
 $window.FindName('token_editor_panel').Visibility = 'Collapsed'
 $window.Content = $null

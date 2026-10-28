@@ -229,6 +229,8 @@ class TokenEditor(object):
         return button
 
     def icon_content(self, button, kind):
+        button.Style = self.host.window.FindResource('TokenPillStyle')
+        button.Padding = Thickness(9, 1, 9, 1)
         panel = StackPanel()
         panel.Orientation = Orientation.Horizontal
         icon = Path()
@@ -236,10 +238,11 @@ class TokenEditor(object):
         icon.Width = 12
         icon.Height = 12
         icon.Stretch = Stretch.Uniform
-        icon.Stroke = Brushes.DarkSlateGray
+        icon.Stroke = button.Foreground
         icon.StrokeThickness = 1.2
         icon.Margin = Thickness(0, 0, 5, 0)
         text = TextBlock()
+        text.Margin = Thickness(0)
         text.Text = button.Content
         AutomationProperties.SetName(button, text.Text)
         panel.Children.Add(icon)
@@ -347,19 +350,15 @@ class TokenEditor(object):
         self.clear_insertion()
         self.bar.Children.Clear()
         mappings = self.mappings()
-        colours = {'source': Brushes.AliceBlue, 'parameter': Brushes.Honeydew,
-                   'counter': Brushes.LemonChiffon, 'text': Brushes.WhiteSmoke,
-                   'original': Brushes.Lavender}
         for index, item in enumerate(self.items):
             button = self.button(label(item, self.samples, mappings),
                                  lambda sender, args, i=index: self.select(i))
-            button.Background = colours[item['kind']]
             self.icon_content(button, item['kind'])
             button.Tag = index
             button.ToolTip = serialize_pattern([item])
             if item['kind'] == 'text':
                 button.ToolTip += '\n{} character(s); spaces are preserved.'.format(len(item['text']))
-            button.BorderBrush = Brushes.SteelBlue if index == self.selected else Brushes.Gray
+            button.BorderBrush = Brushes.MidnightBlue if index == self.selected else Brushes.SteelBlue
             button.BorderThickness = Thickness(2 if index == self.selected else 1)
             button.MouseDoubleClick += lambda sender, args, i=index: self.edit(i)
             button.ContextMenu = self.context_menu(index)
@@ -378,7 +377,7 @@ class TokenEditor(object):
         self.selected = index
         for i in range(len(self.items)):
             child = self.bar.Children[i]
-            child.BorderBrush = Brushes.SteelBlue if i == index else Brushes.Gray
+            child.BorderBrush = Brushes.MidnightBlue if i == index else Brushes.SteelBlue
             child.BorderThickness = Thickness(2 if i == index else 1)
 
     def key_down(self, index, args):
@@ -571,9 +570,9 @@ class TokenEditor(object):
         if self._insertion is not None:
             child = self._insertion
             selected = child.Tag == self.selected
-            child.BorderBrush = Brushes.SteelBlue if selected else Brushes.Gray
+            child.BorderBrush = Brushes.MidnightBlue if selected else Brushes.SteelBlue
             child.BorderThickness = Thickness(2 if selected else 1)
-            child.Padding = Thickness(6, 3, 6, 3)
+            child.Padding = Thickness(9, 1, 9, 1)
             self._insertion = None
         self.bar.Background = Brushes.Transparent
 
@@ -587,14 +586,14 @@ class TokenEditor(object):
             gap = self.drop_position(args.GetPosition(self.bar))
             if self.items:
                 child = self.bar.Children[min(gap, len(self.items) - 1)]
-                child.BorderBrush = Brushes.DodgerBlue
+                child.BorderBrush = Brushes.MidnightBlue
                 base = 2 if child.Tag == self.selected else 1
                 if gap == len(self.items):
                     child.BorderThickness = Thickness(base, base, 4, base)
-                    child.Padding = Thickness(6, 3, 6 - (4 - base), 3)
+                    child.Padding = Thickness(9, 1, 9 - (4 - base), 1)
                 else:
                     child.BorderThickness = Thickness(4, base, base, base)
-                    child.Padding = Thickness(6 - (4 - base), 3, 6, 3)
+                    child.Padding = Thickness(9 - (4 - base), 1, 9, 1)
                 self._insertion = child
             else:
                 self.bar.Background = Brushes.AliceBlue
