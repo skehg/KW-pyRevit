@@ -18,6 +18,31 @@ def token(kind, **values):
     return item
 
 
+def position_controls(spec):
+    """Translate a pattern position to a direction and one-based UI number."""
+    if spec.startswith('end'):
+        return 'End', str(1 + (int(spec[4:]) if spec.startswith('end-') else 0))
+    if spec.startswith('+'):
+        return 'Following', spec[1:]
+    return 'Start', spec[3:] if spec.startswith('val') else spec
+
+
+def position_expression(direction, number, is_end=False):
+    number = number.strip()
+    if not re.match(r'^[0-9]+$', number):
+        raise ValueError('Enter a whole number for the token position.')
+    value = int(number)
+    if direction == 'Following' and is_end:
+        return '+' + str(value)
+    if value < 1:
+        raise ValueError('Token positions start at 1; End 1 means the last token.')
+    if direction == 'End':
+        return 'end' if value == 1 else 'end-{}'.format(value - 1)
+    if direction != 'Start':
+        raise ValueError('Choose Start or End for the token direction.')
+    return str(value) if is_end else 'val{}'.format(value)
+
+
 def expression(item):
     kind = item['kind']
     if kind == 'text':

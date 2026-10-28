@@ -18,6 +18,23 @@ if ($window.FindName('combo_editor_mode').SelectedIndex -ne 0 -or
     throw 'The token interface must be the default.'
 }
 Write-Output 'PASS: token interface is the default.'
+foreach ($label in @('Start', 'End', 'Following')) {
+    $direction = New-Object System.Windows.Controls.RadioButton
+    $direction.Style = $window.FindResource('TokenDirectionStyle')
+    $direction.Content = $label
+    $direction.Measure([System.Windows.Size]::new(300, 100))
+    if ($direction.DesiredSize.Width -gt 85 -or $direction.DesiredSize.Height -gt 28 -or
+        $direction.FontSize -lt 12) {
+        throw 'Direction toggles must remain compact with legible labels.'
+    }
+    $null = $direction.ApplyTemplate()
+    $segment = $direction.Template.FindName('segment', $direction)
+    $direction.IsChecked = $true
+    if ($segment.Background.Color.ToString() -ne '#FF38BDF8') {
+        throw 'Checked direction toggles must be visibly selected.'
+    }
+}
+Write-Output 'PASS: compact labelled direction toggles and checked appearance.'
 $chip = New-Object System.Windows.Controls.Button
 $chip.Style = $window.FindResource('TokenPillStyle')
 $chip.Padding = [System.Windows.Thickness]::new(9, 1, 9, 1)

@@ -227,10 +227,33 @@ def run_checks(capture=None):
             'RM09', expression(item), {}, tokenizer_func=lambda value: [value]) == 'RM11'
 
         settings = TokenSettings(editor, token('source', start='end'))
+        assert settings.fields['start'].Text == '1'
+        assert settings.fields['start_directions'][1].IsChecked
+        assert not settings.fields['end_row'].IsEnabled
         settings.fields['operation'].SelectedItem = 'Increment'
         settings.accept(None, None)
         assert 'single valN' in settings.error.Text
         assert settings.result is None
+
+        settings = TokenSettings(editor, token('source', start='val3', end='+2'))
+        assert settings.fields['start'].Text == '3'
+        assert settings.fields['end'].Text == '2'
+        assert settings.fields['end_directions'][2].IsChecked
+        assert settings.fields['end_row'].IsEnabled
+        settings.fields['start_directions'][1].IsChecked = True
+        settings.fields['start'].Text = '2'
+        settings.fields['end_directions'][1].IsChecked = True
+        settings.fields['end'].Text = '1'
+        settings.window.Loaded += lambda sender, args: settings.accept(None, None)
+        item, unused, unused_counter = settings.show()
+        assert expression(item) == '{end-1:end}'
+
+        settings = TokenSettings(editor, token('source', start='val3', end='+2'))
+        settings.fields['range'].IsChecked = False
+        assert not settings.fields['join'].IsEnabled
+        settings.window.Loaded += lambda sender, args: settings.accept(None, None)
+        item, unused, unused_counter = settings.show()
+        assert expression(item) == '{val3}'
 
         before = editor.mappings()
         settings = TokenSettings(editor, token('parameter'))

@@ -7,7 +7,7 @@ from System.Windows import (
     SizeToContent,
 )
 from System.Windows.Controls import (
-    Button, ComboBox, ContextMenu, MenuItem, Orientation, ScrollViewer,
+    Button, CheckBox, ComboBox, ContextMenu, MenuItem, Orientation, RadioButton, ScrollViewer,
     ScrollBarVisibility, StackPanel, TextBlock, TextBox,
 )
 from System.Windows.Automation import AutomationProperties
@@ -17,6 +17,7 @@ from System.Windows.Shapes import Path
 from token_pattern import (
     CASES, edited, expression, insert_item, label, parameter_slot, parse_pattern,
     serialize_pattern, token,
+    position_controls, position_expression,
 )
 
 
@@ -47,13 +48,26 @@ class TokenSettings(object):
         if kind == 'text':
             self.text('Literal text (spaces are preserved)', 'text', item.get('text', ''))
         elif kind == 'source':
-            self.note('Start: val1, val2, end, end-1, ...\n'
-                      'End: blank for a single token; otherwise 3, end, end-1 or +2.')
-            self.text('Start', 'start', item.get('start', 'val1'))
-            self.text('End', 'end', item.get('end', ''))
+            self.note('Count from Start or End. Position 1 from End is the last token.')
+            self.position_row('Start position', 'start', item.get('start', 'val1'))
+            include_range = CheckBox()
+            include_range.Content = 'Include a range'
+            include_range.Margin = Thickness(0, 5, 0, 5)
+            include_range.IsChecked = bool(item.get('end'))
+            self.fields['range'] = include_range
+            panel.Children.Add(include_range)
+            self.position_row('End position', 'end', item.get('end') or 'end', True)
             self.combo('Join separator (ranges; enter custom text exactly, without wrapping quotes)', 'join',
                        ['', 'hyphen', 'space', 'underscore', '/', '.'],
                        item.get('join', ''), editable=True)
+            self.position_hint = self.note('')
+            include_range.Checked += self.positions_changed
+            include_range.Unchecked += self.positions_changed
+            for name in ('start', 'end'):
+                self.fields[name].TextChanged += self.positions_changed
+                for direction in self.fields[name + '_directions']:
+                    direction.Checked += self.positions_changed
+            self.positions_changed(None, None)
         elif kind == 'parameter':
             self.note('Five shared slots. Reassigning a slot changes EVERY chip using it.\n'
                       'Existing mappings are reused; otherwise an empty slot is selected.')
@@ -75,7 +89,7 @@ class TokenSettings(object):
             self.combo('Text case (this chip)', 'case', list(CASES),
                        item.get('case', 'Unchanged'))
         if kind in ('source', 'parameter'):
-            self.note('Progression supports a single valN or parameter slot, not ranges or end-relative tokens.\n'
+            self.note('Progression supports a single position counted from Start or a parameter slot, not ranges.\n'
                       'Increment: each row independently. Sequence: first unfiltered row plus row position.')
             self.combo('Progression', 'operation', ['None', 'Increment', 'Sequence'],
                        {'inc': 'Increment', 'seq': 'Sequence'}.get(item.get('operation'), 'None'))
@@ -133,13 +147,19 @@ class TokenSettings(object):
         mappings = list(self.mappings)
         counter = None
         try:
-            for name in ('text', 'start', 'end', 'step'):
+            for name in ('text', 'step'):
                 if name in self.fields:
                     value = self.fields[name].Text
                     candidate[name] = value if name == 'text' else value.strip()
+            if candidate['kind'] == 'source':
+                candidate['start'] = self.read_position('start')
+                candidate['end'] = self.read_position('end') if self.fields['range'].IsChecked else ''
             for name in ('case', 'join'):
                 if name in self.fields:
                     candidate[name] = self.fields[name].Text
+            if candidate['kind'] == 'source' and not self.fields['range'].IsChecked:
+                candidate['join'] = ''
+                candidate['join_quoted'] = False
             if 'operation' in self.fields:
                 candidate['operation'] = {
                     'None': '', 'Increment': 'inc', 'Sequence': 'seq',
@@ -168,6 +188,53 @@ class TokenSettings(object):
             return
         self.result = candidate, mappings, counter
         self.window.DialogResult = True
+
+    def position_row(self, title, name, spec, is_end=False):
+        self.note(title)
+        row = StackPanel()
+        row.Orientation = Orientation.Horizontal
+        direction, number = position_controls(spec)
+        buttons = []
+        for value in (('Start', 'End', 'Following') if is_end else ('Start', 'End')):
+            button = RadioButton()
+            button.Content = value
+            button.GroupName = name + '_direction'
+            button.Style = self.editor.host.window.FindResource('TokenDirectionStyle')
+            button.IsChecked = value == direction
+            button.ToolTip = ('Additional tokens after the start (0 allowed).' if value == 'Following'
+                              else 'Count from the {}: 1 is the {} token.'.format(
+                                  value.lower(), 'first' if value == 'Start' else 'last'))
+            AutomationProperties.SetName(button, title + ': ' + value)
+            row.Children.Add(button)
+            buttons.append(button)
+        field = TextBox()
+        field.Text = number
+        field.Width = 62
+        field.Margin = Thickness(8, 0, 0, 0)
+        AutomationProperties.SetName(field, title + ' number')
+        row.Children.Add(field)
+        self.fields[name] = field
+        self.fields[name + '_directions'] = buttons
+        self.fields[name + '_row'] = row
+        self.panel.Children.Add(row)
+
+    def read_position(self, name):
+        direction = next(button.Content for button in self.fields[name + '_directions']
+                         if button.IsChecked)
+        return position_expression(direction, self.fields[name].Text, name == 'end')
+
+    def positions_changed(self, sender, args):
+        ranged = bool(self.fields['range'].IsChecked)
+        self.fields['end_row'].IsEnabled = ranged
+        self.fields['join'].IsEnabled = ranged
+        try:
+            start = self.read_position('start')
+            end = self.read_position('end') if ranged else ''
+            self.position_hint.Text = 'Selection: {' + start + (':' + end if end else '') + '}'
+            if end.startswith('+'):
+                self.position_hint.Text += '  (start plus {} following token(s))'.format(int(end[1:]))
+        except ValueError as ex:
+            self.position_hint.Text = str(ex)
 
     def show(self):
         self.window.ShowDialog()

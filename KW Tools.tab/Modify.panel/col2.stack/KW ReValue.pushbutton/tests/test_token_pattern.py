@@ -8,10 +8,27 @@ from token_pattern import (
     edited, expression, insert_item, label, parameter_slot, parse_pattern,
     serialize_pattern, token,
 )
+from token_pattern import position_controls, position_expression
 from test_preview import load_pattern_function
 
 
 class TokenPatternTests(unittest.TestCase):
+    def test_numeric_position_directions_roundtrip(self):
+        for spec, is_end in [('val1', False), ('val34', False), ('end', False),
+                             ('end-2', False), ('3', True), ('end', True),
+                             ('end-4', True), ('+2', True), ('+0', True)]:
+            direction, number = position_controls(spec)
+            self.assertEqual(spec, position_expression(direction, number, is_end))
+        self.assertEqual('end', position_expression('End', '1'))
+        self.assertEqual('end-1', position_expression('End', '2'))
+
+    def test_numeric_positions_reject_invalid_input(self):
+        for number in ('', 'val1', 'end', '-1', '1.5', '0'):
+            with self.assertRaises(ValueError):
+                position_expression('Start', number)
+        with self.assertRaises(ValueError):
+            position_expression('Following', '2')
+
     def test_lossless_round_trip(self):
         patterns = [
             '', 'Door - Existing', '{val1}-{param1}-{count}',

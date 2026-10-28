@@ -5,6 +5,40 @@
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResize">
     <Window.Resources>
+        <Style x:Key="TokenDirectionStyle" TargetType="RadioButton">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="MinWidth" Value="52"/>
+            <Setter Property="MinHeight" Value="26"/>
+            <Setter Property="Padding" Value="8,3"/>
+            <Setter Property="Foreground" Value="#082F49"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="segment" Background="#F0F9FF"
+                                BorderBrush="#7DA9BF" BorderThickness="1" CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="segment" Property="Background" Value="#BAE6FD"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="segment" Property="Background" Value="#38BDF8"/>
+                                <Setter TargetName="segment" Property="BorderBrush" Value="#0369A1"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="segment" Property="BorderBrush" Value="#082F49"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="segment" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <LinearGradientBrush x:Key="TokenRaisedFill" StartPoint="0,0" EndPoint="0,1">
             <GradientStop Color="#9BDFFA" Offset="0"/>
             <GradientStop Color="#38BDF8" Offset="0.45"/>
