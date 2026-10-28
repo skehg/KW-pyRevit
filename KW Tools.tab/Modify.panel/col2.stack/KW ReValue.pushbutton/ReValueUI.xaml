@@ -262,7 +262,14 @@
                             <ScrollViewer x:Name="token_bar_scroll" MinHeight="38" MaxHeight="72"
                                           VerticalScrollBarVisibility="Auto"
                                           HorizontalScrollBarVisibility="Disabled">
-                                <WrapPanel x:Name="token_bar" MinHeight="36" Background="Transparent"/>
+                                <Grid>
+                                    <WrapPanel x:Name="token_bar" MinHeight="36" Background="Transparent"/>
+                                    <Canvas IsHitTestVisible="False" ClipToBounds="True">
+                                        <Path x:Name="token_insertion_caret" Visibility="Collapsed"
+                                              Stroke="#082F49" StrokeThickness="1.5"
+                                              Data="M0,0 L4,0 M2,0 L2,22 M0,22 L4,22"/>
+                                    </Canvas>
+                                </Grid>
                             </ScrollViewer>
                         </Border>
                     </DockPanel>

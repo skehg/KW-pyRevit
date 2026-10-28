@@ -18,6 +18,15 @@ if ($window.FindName('combo_editor_mode').SelectedIndex -ne 0 -or
     throw 'The token interface must be the default.'
 }
 Write-Output 'PASS: token interface is the default.'
+$caret = $window.FindName('token_insertion_caret')
+$bar = $window.FindName('token_bar')
+if ($caret.Visibility -ne 'Collapsed' -or
+    $caret.Parent -isnot [System.Windows.Controls.Canvas] -or
+    $caret.Parent.IsHitTestVisible -or -not $caret.Parent.ClipToBounds -or
+    $caret.Parent.Parent -ne $bar.Parent) {
+    throw 'The insertion caret must be a hidden, non-interactive overlay beside the token bar.'
+}
+Write-Output 'PASS: insertion caret overlay does not intercept drag events or occupy token space.'
 foreach ($label in @('Start', 'End', 'Following')) {
     $direction = New-Object System.Windows.Controls.RadioButton
     $direction.Style = $window.FindResource('TokenDirectionStyle')

@@ -14,7 +14,7 @@ clr.AddReference('PresentationCore')
 clr.AddReference('WindowsBase')
 
 from System.Windows import DataObject, DragDropEffects, Point, Size, Rect, Visibility
-from System.Windows.Controls import Button
+from System.Windows.Controls import Button, Canvas
 from System.Windows.Markup import XamlReader
 from token_editor import TokenEditor, TokenSettings
 from token_pattern import expression, parse_pattern, serialize_pattern, token
@@ -172,11 +172,20 @@ def run_checks(capture=None):
         args = DragArgs()
         editor.drag_over(None, args)
         assert args.Effects == getattr(DragDropEffects, 'None')
+        assert editor.insertion_caret.Visibility == Visibility.Collapsed
         args.Data.SetData(editor.DRAG_FORMAT, editor.DRAG_FORMAT)
         editor._drag = (editor.bar.Children[2], Point(0, 0), ('bar', 2, False))
         editor.drag_over(None, args)
         assert args.Effects == DragDropEffects.Move
+        assert editor.insertion_caret.Visibility == Visibility.Visible
+        dimensions = [(child.ActualWidth, child.ActualHeight) for child in editor.bar.Children]
+        editor.show_insertion(1, Point(10, 5))
+        root.UpdateLayout()
+        assert dimensions == [(child.ActualWidth, child.ActualHeight) for child in editor.bar.Children]
+        editor.drag_leave(None, args)
+        assert editor.insertion_caret.Visibility == Visibility.Collapsed
         editor.drop(None, args)
+        assert editor.insertion_caret.Visibility == Visibility.Collapsed
         assert host.txt_pattern.Text == '{val3}{val1}{val2}'
         editor._drag = None
 
@@ -189,11 +198,21 @@ def run_checks(capture=None):
                      for child in editor.bar.Children]
         wrapped = next(i for i, point in enumerate(positions) if point.Y > positions[0].Y)
         assert editor.drop_position(Point(positions[wrapped].X, positions[wrapped].Y + 2)) == wrapped
+        editor.show_insertion(wrapped, Point(positions[wrapped].X, positions[wrapped].Y + 2))
+        assert Canvas.GetTop(editor.insertion_caret) == positions[wrapped].Y
+        editor.show_insertion(wrapped, Point(700, positions[wrapped - 1].Y + 2))
+        assert Canvas.GetTop(editor.insertion_caret) == positions[wrapped - 1].Y
+        editor.clear_insertion()
         assert editor.bar_scroll.ScrollableHeight > 0
         footer = host.window.FindName('btn_close')
         footer_point = footer.TranslatePoint(Point(0, 0), root)
         assert footer_point.Y + footer.ActualHeight <= 600
         assert host.window.FindName('preview_grid').ActualHeight >= 150
+        editor.commit([], -1)
+        editor.show_insertion(0, Point(0, 0))
+        assert editor.insertion_caret.Visibility == Visibility.Visible
+        editor.clear_insertion()
+        assert editor.insertion_caret.Visibility == Visibility.Collapsed
         editor.commit(parse_pattern('{val2} - {val1} - {count}'), -1)
         if capture:
             from System.IO import File

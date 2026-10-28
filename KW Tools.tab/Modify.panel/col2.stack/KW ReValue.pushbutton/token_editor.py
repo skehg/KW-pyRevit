@@ -7,7 +7,7 @@ from System.Windows import (
     SizeToContent,
 )
 from System.Windows.Controls import (
-    Button, CheckBox, ComboBox, ContextMenu, MenuItem, Orientation, RadioButton, ScrollViewer,
+    Button, Canvas, CheckBox, ComboBox, ContextMenu, MenuItem, Orientation, RadioButton, ScrollViewer,
     ScrollBarVisibility, StackPanel, TextBlock, TextBox,
 )
 from System.Windows.Automation import AutomationProperties
@@ -261,13 +261,13 @@ class TokenEditor(object):
         self._signature = None
         self._syncing = False
         self._drag = None
-        self._insertion = None
         window = host.window
         self.mode = window.FindName('combo_editor_mode')
         self.panel = window.FindName('token_editor_panel')
         self.palette = window.FindName('token_palette')
         self.bar = window.FindName('token_bar')
         self.bar_scroll = window.FindName('token_bar_scroll')
+        self.insertion_caret = window.FindName('token_insertion_caret')
         self.status = window.FindName('token_status')
         self.sample_label = window.FindName('token_sample')
         self.mode.SelectionChanged += self.mode_changed
@@ -634,14 +634,27 @@ class TokenEditor(object):
         return len(self.items)
 
     def clear_insertion(self):
-        if self._insertion is not None:
-            child = self._insertion
-            selected = child.Tag == self.selected
-            child.BorderBrush = Brushes.MidnightBlue if selected else Brushes.SteelBlue
-            child.BorderThickness = Thickness(2 if selected else 1)
-            child.Padding = Thickness(9, 1, 9, 1)
-            self._insertion = None
-        self.bar.Background = Brushes.Transparent
+        self.insertion_caret.Visibility = Visibility.Collapsed
+
+    def show_insertion(self, gap, point):
+        x, y = 2, 2
+        if self.items:
+            index = min(gap, len(self.items) - 1)
+            child = self.bar.Children[index]
+            origin = child.TranslatePoint(Point(0, 0), self.bar)
+            trailing = gap == len(self.items)
+            if gap > 0 and not trailing:
+                previous = self.bar.Children[gap - 1]
+                previous_origin = previous.TranslatePoint(Point(0, 0), self.bar)
+                # The same gap can be the end of one wrapped row or start of the next.
+                if previous_origin.Y < origin.Y and point.Y < origin.Y:
+                    child, origin = previous, previous_origin
+                    trailing = True
+            x = origin.X + child.ActualWidth if trailing else origin.X - 4
+            y = origin.Y + max(0, (child.ActualHeight - 22) / 2)
+        Canvas.SetLeft(self.insertion_caret, max(0, min(x, self.bar.ActualWidth - 5)))
+        Canvas.SetTop(self.insertion_caret, y)
+        self.insertion_caret.Visibility = Visibility.Visible
 
     def drag_over(self, sender, args):
         self.clear_insertion()
@@ -650,25 +663,13 @@ class TokenEditor(object):
         else:
             args.Effects = (DragDropEffects.Move if self._drag[2][0] == 'bar'
                             else DragDropEffects.Copy)
-            gap = self.drop_position(args.GetPosition(self.bar))
-            if self.items:
-                child = self.bar.Children[min(gap, len(self.items) - 1)]
-                child.BorderBrush = Brushes.MidnightBlue
-                base = 2 if child.Tag == self.selected else 1
-                if gap == len(self.items):
-                    child.BorderThickness = Thickness(base, base, 4, base)
-                    child.Padding = Thickness(9, 1, 9 - (4 - base), 1)
-                else:
-                    child.BorderThickness = Thickness(4, base, base, base)
-                    child.Padding = Thickness(9 - (4 - base), 1, 9, 1)
-                self._insertion = child
-            else:
-                self.bar.Background = Brushes.AliceBlue
             point = args.GetPosition(self.bar_scroll)
             if point.Y < 15:
                 self.bar_scroll.LineUp()
             elif point.Y > self.bar_scroll.ActualHeight - 15:
                 self.bar_scroll.LineDown()
+            point = args.GetPosition(self.bar)
+            self.show_insertion(self.drop_position(point), point)
         args.Handled = True
 
     def drag_leave(self, sender, args):
