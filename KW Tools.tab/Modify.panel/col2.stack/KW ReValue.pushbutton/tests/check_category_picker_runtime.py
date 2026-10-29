@@ -110,6 +110,12 @@ def run_checks():
     picker = CategoryPicker(source)
     picker.loaded(None, None)
     assert picker.scope == 'view'
+    assert picker.window.FindName('scope_view_label').Text == 'Current View'
+    assert picker.window.FindName('scope_project_label').Text == 'Entire Project'
+    assert picker.scope_toggle.Content == ''
+    assert picker.scope_toggle.ToolTip.startswith('Scope: Current View.')
+    assert not picker.scope_toggle.IsChecked
+    assert not picker.family_toggle.IsEnabled
     assert len(picker.category_list.Items) == 2
     assert not picker.use_selection.IsEnabled
     assert source.calls == [('categories', 'view')]
@@ -119,9 +125,20 @@ def run_checks():
     assert ('view', 1) in source.family_cache
     assert ('view', 2) not in source.family_cache
     assert 'Matching elements: 1.' in picker.selection_status.Text
-    picker.selected_families.IsChecked = True
+    picker.family_toggle.IsChecked = True
+    assert picker.family_toggle.Content == 'All families'
+    assert picker.family_toggle.Tag == 'Selected families only'
     assert not picker.use_selection.IsEnabled
     family_checkbox(picker, 'Single').IsChecked = True
+    assert picker.use_selection.IsEnabled
+    picker.family_toggle.IsChecked = False
+    assert picker.state(1)['all']
+    assert not picker.family_list.IsEnabled
+    assert picker.state(1)['families'] == set(['Single'])
+    picker.family_toggle.IsChecked = True
+    assert not picker.state(1)['all']
+    assert picker.family_list.IsEnabled
+    assert family_checkbox(picker, 'Single').IsChecked
     assert picker.use_selection.IsEnabled
     calls = list(source.calls)
     picker.search_families.Text = 'not found'
@@ -137,8 +154,12 @@ def run_checks():
     assert picker.state(1)['all'] is False
     assert source.calls == calls
 
-    picker.scope_project.IsChecked = True
+    picker.scope_toggle.IsChecked = True
     assert picker.scope == 'project'
+    assert picker.window.FindName('scope_project_label').Text == 'Entire Project'
+    assert picker.scope_toggle.Content == ''
+    assert picker.window.FindName('scope_view_label').Text == 'Current View'
+    assert picker.scope_toggle.ToolTip.startswith('Scope: Entire Project.')
     assert picker.state(1)['checked']
     assert picker.state(1)['families'] == set(['Single'])
     assert picker.state(1)['all'] is False
@@ -150,27 +171,27 @@ def run_checks():
     family_checkbox(picker, 'Double').IsChecked = True
     assert 'Matching elements: 1.' in picker.selection_status.Text
     category_checkbox(picker, 3).IsChecked = True
-    picker.scope_view.IsChecked = True
+    picker.scope_toggle.IsChecked = False
     assert picker.state(1)['families'] == set(['Single'])
     assert '1 selected category(s)' in picker.notice
-    picker.scope_project.IsChecked = True
+    picker.scope_toggle.IsChecked = True
     assert picker.state(1)['families'] == set(['Double'])
     assert picker.state(3)['checked']
     calls = list(source.calls)
-    picker.scope_view.IsChecked = True
-    picker.scope_project.IsChecked = True
+    picker.scope_toggle.IsChecked = False
+    picker.scope_toggle.IsChecked = True
     assert not any(call[0] == 'families' for call in source.calls[len(calls):])
 
     # Starting in Project scope exercises a restricted first visit to View.
     restricted = CategoryPicker(Source())
     restricted._updating = True
     restricted.scope = 'project'
-    restricted.scope_project.IsChecked = True
+    restricted.scope_toggle.IsChecked = True
     restricted._updating = False
     restricted.load_scope()
     restricted.states['project'][1] = dict(
         checked=True, all=False, families=set(['Double']))
-    restricted.scope_view.IsChecked = True
+    restricted.scope_toggle.IsChecked = False
     assert restricted.state(1)['families'] == set()
     assert not restricted.state(1)['all']
     assert not restricted.use_selection.IsEnabled
@@ -178,8 +199,9 @@ def run_checks():
     restricted.category_list.SelectedItem = restricted.category_list.Items[0]
     assert not restricted.state(1)['all']
     assert not restricted.use_selection.IsEnabled
-    restricted.all_families.IsChecked = True
+    restricted.family_toggle.IsChecked = False
     assert restricted.use_selection.IsEnabled
+    assert restricted.family_toggle.Content == 'All families'
 
     # A category losing meaningful family grouping must not broaden a restriction.
     ungrouped = CategoryPicker(Source())
@@ -190,33 +212,40 @@ def run_checks():
     ungrouped.category_list.SelectedItem = ungrouped.category_list.Items[0]
     assert not ungrouped.state(1)['all']
     assert not ungrouped.use_selection.IsEnabled
-    ungrouped.all_families.IsChecked = True
+    assert ungrouped.family_toggle.IsEnabled
+    ungrouped.family_toggle.IsChecked = False
     assert ungrouped.use_selection.IsEnabled
+    assert not ungrouped.family_toggle.IsEnabled
 
     no_family = CategoryPicker(Source())
     no_family.load_scope()
     category_checkbox(no_family, 2).IsChecked = True
     assert no_family.state(2)['all']
-    assert not no_family.selected_families.IsEnabled
+    assert not no_family.family_toggle.IsEnabled
+    assert no_family.family_toggle.Content == 'All families'
     assert no_family.use_selection.IsEnabled
 
     unavailable = CategoryPicker(Source(False))
     unavailable.load_scope()
     assert unavailable.scope == 'project'
-    assert not unavailable.scope_view.IsEnabled
+    assert not unavailable.scope_toggle.IsEnabled
+    assert unavailable.scope_toggle.IsChecked
+    assert unavailable.window.FindName('scope_project_label').Text == 'Entire Project'
+    assert unavailable.scope_toggle.Content == ''
+    assert 'does not support element collection' in unavailable.scope_toggle.ToolTip
     assert 'Current View is unavailable' in unavailable.selection_status.Text
 
     failure = CategoryPicker(Source())
     failure.load_scope()
     category_checkbox(failure, 1).IsChecked = True
     failure.source.fail_categories = True
-    failure.scope_project.IsChecked = True
+    failure.scope_toggle.IsChecked = True
     failure.update_status()
     assert not failure.use_selection.IsEnabled
     assert len(failure.rows) == 0
     assert 'Test category failure' in failure.selection_status.Text
     failure.source.fail_categories = False
-    failure.scope_view.IsChecked = True
+    failure.scope_toggle.IsChecked = False
     assert failure.use_selection.IsEnabled
     failure.source.fail_families = True
     category_checkbox(failure, 2).IsChecked = True

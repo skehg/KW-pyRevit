@@ -30,18 +30,26 @@ def load_preview_classes():
                       '_selected_combo_text', '_pattern_uses_counter',
                       'commit_preview_edits', 'OnApply', 'OnClose',
                       'OnUseOriginal', 'OnSettingsChanged', 'update_preview',
-                      'OnClearFilters', 'OnEditFilters', 'get_token_sample_item')
+                      'OnClearFilters', 'OnEditFilters', 'get_token_sample_item',
+                      'matches_numbering_filters', 'new_value_filter_active',
+                      'update_parameter_matches', 'sort_preview_items',
+                      'populate_sort_options', '_select_sort_item', 'OnSortByChanged',
+                      'OnSortDirectionClicked', 'OnGridSorting', '_on_sort_changed',
+                      'get_param_sort_key', '_update_sort_indicators', 'OnClearSort',
+                      '_selected_final_case')
     for node in SCRIPT_TREE.body:
         if isinstance(node, ast.Assign) and any(
                 isinstance(target, ast.Name) and target.id in (
-                    'FILTER_CONDITIONS', 'NUMERIC_FILTER_CONDITIONS')
+                    'FILTER_CONDITIONS', 'NUMERIC_FILTER_CONDITIONS', 'SORT_NONE',
+                    'SORT_CURRENT', 'SORT_PARAM', 'NEW_VALUE_FILTER_WARNING')
                 for target in node.targets):
             module.body.append(node)
         elif isinstance(node, ast.FunctionDef) and node.name in (
                 'replace_final_value', 'apply_case_conversion',
                 '_split_case_modifier', 'get_default_source_label',
                 '_resolve_target_param_name', 'parse_filter_number',
-                'matches_parameter_filter', 'compare_filter_rule'):
+                'matches_parameter_filter', 'compare_filter_rule',
+                'natural_sort_key', 'order_preview_rows'):
             module.body.append(node)
         elif isinstance(node, ast.ClassDef) and node.name == 'PreviewItem':
             module.body.append(node)
@@ -401,7 +409,12 @@ class RepeatedApplyTests(unittest.TestCase):
         self.dialog.preview_grid = Grid(
             self.dialog.preview_items, self.dialog.matches_preview_filters)
         self.dialog.refresh_preview_filters = mock.Mock(
-            side_effect=self.dialog.preview_grid.Items.Refresh)
+            side_effect=lambda **kwargs: self.dialog.preview_grid.Items.Refresh())
+        self.dialog.parameter_filter = None
+        self.dialog.available_params = []
+        self.dialog.sort_mode = 'none'
+        self.dialog.sort_descending = False
+        self.dialog._update_sort_indicators = mock.Mock()
         self.globals = ReValueDialog.OnApply.__globals__
         patch = mock.patch.dict(self.globals, {
             'forms': mock.Mock(),
@@ -665,6 +678,15 @@ class FindReplaceTests(unittest.TestCase):
 
 
 class CaseConversionTests(unittest.TestCase):
+    def test_final_case_labels_preserve_internal_values(self):
+        unused, dialog_class = load_preview_classes()
+        dialog = dialog_class()
+        for label, value in [('None', 'None'), ('UPPER', 'upper'), ('lower', 'lower'),
+                             ('Title Case', 'title'), ('Sentence case', 'sentence')]:
+            dialog.combo_final_case = types.SimpleNamespace(
+                SelectedItem=types.SimpleNamespace(Content=label, Tag=value))
+            self.assertEqual(value, dialog._selected_final_case())
+
     def test_case_conversion_modes(self):
         convert_case = load_pattern_function()['apply_case_conversion']
         cases = [
@@ -721,6 +743,314 @@ class CaseConversionTests(unittest.TestCase):
                 self.assertEqual(expected, dialog._pattern_uses_counter())
 
 
+class Toggle(object):
+    def __init__(self):
+        self.Content = None
+        self.IsEnabled = True
+
+
+class SortColumn(object):
+    def __init__(self):
+        self.SortDirection = None
+        self.Visibility = 'Collapsed'
+        self.Header = ''
+
+
+class SortHint(object):
+    def __init__(self):
+        self.Visibility = 'Visible'
+
+
+class SortingTests(unittest.TestCase):
+    def setUp(self):
+        self.dialog = ReValueDialog()
+        self.dialog.window = mock.Mock()
+        self.dialog.window.IsVisible = True
+        self.dialog.is_instance_mode = True
+        self.dialog._suspend_events = False
+        self.dialog._parameter_filter_error = ''
+        self.dialog._invalid_filter_values = 0
+        self.dialog.txt_pattern = TextBox('{orig}-{count}')
+        self.dialog.txt_find = TextBox()
+        self.dialog.txt_replace = TextBox()
+        self.dialog.chk_match_case = types.SimpleNamespace(IsChecked=False)
+        self.dialog.chk_match_whole_word = types.SimpleNamespace(IsChecked=False)
+        self.dialog._selected_final_case = lambda: 'None'
+        self.dialog.get_selected_original_param_name = lambda: ''
+        self.dialog.get_tokenizer_func = lambda: lambda value: [value]
+        self.dialog.get_selected_param_values = lambda element: []
+        self.dialog.update_tokenization_display = mock.Mock()
+        self.dialog.persist_settings = mock.Mock()
+        self.dialog.parameter_filter = None
+        self.dialog.available_params = ['Width']
+        self.dialog._decimal_separator = '.'
+        self.dialog._group_separator = ','
+        self.dialog.txt_filter_current = TextBox()
+        self.dialog.txt_filter_new = TextBox()
+        self.dialog.txt_filter_summary = TextBox()
+        self.dialog.txt_filter_status = TextBox()
+        self.dialog.btn_clear_filters = LayoutPart()
+        self.dialog.btn_apply = LayoutPart()
+        self.dialog.btn_apply.FindResource = mock.Mock(return_value='filter tooltip')
+        self.dialog.combo_sort_by = SourceCombo()
+        self.dialog.btn_sort_direction = Toggle()
+        self.dialog.btn_clear_sort = Toggle()
+        self.dialog.col_current = SortColumn()
+        self.dialog.current_sort_hint = SortHint()
+        self.dialog.current_header_sort_hint = LayoutPart()
+        self.dialog.col_sort_value = SortColumn()
+        self.dialog.col_new = SortColumn()
+        self.widths = {'Rm10': '900', 'Rm2': '', 'rm1': '1200'}
+        self.dialog.get_param_value = lambda element, name: self.widths[element.name]
+        self.dialog.get_param_sort_key = lambda element, name: (
+            (True, None) if not self.widths[element.name]
+            else (False, (0, float(self.widths[element.name]))))
+        self.dialog.preview_items = []
+        for index, name in enumerate(('Rm10', 'Rm2', 'rm1')):
+            element = LayoutPart()
+            element.name = name
+            item = PreviewItem(element, name)
+            item.SelectionIndex = index
+            self.dialog.preview_items.append(item)
+        self.dialog.preview_grid = Grid(
+            self.dialog.preview_items, self.dialog.matches_preview_filters)
+        self.dialog.preview_view = self.dialog.preview_grid.Items
+        self.dialog.sort_mode = 'none'
+        self.dialog.sort_param = ''
+        self.dialog.sort_descending = False
+        self.globals = ReValueDialog.update_preview.__globals__
+        patch = mock.patch.dict(self.globals, {
+            'forms': mock.Mock(),
+            'revalue_elements': mock.Mock(return_value=True),
+            '_sequence_source_refs': lambda pattern: [],
+            '_safe_element_name': lambda element: element.name,
+            'apply_pattern': load_pattern_function()['apply_pattern'],
+            'ListSortDirection': types.SimpleNamespace(
+                Ascending='Ascending', Descending='Descending'),
+            'WpfVisibility': types.SimpleNamespace(
+                Visible='Visible', Collapsed='Collapsed'),
+        })
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.dialog.get_counter_generator = lambda: (lambda idx: str(idx + 1), None)
+        self.dialog.populate_sort_options({})
+        self.dialog.update_preview()
+
+    def rows(self):
+        return [(row.CurrentName, row.NewName) for row in self.dialog.preview_items]
+
+    def choose(self, item):
+        self.dialog.combo_sort_by.SelectedItem = item
+        self.dialog.OnSortByChanged(None, None)
+
+    def test_natural_sort_key_orders_numbers_and_ignores_case(self):
+        key = self.globals['natural_sort_key']
+        self.assertEqual(['a1', 'A2', 'a10', 'B1'],
+                         sorted(['a10', 'B1', 'A2', 'a1'], key=key))
+
+    def test_order_rows_keeps_blanks_last_and_ties_in_selection_order(self):
+        order = self.globals['order_preview_rows']
+        rows = []
+        for index, name in enumerate('abcd'):
+            row = LayoutPart()
+            row.SelectionIndex, row.name = index, name
+            rows.append(row)
+        entries = {rows[0]: (False, 2), rows[1]: (True, None),
+                   rows[2]: (False, 1), rows[3]: (False, 2)}
+        self.assertEqual('cadb', ''.join(r.name for r in order(rows, entries, False)))
+        self.assertEqual('adcb', ''.join(r.name for r in order(rows, entries, True)))
+        self.assertEqual('abcd', ''.join(r.name for r in order(rows[::-1], None, False)))
+
+    def test_wpf_visibility_is_not_shadowed_by_revit_import(self):
+        visibility_imports = [
+            alias for node in SCRIPT_TREE.body
+            if isinstance(node, ast.ImportFrom) and node.module == 'System.Windows'
+            for alias in node.names if alias.name == 'Visibility']
+        self.assertEqual(['WpfVisibility'],
+                         [alias.asname for alias in visibility_imports])
+        with mock.patch.dict(self.globals, {'Visibility': type('Visibility', (), {})}):
+            self.dialog.sort_mode = 'param'
+            self.dialog._update_sort_indicators()
+            self.assertEqual('Visible', self.dialog.col_sort_value.Visibility)
+            self.dialog.sort_mode = 'none'
+            self.dialog._update_sort_indicators()
+            self.assertEqual('Collapsed', self.dialog.col_sort_value.Visibility)
+
+    def test_selection_order_is_default(self):
+        self.assertEqual([('Rm10', 'Rm10-1'), ('Rm2', 'Rm2-2'), ('rm1', 'rm1-3')],
+                         self.rows())
+        self.assertFalse(self.dialog.btn_sort_direction.IsEnabled)
+
+    def test_current_value_sort_renumbers_in_display_order(self):
+        self.choose(self.dialog.sort_current_item)
+        self.assertEqual([('rm1', 'rm1-1'), ('Rm2', 'Rm2-2'), ('Rm10', 'Rm10-3')],
+                         self.rows())
+        self.assertEqual('Ascending', self.dialog.col_current.SortDirection)
+        self.assertEqual('Collapsed', self.dialog.current_sort_hint.Visibility)
+        self.assertEqual('Sorted ascending. Click to sort descending.',
+                         self.dialog.current_header_sort_hint.ToolTip)
+        self.dialog.OnSortDirectionClicked(None, None)
+        self.assertEqual([('Rm10', 'Rm10-1'), ('Rm2', 'Rm2-2'), ('rm1', 'rm1-3')],
+                         self.rows())
+        self.assertTrue(self.dialog.btn_sort_direction.IsChecked)
+        self.assertEqual('Sorted descending. Click to sort ascending.',
+                         self.dialog.current_header_sort_hint.ToolTip)
+        self.dialog.persist_settings.assert_called()
+
+    def test_unsorted_current_header_shows_sort_hint_and_tooltip(self):
+        self.dialog.sort_mode = 'none'
+        self.dialog._update_sort_indicators()
+        self.assertEqual('Visible', self.dialog.current_sort_hint.Visibility)
+        self.assertEqual('Click to sort ascending.',
+                         self.dialog.current_header_sort_hint.ToolTip)
+
+    def test_clear_sort_restores_selection_order_and_renumbers(self):
+        self.choose('Width')
+        self.dialog.OnSortDirectionClicked(None, None)
+        self.dialog.OnClearSort(None, None)
+        self.assertEqual(('none', '', False), (
+            self.dialog.sort_mode, self.dialog.sort_param, self.dialog.sort_descending))
+        self.assertEqual([('Rm10', 'Rm10-1'), ('Rm2', 'Rm2-2'), ('rm1', 'rm1-3')],
+                         self.rows())
+        self.assertIs(self.dialog.sort_none_item, self.dialog.combo_sort_by.SelectedItem)
+        self.assertFalse(self.dialog.btn_sort_direction.IsChecked)
+        self.assertFalse(self.dialog.btn_clear_sort.IsEnabled)
+        self.assertFalse(self.dialog.btn_sort_direction.IsEnabled)
+        self.dialog.persist_settings.assert_called()
+
+    def test_clear_sort_does_not_change_order_when_edits_cannot_commit(self):
+        self.choose('Width')
+        self.dialog.commit_preview_edits = lambda: False
+        self.dialog.OnClearSort(None, None)
+        self.assertEqual('param', self.dialog.sort_mode)
+
+    def test_parameter_sort_puts_blanks_last_and_shows_sort_column(self):
+        self.choose('Width')
+        self.assertEqual([('Rm10', 'Rm10-1'), ('rm1', 'rm1-2'), ('Rm2', 'Rm2-3')],
+                         self.rows())
+        self.assertEqual('Visible', self.dialog.col_sort_value.Visibility)
+        self.assertEqual('Sort: Width', self.dialog.col_sort_value.Header)
+        self.assertEqual(['900', '1200', ''],
+                         [row.SortValue for row in self.dialog.preview_items])
+        self.dialog.OnSortDirectionClicked(None, None)
+        self.assertEqual(['rm1', 'Rm10', 'Rm2'],
+                         [row.CurrentName for row in self.dialog.preview_items])
+        self.choose(self.dialog.sort_none_item)
+        self.assertEqual('Collapsed', self.dialog.col_sort_value.Visibility)
+        self.assertEqual(['Rm10', 'Rm2', 'rm1'],
+                         [row.CurrentName for row in self.dialog.preview_items])
+
+    def test_current_filter_renumbers_visible_rows(self):
+        self.dialog.txt_filter_current.Text = 'm1'
+        self.dialog.OnPreviewFilterChanged(self.dialog.txt_filter_current, None)
+        visible = [(row.CurrentName, row.NewName) for row in self.dialog.preview_grid.Items]
+        self.assertEqual([('Rm10', 'Rm10-1'), ('rm1', 'rm1-2')], visible)
+        self.assertTrue(self.dialog.btn_apply.IsEnabled)
+
+    def test_new_value_filter_is_find_only_and_blocks_apply(self):
+        self.dialog.txt_filter_new.Text = '-3'
+        self.dialog.OnPreviewFilterChanged(self.dialog.txt_filter_new, None)
+        self.assertEqual([('rm1', 'rm1-3')],
+                         [(row.CurrentName, row.NewName) for row in self.dialog.preview_grid.Items])
+        self.assertFalse(self.dialog.btn_apply.IsEnabled)
+        warning = self.globals['NEW_VALUE_FILTER_WARNING']
+        self.assertNotIn(warning, self.dialog.txt_filter_status.Text)
+        self.assertEqual('filter tooltip', self.dialog.btn_apply.ToolTip)
+        self.dialog.OnApply(None, None)
+        self.globals['revalue_elements'].assert_not_called()
+        self.globals['forms'].alert.assert_called_once_with(warning)
+        self.dialog.window.Activate.assert_called_once_with()
+
+        self.dialog.txt_filter_new.Text = ''
+        self.dialog.OnPreviewFilterChanged(self.dialog.txt_filter_new, None)
+        self.assertTrue(self.dialog.btn_apply.IsEnabled)
+        self.assertIsNone(self.dialog.btn_apply.ToolTip)
+
+    def test_header_click_sorts_current_but_not_new_value(self):
+        self.dialog._is_mouse_over_text_box = lambda: False
+        args = types.SimpleNamespace(Column=self.dialog.col_new, Handled=False)
+        self.dialog.OnGridSorting(None, args)
+        self.assertTrue(args.Handled)
+        self.assertEqual('none', self.dialog.sort_mode)
+
+        args.Column = self.dialog.col_current
+        self.dialog.OnGridSorting(None, args)
+        self.assertEqual('current', self.dialog.sort_mode)
+        self.assertIs(self.dialog.sort_current_item, self.dialog.combo_sort_by.SelectedItem)
+        self.dialog.OnGridSorting(None, args)
+        self.assertTrue(self.dialog.sort_descending)
+
+        self.dialog._is_mouse_over_text_box = lambda: True
+        self.dialog.OnGridSorting(None, args)
+        self.assertTrue(self.dialog.sort_descending)
+
+    def test_saved_sort_restores_or_falls_back_when_parameter_missing(self):
+        self.dialog.populate_sort_options(
+            {'sort_mode': 'param', 'sort_param': 'Width', 'sort_descending': 'True'})
+        self.assertEqual(('param', 'Width', True), (
+            self.dialog.sort_mode, self.dialog.sort_param, self.dialog.sort_descending))
+        self.assertEqual('Width', self.dialog.combo_sort_by.SelectedItem)
+        self.dialog.populate_sort_options(
+            {'sort_mode': 'param', 'sort_param': 'Missing', 'sort_descending': 'False'})
+        self.assertEqual('none', self.dialog.sort_mode)
+        self.assertIs(self.dialog.sort_none_item, self.dialog.combo_sort_by.SelectedItem)
+
+
+class ParameterSortKeyTests(unittest.TestCase):
+    class Param(object):
+        def __init__(self, storage, value, has_value=True):
+            self.StorageType = storage
+            self.HasValue = has_value
+            self.value = value
+
+        def AsDouble(self):
+            return self.value
+
+        def AsInteger(self):
+            return self.value
+
+        def AsString(self):
+            return self.value
+
+        def AsElementId(self):
+            return self.value
+
+    class Level(object):
+        def __init__(self, elevation):
+            self.Elevation = elevation
+
+    def setUp(self):
+        self.dialog = ReValueDialog()
+        self.params = {}
+        self.dialog._lookup_parameter = lambda element, name: self.params.get(name)
+        self.dialog.get_param_value = lambda element, name: ''
+        storage = types.SimpleNamespace(
+            String='String', Double='Double', Integer='Integer', ElementId='ElementId')
+        levels = {1: self.Level(3.5)}
+        patch = mock.patch.dict(ReValueDialog.get_param_sort_key.__globals__, {
+            'StorageType': storage,
+            'Level': self.Level,
+            'doc': types.SimpleNamespace(GetElement=lambda key: levels.get(key)),
+            '_elementid_param_to_text': lambda param: 'Phase {}'.format(param.value),
+        })
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def key(self, param):
+        self.params['P'] = param
+        return self.dialog.get_param_sort_key(None, 'P')
+
+    def test_keys_by_storage_type(self):
+        self.assertEqual((False, (0, 2.5)), self.key(self.Param('Double', 2.5)))
+        self.assertEqual((False, (0, 7)), self.key(self.Param('Integer', 7)))
+        self.assertEqual((False, (0, 3.5)), self.key(self.Param('ElementId', 1)))
+        self.assertEqual((False, (1, ((1, 'phase '), (0, 2)))),
+                         self.key(self.Param('ElementId', 2)))
+        self.assertEqual((True, None), self.key(self.Param('String', '  ')))
+        self.assertEqual((True, None), self.key(self.Param('Double', 1.0, has_value=False)))
+        self.assertEqual((True, None), self.dialog.get_param_sort_key(None, 'Missing'))
+
+
 class PreviewTests(unittest.TestCase):
     def setUp(self):
         self.dialog = ReValueDialog()
@@ -741,12 +1071,15 @@ class PreviewTests(unittest.TestCase):
         self.dialog.preview_grid = Grid(
             self.rows, self.dialog.matches_preview_filters)
         self.dialog.preview_view = self.dialog.preview_grid.Items
+        self.dialog.update_preview = self.dialog.refresh_preview_filters
+        self.dialog._invalid_filter_values = 0
         self.dialog.parameter_filter = None
         self.dialog.available_params = ['Width', 'Comments']
         self.dialog.txt_filter_summary = TextBox()
         self.dialog.btn_clear_filters = LayoutPart()
         self.dialog.txt_filter_status = TextBox()
         self.dialog.btn_apply = LayoutPart()
+        self.dialog.btn_apply.FindResource = mock.Mock(return_value='filter tooltip')
         self.dialog._decimal_separator = '.'
         self.dialog._group_separator = ','
         self.dialog._parameter_filter_error = ''

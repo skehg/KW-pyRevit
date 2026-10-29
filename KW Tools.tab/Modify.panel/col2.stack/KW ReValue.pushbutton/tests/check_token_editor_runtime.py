@@ -15,7 +15,6 @@ clr.AddReference('WindowsBase')
 
 from System.Windows import DataObject, DragDropEffects, Point, Size, Rect, Visibility
 from System.Windows.Controls import Button, Canvas
-from System.Windows.Markup import XamlReader
 from token_editor import TokenEditor, TokenSettings
 from token_pattern import expression, parse_pattern, serialize_pattern, token
 from range_separator import decode_separator, split_case
@@ -53,8 +52,8 @@ class Row(object):
 
 class Host(object):
     def __init__(self):
-        with io.open(os.path.join(COMMAND_DIR, 'ReValueUI.xaml'), encoding='utf-8') as source:
-            self.window = XamlReader.Parse(source.read())
+        from ui_styles import load_window
+        self.window = load_window(os.path.join(COMMAND_DIR, 'ReValueUI.xaml'))
         self.available_params = ['Comments', 'Mark', 'Width', 'Height', 'Code', 'Extra']
         self.param_combos = [self.window.FindName('combo_param{}'.format(i)) for i in range(1, 6)]
         for combo in self.param_combos:
@@ -115,6 +114,10 @@ def run_checks(capture=None):
             assert chip.DesiredSize.Height <= 28
         editor.select(0)
         assert editor.bar.Children[0] is first_button  # Preserve double-click target.
+        case_menu = next(item for item in editor.context_menu(0).Items
+                         if item.Header == 'Text Case')
+        assert [item.Header for item in case_menu.Items] == [
+            'Unchanged', 'UPPER', 'lower', 'Title Case', 'Sentence case']
         editor.set_case(0, 'upper')
         assert host.txt_pattern.Text == '{val1~upper} - {val2}'
         editor.duplicate(0)
@@ -236,7 +239,28 @@ def run_checks(capture=None):
         host.window.ShowInTaskbar = False
         host.window.Show()
         host.window.Hide()
+        for case_label, case_value in [
+                ('Unchanged', 'Unchanged'), ('UPPER', 'upper'), ('lower', 'lower'),
+                ('Title Case', 'title'), ('Sentence case', 'sentence')]:
+            case_settings = TokenSettings(editor, token('source', start='val1', case=case_value))
+            assert case_settings.fields['case'].SelectedItem == case_label
+            case_settings.fields['case'].SelectedItem = case_label
+            case_settings.window.Loaded += (
+                lambda sender, args: case_settings.accept(None, None))
+            case_item, unused, unused_counter = case_settings.show()
+            assert case_item['case'] == case_value
+            assert expression(case_item) == (
+                '{val1}' if case_value == 'Unchanged' else '{val1~' + case_value + '}')
         settings = TokenSettings(editor, token('source', start='val1'))
+        action = Button()
+        settings.panel.Children.Add(action)
+        action.ApplyTemplate()
+        face = action.Template.FindName('button_face', action)
+        assert face is not None and face.CornerRadius.TopLeft == 6
+        assert face.Effect.ShadowDepth == 1
+        action.IsEnabled = False
+        assert face.Effect is None
+        settings.panel.Children.Remove(action)
         settings.fields['operation'].SelectedItem = 'Increment'
         settings.fields['step'].Text = '2'
         settings.window.Loaded += lambda sender, args: settings.accept(None, None)

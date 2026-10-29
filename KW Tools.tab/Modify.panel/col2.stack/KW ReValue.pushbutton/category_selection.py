@@ -1,5 +1,4 @@
 """On-demand, read-only category/family selection for KW ReValue."""
-import io
 import os
 
 from Autodesk.Revit import DB
@@ -8,7 +7,7 @@ from System import Action
 from System.Windows import Thickness
 from System.Windows.Controls import CheckBox, ListBoxItem
 from System.Windows.Input import Cursors
-from System.Windows.Markup import XamlReader
+from ui_styles import load_window
 from System.Windows.Threading import DispatcherPriority
 from pyrevit import forms
 from pyrevit.compat import get_elementid_value_func
@@ -109,12 +108,11 @@ class CategoryPicker(object):
     def __init__(self, source):
         self.source = source
         path = os.path.join(os.path.dirname(__file__), 'CategorySelection.xaml')
-        with io.open(path, encoding='utf-8') as xaml:
-            self.window = XamlReader.Parse(xaml.read())
+        self.window = load_window(path)
         for name in (
-                'scope_view', 'scope_project', 'category_list', 'family_list',
-                'search_categories', 'search_families', 'all_families',
-                'selected_families', 'family_heading', 'family_modes',
+                'scope_toggle', 'category_list', 'family_list',
+                'search_categories', 'search_families', 'family_toggle',
+                'family_heading', 'family_modes',
                 'selection_summary', 'selection_status', 'use_selection',
                 'cancel_selection'):
             setattr(self, name, self.window.FindName(name))
@@ -127,17 +125,18 @@ class CategoryPicker(object):
         self._collection_error = None
         self.notice = ''
         if not source.view_available:
-            self.scope_view.IsEnabled = False
-            self.scope_view.ToolTip = 'The active view does not support element collection.'
-            self.scope_project.IsChecked = True
+            self.scope_toggle.IsChecked = True
+            self.scope_toggle.IsEnabled = False
+            self.scope_toggle.ToolTip = (
+                'The active view does not support element collection. Using Entire Project.')
             self.notice = 'Current View is unavailable for this view; Entire Project is selected.'
-        self.scope_view.Checked += self.scope_changed
-        self.scope_project.Checked += self.scope_changed
+        self.scope_toggle.Checked += self.scope_changed
+        self.scope_toggle.Unchecked += self.scope_changed
         self.category_list.SelectionChanged += self.category_changed
         self.search_categories.TextChanged += self.render_categories
         self.search_families.TextChanged += self.render_families
-        self.all_families.Checked += self.family_mode_changed
-        self.selected_families.Checked += self.family_mode_changed
+        self.family_toggle.Checked += self.family_mode_changed
+        self.family_toggle.Unchecked += self.family_mode_changed
         self.use_selection.Click += self.accept
         self.cancel_selection.Click += self.cancel
         self.window.Loaded += self.loaded
@@ -186,7 +185,7 @@ class CategoryPicker(object):
     def scope_changed(self, sender, args):
         if self._updating:
             return
-        new_scope = 'view' if self.scope_view.IsChecked else 'project'
+        new_scope = 'project' if self.scope_toggle.IsChecked else 'view'
         if new_scope == self.scope:
             return
         old_states = self.states[self.scope]
@@ -289,11 +288,11 @@ class CategoryPicker(object):
                 'No family grouping - use All families to include this category.'
                 if row else 'Families - highlight a category first')
             if not row:
+                self.family_toggle.IsChecked = False
                 return
             state = self.state(row.key)
-            self.selected_families.IsEnabled = meaningful or not state['all']
-            self.all_families.IsChecked = state['all']
-            self.selected_families.IsChecked = not state['all']
+            self.family_toggle.IsEnabled = meaningful or not state['all']
+            self.family_toggle.IsChecked = not state['all']
             self.family_list.IsEnabled = not state['all'] and meaningful
             search = self.search_families.Text.lower()
             for name in sorted(groups or {}, key=lambda value: (value or '').lower()):
@@ -314,7 +313,7 @@ class CategoryPicker(object):
     def family_mode_changed(self, sender, args):
         if self._updating or self.active_category is None:
             return
-        self.state(self.active_category.key)['all'] = bool(self.all_families.IsChecked)
+        self.state(self.active_category.key)['all'] = not bool(self.family_toggle.IsChecked)
         self.render_families()
         self.update_status()
 

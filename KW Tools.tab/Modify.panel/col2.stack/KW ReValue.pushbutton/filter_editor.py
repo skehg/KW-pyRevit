@@ -1,13 +1,12 @@
 """Visual filter editing without modifying the active filter until confirmed."""
 import copy
-import io
 import os
 
 from System.Windows import Thickness
 from System.Windows.Controls import (
     Border, Button, CheckBox, ComboBox, Orientation, StackPanel, TextBox,
 )
-from System.Windows.Markup import XamlReader
+from ui_styles import load_window
 from System.Windows.Media import Brushes
 
 from filter_expression import (
@@ -27,8 +26,7 @@ CONDITIONS = (
 class FilterEditor(object):
     def __init__(self, owner, parameters, active_filter):
         path = os.path.join(os.path.dirname(__file__), 'FilterEditor.xaml')
-        with io.open(path, encoding='utf-8') as source:
-            self.window = XamlReader.Parse(source.read())
+        self.window = load_window(path)
         self.window.Owner = owner
         self.parameters = list(parameters)
         self.tree = copy.deepcopy(active_filter)

@@ -16,11 +16,13 @@ clr.AddReference('PresentationFramework')
 clr.AddReference('WindowsBase')
 clr.AddReference('System.Xaml')
 
-from System.Windows import Window, GridLength, GridUnitType
-from System import Predicate
-from System.Windows.Controls import ComboBoxItem, DataGridEditingUnit
+from System import Enum, Predicate
+from System.Windows import Window, GridLength, GridUnitType, Visibility as WpfVisibility
+from System.Windows.Controls import ComboBoxItem, DataGridColumn, DataGridEditingUnit, TextBox
 from System.Windows.Data import CollectionViewSource
-from System.Windows.Markup import XamlReader
+from System.Windows.Input import Mouse
+from ui_styles import load_window
+from System.Windows.Media import VisualTreeHelper
 from System.Collections.ObjectModel import ObservableCollection
 from System.Globalization import CultureInfo
 from Autodesk.Revit.DB import *
@@ -32,6 +34,16 @@ from filter_expression import (
     count_rules, evaluate_expression, serialize_expression, validate_expression,
 )
 from range_separator import decode_separator, split_case
+
+
+class ListSortDirection(object):
+    """ListSortDirection lives in different assemblies on .NET Framework (Revit 2024-)
+    and .NET 8 (Revit 2025+), so resolve it from DataGridColumn.SortDirection."""
+    _enum_type = clr.GetClrType(DataGridColumn).GetProperty(
+        'SortDirection').PropertyType.GetGenericArguments()[0]
+    Ascending = Enum.Parse(_enum_type, 'Ascending')
+    Descending = Enum.Parse(_enum_type, 'Descending')
+
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
@@ -57,7 +69,33 @@ _SESSION_SETTING_DEFAULTS = {
     'replace_text': '',
     'match_whole_word': 'False',
     'match_case': 'True',
+    'sort_mode': 'none',
+    'sort_param': '',
+    'sort_descending': 'False',
 }
+
+SORT_NONE = 'none'
+SORT_CURRENT = 'current'
+SORT_PARAM = 'param'
+NEW_VALUE_FILTER_WARNING = 'Clear New Value filter to apply'
+
+
+def natural_sort_key(text):
+    """Case-insensitive key that orders embedded numbers numerically (A2 before A10)."""
+    parts = re.split(r'(\d+)', text or '')
+    return tuple((0, int(part)) if part.isdigit() else (1, part.lower())
+                 for part in parts if part)
+
+
+def order_preview_rows(rows, sort_entries, descending):
+    """Return rows sorted by (is_blank, key) entries; blanks last, ties in selection order."""
+    by_selection = sorted(rows, key=lambda row: row.SelectionIndex)
+    if sort_entries is None:
+        return by_selection
+    filled = [row for row in by_selection if not sort_entries[row][0]]
+    blanks = [row for row in by_selection if sort_entries[row][0]]
+    filled = sorted(filled, key=lambda row: sort_entries[row][1], reverse=descending)
+    return filled + blanks
 
 
 def _session_key(name):
@@ -893,11 +931,7 @@ def load_xaml_window():
     if not os.path.exists(xaml_file):
         raise IOError("XAML file not found: {}".format(xaml_file))
     
-    with open(xaml_file, 'r') as f:
-        xaml_string = f.read()
-    
-    window = XamlReader.Parse(xaml_string)
-    return window
+    return load_window(xaml_file)
 
 
 # ============================================================================
@@ -1023,6 +1057,8 @@ class PreviewItem(object):
         self.final = False
         self.tooltip = ''
         self.FilterMatch = True
+        self.SortValue = ''
+        self.SelectionIndex = 0
 
     @property
     def HasChanges(self):
@@ -1092,16 +1128,27 @@ class ReValueDialog(object):
         self.param_values_map = {}
         self._suspend_events = False
         self._pattern_before_original = None
+        self.sort_mode = SORT_NONE
+        self.sort_param = ''
+        self.sort_descending = False
         
         # Get controls - mode toggle
-        self.radio_type = self.window.FindName('radio_type')
-        self.radio_instance = self.window.FindName('radio_instance')
+        self.btn_mode = self.window.FindName('btn_mode')
         
         # Get controls - delimiters
         self.txt_delimiters = self.window.FindName('txt_delimiters')
         
         # Get controls - original parameter dropdown
         self.combo_orig_param = self.window.FindName('combo_orig_param')
+
+        # Get controls - row sorting
+        self.combo_sort_by = self.window.FindName('combo_sort_by')
+        self.btn_sort_direction = self.window.FindName('btn_sort_direction')
+        self.btn_clear_sort = self.window.FindName('btn_clear_sort')
+        self.col_sort_value = self.window.FindName('col_sort_value')
+        self.col_current = self.window.FindName('col_current')
+        self.current_sort_hint = self.window.FindName('current_sort_hint')
+        self.current_header_sort_hint = self.window.FindName('current_header_sort_hint')
         
         # Get controls - parameters (5 combos)
         self.param_combos = [
@@ -1146,15 +1193,13 @@ class ReValueDialog(object):
         self.txt_filter_status = self.window.FindName('txt_filter_status')
         self.parameter_filter = None
         self._parameter_filter_error = ''
+        self._invalid_filter_values = 0
         number_format = CultureInfo.CurrentCulture.NumberFormat
         self._decimal_separator = number_format.NumberDecimalSeparator
         self._group_separator = number_format.NumberGroupSeparator
         
         # Wire up events
-        if self.radio_type:
-            self.radio_type.Checked += self.OnModeChanged
-        if self.radio_instance:
-            self.radio_instance.Checked += self.OnModeChanged
+        self.btn_mode.Click += self.OnModeChanged
         if self.txt_delimiters:
             self.txt_delimiters.TextChanged += self.OnSettingsChanged
         if self.combo_orig_param:
@@ -1180,6 +1225,10 @@ class ReValueDialog(object):
         self.txt_pattern.TextChanged += self.OnSettingsChanged
         self.btn_use_orig.Click += self.OnUseOriginal
         self.preview_grid.SelectedCellsChanged += self.OnGridSelectionChanged
+        self.preview_grid.Sorting += self.OnGridSorting
+        self.combo_sort_by.SelectionChanged += self.OnSortByChanged
+        self.btn_sort_direction.Click += self.OnSortDirectionClicked
+        self.btn_clear_sort.Click += self.OnClearSort
         self.txt_filter_current.TextChanged += self.OnPreviewFilterChanged
         self.txt_filter_new.TextChanged += self.OnPreviewFilterChanged
         self.more_settings.Expanded += self.OnMoreSettingsChanged
@@ -1205,10 +1254,7 @@ class ReValueDialog(object):
 
         # Set mode
         self.is_instance_mode = str(session_settings.get('mode', 'type')).lower() == 'instance'
-        if self.radio_type:
-            self.radio_type.IsChecked = not self.is_instance_mode
-        if self.radio_instance:
-            self.radio_instance.IsChecked = self.is_instance_mode
+        self.btn_mode.IsChecked = self.is_instance_mode
         
         # Set delimiters
         if self.txt_delimiters:
@@ -1240,6 +1286,7 @@ class ReValueDialog(object):
             self.elements, self.is_instance_mode)
         
         self.populate_source_parameters(session_settings.get('orig_param', ''))
+        self.populate_sort_options(session_settings)
         
         # Populate parameter combo boxes (5 slots)
         for i, combo in enumerate(self.param_combos):
@@ -1286,6 +1333,7 @@ class ReValueDialog(object):
                     continue
             
             preview_item = PreviewItem(elem, current_name)
+            preview_item.SelectionIndex = len(self.preview_items)
             self.preview_items.Add(preview_item)
         
         # Set grid data source
@@ -1324,6 +1372,186 @@ class ReValueDialog(object):
             self.combo_orig_param.SelectedItem = previous_selection
         else:
             self.combo_orig_param.SelectedIndex = 0
+
+    def populate_sort_options(self, session_settings):
+        """Fill Sort by, restoring the session sort only if its parameter still exists."""
+        self.sort_descending = str(
+            session_settings.get('sort_descending', 'False')).lower() == 'true'
+        self.sort_mode = session_settings.get('sort_mode', SORT_NONE)
+        self.sort_param = session_settings.get('sort_param', '') or ''
+        if self.sort_mode == SORT_PARAM and self.sort_param not in self.available_params:
+            self.sort_mode = SORT_NONE
+        if self.sort_mode not in (SORT_CURRENT, SORT_PARAM):
+            self.sort_mode = SORT_NONE
+        if self.sort_mode != SORT_PARAM:
+            self.sort_param = ''
+
+        self.combo_sort_by.Items.Clear()
+        self.sort_none_item = ComboBoxItem()
+        self.sort_none_item.Content = '<Selection order>'
+        self.sort_none_item.ToolTip = 'Keep rows in the order the elements were selected.'
+        self.sort_current_item = ComboBoxItem()
+        self.sort_current_item.Content = '<Current Value>'
+        self.sort_current_item.ToolTip = 'Sort by the Current Value column.'
+        self.combo_sort_by.Items.Add(self.sort_none_item)
+        self.combo_sort_by.Items.Add(self.sort_current_item)
+        for param_name in self.available_params:
+            self.combo_sort_by.Items.Add(param_name)
+        self._select_sort_item()
+
+    def _select_sort_item(self):
+        """Show the active sort in the dropdown without triggering its change handler."""
+        suspended = self._suspend_events
+        self._suspend_events = True
+        try:
+            if self.sort_mode == SORT_PARAM:
+                self.combo_sort_by.SelectedItem = self.sort_param
+            elif self.sort_mode == SORT_CURRENT:
+                self.combo_sort_by.SelectedItem = self.sort_current_item
+            else:
+                self.combo_sort_by.SelectedItem = self.sort_none_item
+        finally:
+            self._suspend_events = suspended
+
+    def OnSortByChanged(self, sender, args):
+        if self._suspend_events:
+            return
+        selected = self.combo_sort_by.SelectedItem
+        if selected is None:
+            return
+        if selected == self.sort_none_item:
+            self.sort_mode, self.sort_param = SORT_NONE, ''
+        elif selected == self.sort_current_item:
+            self.sort_mode, self.sort_param = SORT_CURRENT, ''
+        else:
+            self.sort_mode, self.sort_param = SORT_PARAM, str(selected)
+        self._on_sort_changed()
+
+    def OnSortDirectionClicked(self, sender, args):
+        if self.sort_mode == SORT_NONE:
+            return
+        self.sort_descending = not self.sort_descending
+        self._on_sort_changed()
+
+    def OnClearSort(self, sender, args):
+        if not self.commit_preview_edits():
+            return
+        self.sort_mode, self.sort_param = SORT_NONE, ''
+        self.sort_descending = False
+        self._select_sort_item()
+        self.persist_settings()
+        self.update_preview()
+
+    def OnGridSorting(self, sender, args):
+        """Replace WPF's view sort so numbering always follows the displayed order."""
+        args.Handled = True
+        if self._is_mouse_over_text_box():
+            return
+        column = args.Column
+        if column == self.col_current:
+            if self.sort_mode == SORT_CURRENT:
+                self.sort_descending = not self.sort_descending
+            else:
+                self.sort_mode, self.sort_param = SORT_CURRENT, ''
+                self.sort_descending = False
+        elif column == self.col_sort_value and self.sort_mode == SORT_PARAM:
+            self.sort_descending = not self.sort_descending
+        else:
+            return
+        self._select_sort_item()
+        self._on_sort_changed()
+
+    def _is_mouse_over_text_box(self):
+        """Header filter boxes sit inside sortable headers; clicks in them must not sort."""
+        element = Mouse.DirectlyOver
+        while element is not None:
+            if isinstance(element, TextBox):
+                return True
+            try:
+                element = VisualTreeHelper.GetParent(element)
+            except Exception:
+                return False
+        return False
+
+    def _on_sort_changed(self):
+        if not self.commit_preview_edits():
+            return
+        self.persist_settings()
+        self.update_preview()
+
+    def _update_sort_indicators(self):
+        direction = (ListSortDirection.Descending if self.sort_descending
+                     else ListSortDirection.Ascending)
+        current_is_sorted = self.sort_mode == SORT_CURRENT
+        self.col_current.SortDirection = direction if current_is_sorted else None
+        self.current_sort_hint.Visibility = (
+            WpfVisibility.Collapsed if current_is_sorted else WpfVisibility.Visible)
+        if current_is_sorted:
+            order = 'descending' if self.sort_descending else 'ascending'
+            next_order = 'ascending' if self.sort_descending else 'descending'
+            self.current_header_sort_hint.ToolTip = (
+                'Sorted {}. Click to sort {}.'.format(order, next_order))
+        else:
+            self.current_header_sort_hint.ToolTip = 'Click to sort ascending.'
+        if self.sort_mode == SORT_PARAM:
+            self.col_sort_value.Header = 'Sort: {}'.format(self.sort_param)
+            self.col_sort_value.SortDirection = direction
+            self.col_sort_value.Visibility = WpfVisibility.Visible
+        else:
+            self.col_sort_value.SortDirection = None
+            self.col_sort_value.Visibility = WpfVisibility.Collapsed
+        self.btn_sort_direction.IsChecked = self.sort_descending
+        self.btn_sort_direction.IsEnabled = self.sort_mode != SORT_NONE
+        self.btn_clear_sort.IsEnabled = self.sort_mode != SORT_NONE
+
+    def get_param_sort_key(self, element, param_name):
+        """Return (is_blank, key): numbers by value, Levels by elevation, text naturally."""
+        param = self._lookup_parameter(element, param_name)
+        if param is None or not param.HasValue:
+            return True, None
+        storage = param.StorageType
+        try:
+            if storage == StorageType.Double:
+                return False, (0, param.AsDouble())
+            if storage == StorageType.Integer:
+                return False, (0, param.AsInteger())
+            if storage == StorageType.ElementId:
+                referenced = doc.GetElement(param.AsElementId())
+                if isinstance(referenced, Level):
+                    return False, (0, referenced.Elevation)
+                text = _elementid_param_to_text(param)
+            else:
+                text = param.AsString()
+        except Exception:
+            text = self.get_param_value(element, param_name)
+        if not text or not text.strip():
+            return True, None
+        return False, (1, natural_sort_key(text))
+
+    def sort_preview_items(self):
+        """Reorder the rows in place; keys never depend on New Value, so this cannot loop."""
+        entries = None
+        for item in self.preview_items:
+            item.SortValue = ''
+        if self.sort_mode == SORT_CURRENT:
+            entries = {}
+            for item in self.preview_items:
+                text = item.CurrentName or ''
+                entries[item] = (not text.strip(), natural_sort_key(text))
+        elif self.sort_mode == SORT_PARAM:
+            entries = {}
+            for item in self.preview_items:
+                entries[item] = self.get_param_sort_key(item.Element, self.sort_param)
+                item.SortValue = self.get_param_value(item.Element, self.sort_param)
+        ordered = order_preview_rows(list(self.preview_items), entries, self.sort_descending)
+        if hasattr(self.preview_items, 'Move'):
+            for target_index, item in enumerate(ordered):
+                current_index = self.preview_items.IndexOf(item)
+                if current_index != target_index:
+                    self.preview_items.Move(current_index, target_index)
+        else:
+            self.preview_items[:] = ordered
+        self._update_sort_indicators()
 
     def _selected_combo_text(self, combo):
         """Get selected ComboBox item text safely."""
@@ -1365,6 +1593,9 @@ class ReValueDialog(object):
         save_session_setting('replace_text', replace_text)
         save_session_setting('match_whole_word', bool(self.chk_match_whole_word.IsChecked))
         save_session_setting('match_case', bool(self.chk_match_case.IsChecked))
+        save_session_setting('sort_mode', self.sort_mode)
+        save_session_setting('sort_param', self.sort_param)
+        save_session_setting('sort_descending', self.sort_descending)
     
     def get_delimiters(self):
         """Get current delimiters from UI"""
@@ -1382,46 +1613,45 @@ class ReValueDialog(object):
         if not self.combo_final_case or not self.combo_final_case.SelectedItem:
             return 'None'
         selected = self.combo_final_case.SelectedItem
+        if hasattr(selected, 'Tag') and selected.Tag is not None:
+            return str(selected.Tag)
         if hasattr(selected, 'Content'):
             selected = selected.Content
         return str(selected)
     
-    def get_param_value(self, element, param_name):
-        """Get parameter value as string from element"""
+    def _lookup_parameter(self, element, param_name):
+        """Find a parameter using the mode rules: type mode reads the type;
+        instance mode tries the instance first, then its type."""
+        param_name = str(param_name or '').strip()
         if not param_name:
-            return ""
-        
-        param_name = str(param_name).strip()
-        if not param_name:
-            return ""
-        
-        try:
-            # In type mode, resolve selected element to type before lookup.
-            target = element
-            if not self.is_instance_mode:
-                resolved_type = _get_element_type(element)
-                if resolved_type:
-                    target = resolved_type
+            return None
 
-            # Instance mode may include type parameters in selectors.
-            # Try instance first, then fallback to type.
-            if self.is_instance_mode:
-                param = None
+        # In type mode, resolve selected element to type before lookup.
+        target = element
+        if not self.is_instance_mode:
+            resolved_type = _get_element_type(element)
+            if resolved_type:
+                target = resolved_type
+
+        param = None
+        try:
+            param = target.LookupParameter(param_name)
+        except:
+            param = None
+
+        if not param and self.is_instance_mode:
+            resolved_type = _get_element_type(element)
+            if resolved_type:
                 try:
-                    param = target.LookupParameter(param_name)
+                    param = resolved_type.LookupParameter(param_name)
                 except:
                     param = None
+        return param
 
-                if not param:
-                    resolved_type = _get_element_type(element)
-                    if resolved_type:
-                        try:
-                            param = resolved_type.LookupParameter(param_name)
-                        except:
-                            param = None
-            else:
-                param = target.LookupParameter(param_name)
-
+    def get_param_value(self, element, param_name):
+        """Get parameter value as string from element"""
+        try:
+            param = self._lookup_parameter(element, param_name)
             if param:
                 if param.HasValue:
                     param_storage = param.StorageType
@@ -1528,28 +1758,31 @@ class ReValueDialog(object):
         return build_counter_generator(start_text, increment_text)
     
     def update_preview(self):
-        """Update preview grid with new names using current pattern"""
+        """Sort, then number only rows passing the Current Value and parameter filters,
+        in display order. The New Value filter is excluded so it can never renumber."""
         pattern = self.txt_pattern.Text
         tokenizer_func = self.get_tokenizer_func()
         counter_gen, counter_error = self.get_counter_generator()
 
+        for item in self.preview_items:
+            # CurrentName column always reflects the selected tokenization source.
+            item.CurrentName = self.get_original_source_text(item.Element)
+        self.sort_preview_items()
+        self.update_parameter_matches()
+
         if counter_error:
             for item in self.preview_items:
-                item.CurrentName = self.get_original_source_text(item.Element)
                 item.NewName = ''
                 item.tooltip = 'Counter Error: {}'.format(counter_error)
 
-            self.refresh_preview_filters()
+            self.refresh_preview_filters(recompute_matches=False)
             self.update_tokenization_display()
             return
-        
-        row_contexts = []
-        for item in self.preview_items:
-            # CurrentName column always reflects the selected tokenization source.
-            original_source = self.get_original_source_text(item.Element)
-            item.CurrentName = original_source
-            param_values = self.get_selected_param_values(item.Element)
-            row_contexts.append((original_source, param_values))
+
+        numbered_rows = [item for item in self.preview_items
+                         if self.matches_numbering_filters(item)]
+        row_contexts = [(item.CurrentName, self.get_selected_param_values(item.Element))
+                        for item in numbered_rows]
 
         sequence_seeds = {}
         if row_contexts:
@@ -1562,11 +1795,11 @@ class ReValueDialog(object):
                 sequence_seeds[source_ref] = _resolve_progression_source(
                     source_ref, first_tokens, first_param_dict)
 
-        for idx, item in enumerate(self.preview_items):
+        find_text = self.txt_find.Text if self.txt_find else ''
+        replace_text = self.txt_replace.Text if self.txt_replace else ''
+        for idx, item in enumerate(numbered_rows):
             original_source, param_values = row_contexts[idx]
             counter_value = counter_gen(idx) if counter_gen else ''
-            find_text = self.txt_find.Text if self.txt_find else ''
-            replace_text = self.txt_replace.Text if self.txt_replace else ''
             item.format_value(
                 pattern,
                 param_values,
@@ -1582,7 +1815,7 @@ class ReValueDialog(object):
                 final_case=self._selected_final_case(),
             )
         
-        self.refresh_preview_filters()
+        self.refresh_preview_filters(recompute_matches=False)
         self.update_tokenization_display()
     
     def OnModeChanged(self, sender, args):
@@ -1591,10 +1824,7 @@ class ReValueDialog(object):
             return
 
         # Re-initialize with new mode
-        if self.radio_instance:
-            self.is_instance_mode = self.radio_instance.IsChecked
-        else:
-            self.is_instance_mode = False
+        self.is_instance_mode = bool(self.btn_mode.IsChecked)
 
         self._suspend_events = True
         
@@ -1605,6 +1835,7 @@ class ReValueDialog(object):
         session_settings = load_session_settings()
 
         self.populate_source_parameters(session_settings.get('orig_param', ''))
+        self.populate_sort_options(session_settings)
         
         # Clear and rebuild parameter combos
         for i, combo in enumerate(self.param_combos):
@@ -1651,11 +1882,11 @@ class ReValueDialog(object):
                     continue
             
             preview_item = PreviewItem(elem, current_name)
+            preview_item.SelectionIndex = len(self.preview_items)
             self.preview_items.Add(preview_item)
 
         self._suspend_events = False
         self.persist_settings()
-        self.refresh_preview_filters()
         self.update_preview()
     
     def OnSettingsChanged(self, sender, args):
@@ -1672,15 +1903,22 @@ class ReValueDialog(object):
         """Called when grid selection changes"""
         self.update_tokenization_display()
 
-    def matches_preview_filters(self, item):
-        """Match both header filters without changing preview values or counters."""
+    def matches_numbering_filters(self, item):
+        """Filters that decide which rows are numbered; they never depend on New Value."""
         current_filter = self.txt_filter_current.Text.lower()
+        return item.FilterMatch and current_filter in item.CurrentName.lower()
+
+    def matches_preview_filters(self, item):
+        """Display filter: numbering filters plus the find-only New Value filter."""
         new_filter = self.txt_filter_new.Text.lower()
-        return (item.FilterMatch and current_filter in item.CurrentName.lower()
+        return (self.matches_numbering_filters(item)
                 and new_filter in item.NewName.lower())
 
-    def refresh_preview_filters(self):
-        """Cache read-only parameter matches before refreshing the WPF view."""
+    def new_value_filter_active(self):
+        return bool(self.txt_filter_new.Text)
+
+    def update_parameter_matches(self):
+        """Cache read-only parameter filter matches for every row."""
         self._parameter_filter_error = ''
         try:
             validate_expression(self.parameter_filter, self.available_params)
@@ -1704,13 +1942,24 @@ class ReValueDialog(object):
                 item.FilterMatch = matched is True
                 if matched is None:
                     invalid_values += 1
+        self._invalid_filter_values = invalid_values
+
+    def refresh_preview_filters(self, recompute_matches=True):
+        """Refresh the WPF view, status line and Apply availability."""
+        if recompute_matches:
+            self.update_parameter_matches()
+        invalid_values = self._invalid_filter_values
         self.preview_view.Refresh()
         rules = count_rules(self.parameter_filter)
         self.txt_filter_summary.Text = (
             '{} rule(s) - Custom grouping'.format(rules) if rules else 'No parameter filters')
         self.txt_filter_summary.ToolTip = serialize_expression(self.parameter_filter)
         self.btn_clear_filters.IsEnabled = self.parameter_filter is not None
-        self.btn_apply.IsEnabled = not bool(self._parameter_filter_error)
+        self.btn_apply.IsEnabled = not (
+            self._parameter_filter_error or self.new_value_filter_active())
+        self.btn_apply.ToolTip = (
+            self.btn_apply.FindResource('NewValueFilterToolTip')
+            if self.new_value_filter_active() else None)
         status = '{} of {} rows displayed.'.format(
             self.preview_grid.Items.Count, len(self.preview_items))
         if self._parameter_filter_error:
@@ -1738,20 +1987,24 @@ class ReValueDialog(object):
         accepted, node = editor.show()
         if accepted:
             self.parameter_filter = node
-            self.refresh_preview_filters()
+            self.update_preview()
 
     def OnClearFilters(self, sender, args):
         if not self.commit_preview_edits():
             return
         self.parameter_filter = None
-        self.refresh_preview_filters()
+        self.update_preview()
 
     def OnPreviewFilterChanged(self, sender, args):
         if self._suspend_events:
             return
         if not self.commit_preview_edits():
             return
-        self.refresh_preview_filters()
+        if sender == self.txt_filter_new:
+            # Find-only: hide/show rows without renumbering (renumbering would be circular).
+            self.refresh_preview_filters(recompute_matches=False)
+        else:
+            self.update_preview()
 
     def OnMoreSettingsChanged(self, sender, args):
         """Reclaim space when collapsed, including after dragging the divider."""
@@ -1775,6 +2028,9 @@ class ReValueDialog(object):
                 return
             if self._parameter_filter_error:
                 forms.alert(self._parameter_filter_error)
+                return
+            if self.new_value_filter_active():
+                forms.alert(NEW_VALUE_FILTER_WARNING)
                 return
             revalue_map = self.get_revalue_map()
             if not revalue_map:

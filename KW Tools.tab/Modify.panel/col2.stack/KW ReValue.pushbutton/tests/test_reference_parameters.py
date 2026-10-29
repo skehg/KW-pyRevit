@@ -58,7 +58,8 @@ class ReferenceParameterTests(unittest.TestCase):
             elif isinstance(node, ast.ClassDef) and node.name == 'ReValueDialog':
                 selected.extend(method for method in node.body
                                 if isinstance(method, ast.FunctionDef) and method.name in (
-                                    'get_param_value', 'get_selected_param_values'))
+                                    'get_param_value', 'get_selected_param_values',
+                                    '_lookup_parameter'))
         tree.body = selected
         self.document = mock.Mock()
         self.document.GetElement.side_effect = lambda key: {
@@ -76,6 +77,8 @@ class ReferenceParameterTests(unittest.TestCase):
         self.dialog = types.SimpleNamespace(is_instance_mode=True)
         self.dialog.get_param_value = types.MethodType(
             self.namespace['get_param_value'], self.dialog)
+        self.dialog._lookup_parameter = types.MethodType(
+            self.namespace['_lookup_parameter'], self.dialog)
         self.wall = Element([
             Parameter('Base Constraint', 100),
             Parameter('Top Constraint', 101),

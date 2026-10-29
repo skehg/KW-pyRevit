@@ -1,5 +1,6 @@
 """WPF token editing; model writes remain in the existing ReValue Apply path."""
 import copy
+from clr import GetClrType
 
 from System.Windows import (
     DataObject, DragDrop, DragDropEffects, HorizontalAlignment, Point,
@@ -15,7 +16,7 @@ from System.Windows.Input import Key, MouseButtonState
 from System.Windows.Media import Brushes, Geometry, Stretch
 from System.Windows.Shapes import Path
 from token_pattern import (
-    CASES, edited, expression, insert_item, label, parameter_slot, parse_pattern,
+    CASES, CASE_LABELS, edited, expression, insert_item, label, parameter_slot, parse_pattern,
     serialize_pattern, token,
     position_controls, position_expression,
 )
@@ -30,6 +31,8 @@ class TokenSettings(object):
         self.result = None
         self.fields = {}
         self.window = Window()
+        button_type = GetClrType(Button)
+        self.window.Resources[button_type] = editor.host.window.FindResource(button_type)
         self.window.Title = 'ReValue - Token Settings'
         self.window.Owner = editor.host.window
         self.window.WindowStartupLocation = WindowStartupLocation.CenterOwner
@@ -86,8 +89,8 @@ class TokenSettings(object):
             self.text('Increment (nonnegative integer)', 'counter_increment',
                       editor.host.txt_counter_increment.Text)
         if kind != 'text':
-            self.combo('Text case (this chip)', 'case', list(CASES),
-                       item.get('case', 'Unchanged'))
+            self.combo('Text case (this chip)', 'case', [CASE_LABELS[case] for case in CASES],
+                       CASE_LABELS[item.get('case', 'Unchanged')])
         if kind in ('source', 'parameter'):
             self.note('Progression supports a single position counted from Start or a parameter slot, not ranges.\n'
                       'Increment: each row independently. Sequence: first unfiltered row plus row position.')
@@ -154,9 +157,13 @@ class TokenSettings(object):
             if candidate['kind'] == 'source':
                 candidate['start'] = self.read_position('start')
                 candidate['end'] = self.read_position('end') if self.fields['range'].IsChecked else ''
-            for name in ('case', 'join'):
-                if name in self.fields:
-                    candidate[name] = self.fields[name].Text
+            if 'case' in self.fields:
+                case_index = self.fields['case'].SelectedIndex
+                if case_index < 0:
+                    raise ValueError('Choose a text case.')
+                candidate['case'] = CASES[case_index]
+            if 'join' in self.fields:
+                candidate['join'] = self.fields['join'].Text
             if candidate['kind'] == 'source' and not self.fields['range'].IsChecked:
                 candidate['join'] = ''
                 candidate['join_quoted'] = False
@@ -468,7 +475,7 @@ class TokenEditor(object):
         if item['kind'] != 'text':
             case_menu = self.menu_item(menu, 'Text Case')
             for case in CASES:
-                entry = self.menu_item(case_menu, case,
+                entry = self.menu_item(case_menu, CASE_LABELS[case],
                     lambda sender, args, value=case: self.set_case(index, value))
                 entry.IsCheckable = True
                 entry.IsChecked = item.get('case', 'Unchanged') == case

@@ -16,26 +16,31 @@ A pattern combines literal text with placeholders. Token expressions read source
 - `{param6}` and `{count}` use the configured counter.
 - `{orig}` inserts the complete, un-tokenized source (good for find/replace).
 - `{inc:val3:1}` increments token 3 independently for each row; `{inc:param1:-1}` decrements parameter slot 1.
-- `{seq:val3:1}` starts with token 3 from the first unfiltered preview row and advances by row position.
+- `{seq:val3:1}` starts with token 3 from the first numbered preview row (in the displayed sort order, after the Current Value and parameter filters) and advances by row position.
 - Increment and sequence expressions accept a single `{valN}` or `{param1}` through `{param5}` source and a signed integer step, not a token range. Zero is allowed; `{seq:val3:-1}` counts backward from the first row's token 3. Numeric values keep their digit width (`009` plus 1 becomes `010`), alphabetic values roll over (`Z` to `AA`), and prefixed numeric values keep their prefix (`RM09` plus 1 becomes `RM10`). Negative numeric and prefixed results preserve their width (`RM01` minus 2 becomes `RM-01`). Alphabetic values cannot decrement below `A`; blank or unsupported values remain unchanged and show a preview warning.
 
 The counter is used only when the pattern contains `{count}` or `{param6}`. Its configured increment must be nonnegative.
-The **Final Case** dropdown converts the complete generated value, including literal text, after Find/Replace. Options are None, upper, lower, title, and sentence. It is separate from per-placeholder modifiers.
+The **Final Case** dropdown converts the complete generated value, including literal text, after Find/Replace. Options are None, UPPER, lower, Title Case, and Sentence case. Token settings and Text Case menus use the same case-demonstrating labels, with Unchanged for no conversion. Display labels do not change the pattern modifiers (`~upper`, `~lower`, `~title`, `~sentence`) or saved settings. Final Case is separate from per-placeholder modifiers.
 
 ## Workflow
+
+Action buttons have rounded corners, a neutral raised gradient and a small shadow to distinguish them from dropdowns. Hover, keyboard focus and pressed states provide feedback; disabled buttons are faded and flat. This styling is shared by the main window, token settings, filter editor and category picker. Blue token pills and toggle switches retain their distinct styling.
+
+All sliding switches show both options on opposite sides of the track, with the active option in bold and the inactive option in normal weight. Only the switch itself highlights on hover. Sort direction uses **Asc** (ascending) and **Desc** (descending) to keep the toolbar compact; the tooltip spells out the current direction and click action. **Source:** in the toolbar labels the source-parameter dropdown.
 
 1. Optionally select elements in Revit.
 2. Open KW ReValue.
 3. Choose mode:
    - Type mode: works on element types.
    - Instance mode: works directly on selected instances.
+   - The grey Mode switch highlights the current mode (**Type** or **Instance**) in bold; click it to change. Its colour stays the same in both states.
 4. Expand **More Settings** to adjust token delimiters if required.
 5. Choose a source parameter, or keep the bracketed **Default** option to use the element/type name.
 6. In **More Settings**, pick up to 5 parameters for substitution.
-7. Build a pattern in **Tokens**, or choose **Advanced Pattern** to enter syntax directly. The sliding switch beside the pattern is labelled with the action it will perform: click **Source** to use `{orig}` (the complete source value), then click **Pattern** to restore your previous pattern (kept while the dialog is open, including after applying changes). The switch is grey with its thumb on the left when off, and green with its thumb on the right while Source is enabled. Editing the pattern while Source is enabled turns the switch off, changes its label back to **Source**, and keeps your edit; the next switch remembers that new pattern.
+7. Build a pattern in **Tokens**, or choose **Advanced Pattern** to enter syntax directly. The sliding switch beside the pattern bolds what is currently in use: **Pattern** (your pattern) or **Source** (`{orig}`, the complete source value). Click it to switch to Source, and click again to restore your previous pattern (kept while the dialog is open, including after applying changes). The switch is grey with its thumb on the left when off, and green with its thumb on the right while Source is enabled. Editing the pattern while Source is enabled turns the switch off, bolds **Pattern** again, and keeps your edit; the next switch remembers that new pattern.
 8. Optionally set the counter in **More Settings** and final find/replace in the main controls.
-9. Review Current Value and New Value in the preview. Rows with different values are highlighted pale yellow.
-10. Optionally type into the Current Value and New Value header filters, then click Apply Re-Value. Only rows remaining in the filtered preview are eligible to be changed, including rows below the scroll area.
+9. Review Current Value and New Value in the preview. Rows with different values are highlighted pale yellow. Optionally choose **Sort by** (or click the Current Value header) so the counter and sequences number rows in the order you want; see **Sorting** below.
+10. Optionally type into the Current Value and New Value header filters, then click Apply Re-Value. Only rows remaining in the filtered preview are eligible to be changed, including rows below the scroll area. The New Value filter is for finding rows only: Apply is disabled while it contains text.
 11. After the result message, the dialog stays open, reloads current values from the model, and returns to the foreground ready for another action. Focus also returns after validation or error messages. Find and Replace are cleared, and Final rows are unfrozen so the next preview is recalculated. Pattern, mode, parameter choices, counter settings, case options and filters are preserved. Filters are re-evaluated against the updated values, so changed rows may no longer be visible.
 12. Repeat as needed, then click **Close**. Closing does not apply pending changes or undo earlier applies.
 
@@ -59,8 +64,8 @@ Palette and composition tokens use compact sky-blue pill buttons with semicircul
 
 - Existing preselection opens ReValue directly, unchanged.
 - With nothing selected, choose **Select on Screen** or **Select Categories**. Close the choice window, cancel the category picker, or press Esc during screen selection to exit without changing the model.
-- **Select Categories** opens a separate picker with **Current View** selected by default. Toggle to **Entire Project** to collect from the active document instead. Current View uses Revit's view collection, not the zoomed screen area; elements inside linked documents are excluded. If the active view cannot collect elements, Current View is disabled and the picker explains that Entire Project is selected.
-- Check one or more categories. Highlight a category to load its families; **All families** is the default. For a subset, choose **Selected families only** and check the desired families. Each category has its own family choices. System families are grouped using their type's family name; categories without family grouping (including views and sheets) can be included as a whole.
+- **Select Categories** opens a separate picker with **Current View** selected by default. The grey Scope switch has static labels: **Current View** on the left and **Entire Project** on the right. The active label is bold; the inactive label uses normal weight. Both labels sit outside the switch; only the switch highlights on hover. The thumb points to the selected scope, and the tooltip confirms the current scope and click action. Current View uses Revit's view collection, not the zoomed screen area; elements inside linked documents are excluded. If the active view cannot collect elements, the switch is disabled in Entire Project mode and its tooltip explains why.
+- Check one or more categories. Highlight a category to load its families; **All families** is the default. The grey family switch shows **All families** on the left and **Selected families only** on the right, with the current choice in bold; click to switch to **Selected families only** and check the desired families, or back to **All families**. Each category has its own family choices, and switching to All families preserves the checked subset for later reuse. System families are grouped using their type's family name; categories without family grouping (including views and sheets) can be included as a whole.
 - Search boxes only narrow the lists shown in the picker; they do not clear checked choices. The summary and matching-element count describe the complete selection.
 - On the first scope change, available choices carry across. Unavailable categories/families are reported, and a family restriction with no matches stays restricted rather than becoming All families. Returning to a previously visited scope restores its own choices. **Use Selection** is disabled until every checked, restricted category has at least one matching family.
 - Category counts are cached per scope. Families load only when a category is highlighted or an existing family restriction needs checking in a new scope, with names resolved once per distinct type. Only the final matching element IDs are resolved into the ReValue selection when clicking **Use Selection**. The first collection in a large project or view can still take time.
@@ -69,7 +74,7 @@ Palette and composition tokens use compact sky-blue pill buttons with semicircul
 
 ## Layout
 
-- Mode, Source Parameter, the editor selector/generated pattern and Find/Replace stay visible above the full-width preview. Tokens mode adds the palette and composition bar.
+- Mode, Source Parameter, Sort by, the editor selector/generated pattern and Find/Replace stay visible above the full-width preview. Tokens mode adds the palette and composition bar.
 - **More Settings** starts collapsed and contains shared parameter mappings, token delimiters, the shared counter and the original read-only token display. Collapsing it does not reset any values.
 - When expanded, drag the horizontal divider to adjust the balance between More Settings and Preview. The settings area scrolls independently when space is limited.
 - Collapsing More Settings returns the available space to the preview; reopening it restores the default settings/preview split.
@@ -90,6 +95,17 @@ Palette and composition tokens use compact sky-blue pill buttons with semicircul
 - Both options can be combined and are remembered for the current Revit session. Changing either option updates the preview immediately, except for frozen Final rows.
 - Find and Replace text is cleared after each completed apply (including an apply with individual failed rows); the matching options are preserved. If there are no changes, editing is incomplete, or the operation errors out, the text is kept for correction or retry.
 
+## Sorting
+
+- **Sort by** (beside Source) orders the preview rows: `<Selection order>` (default), `<Current Value>`, or any available parameter. The grey switch beside it shows **Asc** (ascending) on the left and **Desc** (descending) on the right, with the current direction in bold; click it to reverse. Its colour stays the same in both states.
+- The **X** button beside the direction switch, aligned with the left edge of the Final Case dropdown below, clears the sort, restores selection order and resets direction to ascending. Counters and sequences recalculate in selection order. Both controls are disabled when selection order is active.
+- The unsorted **Current Value** heading shows a muted up/down cue; hover the heading for a tooltip explaining the next sort. Once sorted, the cue gives way to the active direction arrow and the tooltip describes the current order and next click. Clicking the heading again reverses the order. Clicks in the header's filter box do not sort. New Value and Final cannot be sorted. To order by new values, apply, then sort by Current Value and run again.
+- When sorting by a parameter, a **Sort: <parameter>** column shows each row's value; click its header to reverse the order.
+- The counter (`{count}` / `{param6}`) and `{seq:...}` expressions number rows in the displayed order, so sorting changes which row gets which number.
+- Text sorts naturally and ignores case (`A2` before `A10`). Numeric parameters sort by value, and Level references (such as Base Constraint) sort by level elevation. Blank values always sort last, and rows with equal values keep their selection order.
+- The sort is remembered for the current Revit session. If the saved parameter is not available for the new selection or mode, selection order is used.
+- Rows are re-sorted whenever the preview refreshes, including after Apply, so changed Current Values may move.
+
 ## Preview filters
 
 - Expand **More Settings** and click **Edit Filters...** under **Filter by Parameter**. The main dialog only shows a compact summary; the rules are edited in a separate window.
@@ -109,7 +125,8 @@ Palette and composition tokens use compact sky-blue pill buttons with semicircul
 - Header filters match text anywhere in the value, ignoring case. When both filters contain text, a row must match both.
 - The parameter expression and both header filters are combined with AND. Apply uses only the rows remaining after all filters. The filtering parameter is never modified just because it is used in a filter.
 - Clear the parameter filters and both header filter boxes to show all rows again.
-- Filtering does not recalculate counters or sequences; values remain exactly as previewed.
+- The parameter filter and the Current Value filter decide which rows are numbered: the counter and sequences restart at the first remaining row and count only remaining rows, in the displayed order. Rows hidden by these filters keep their previous preview and are never applied.
+- The New Value filter is find-only. It hides and shows rows without renumbering them (renumbering by the value being filtered would make rows jump in and out of the filter). While it contains text, Apply Re-Value is disabled; hover over the button for the reminder: Clear **New Value** filter to apply.
 - Unchanged rows and blank new values are not applied. The Final checkbox still freezes a row's preview value; it does not exclude that row from Apply.
 - Pale yellow highlights differences between Current Value and New Value. The existing green New Value cell highlight still indicates a Final (frozen) row.
 

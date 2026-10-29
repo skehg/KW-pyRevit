@@ -5,6 +5,10 @@ from range_separator import decode_separator, encode_separator, split_case
 
 
 CASES = ('Unchanged', 'upper', 'lower', 'title', 'sentence')
+CASE_LABELS = {
+    'Unchanged': 'Unchanged', 'upper': 'UPPER', 'lower': 'lower',
+    'title': 'Title Case', 'sentence': 'Sentence case',
+}
 POSITIONS = r'(?:val[1-9]\d*|end(?:-[1-9]\d*)?)'
 ENDS = r'(?:[1-9]\d*|end(?:-[1-9]\d*)?|\+\d+)'
 SOURCE = re.compile(r'^(' + POSITIONS + r')(?::(' + ENDS + r'))?$')

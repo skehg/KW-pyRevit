@@ -5,7 +5,7 @@ import unittest
 COMMAND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, COMMAND_DIR)
 from token_pattern import (
-    edited, expression, insert_item, label, parameter_slot, parse_pattern,
+    CASES, CASE_LABELS, edited, expression, insert_item, label, parameter_slot, parse_pattern,
     serialize_pattern, token,
 )
 from token_pattern import position_controls, position_expression
@@ -13,6 +13,15 @@ from test_preview import load_pattern_function
 
 
 class TokenPatternTests(unittest.TestCase):
+    def test_case_labels_do_not_change_expression_syntax(self):
+        self.assertEqual(
+            ['Unchanged', 'UPPER', 'lower', 'Title Case', 'Sentence case'],
+            [CASE_LABELS[case] for case in CASES])
+        for case in CASES:
+            item = token('source', start='val1', case=case)
+            expected = '{val1}' if case == 'Unchanged' else '{val1~' + case + '}'
+            self.assertEqual(expected, expression(item))
+
     def test_numeric_position_directions_roundtrip(self):
         for spec, is_end in [('val1', False), ('val34', False), ('end', False),
                              ('end-2', False), ('3', True), ('end', True),

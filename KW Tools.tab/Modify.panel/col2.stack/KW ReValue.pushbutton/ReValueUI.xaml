@@ -5,6 +5,10 @@
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResize">
     <Window.Resources>
+        <ResourceDictionary>
+        <ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary Source="ButtonStyles.xaml"/>
+        </ResourceDictionary.MergedDictionaries>
         <Style x:Key="TokenDirectionStyle" TargetType="RadioButton">
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="MinWidth" Value="52"/>
@@ -26,7 +30,7 @@
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="segment" Property="Background" Value="#38BDF8"/>
                                 <Setter TargetName="segment" Property="BorderBrush" Value="#0369A1"/>
-                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
                                 <Setter TargetName="segment" Property="BorderBrush" Value="#082F49"/>
@@ -129,10 +133,11 @@
         <Style TargetType="ComboBox">
             <Setter Property="MinHeight" Value="24"/>
         </Style>
-        <Style TargetType="Button">
+        <Style TargetType="Button" BasedOn="{StaticResource RaisedButtonStyle}">
             <Setter Property="Margin" Value="5"/>
             <Setter Property="Padding" Value="10,5"/>
         </Style>
+        </ResourceDictionary>
     </Window.Resources>
 
     <Grid Margin="10">
@@ -157,17 +162,64 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,6">
-                <TextBlock Text="Mode:"/>
-                <RadioButton x:Name="radio_type" Content="Type" IsChecked="True"
-                             VerticalAlignment="Center" Margin="8,0,12,0"/>
-                <RadioButton x:Name="radio_instance" Content="Instance"
-                             VerticalAlignment="Center" Margin="0,0,18,0"
-                             ToolTip="Work directly on selected instances, such as views and walls."/>
-                <TextBlock Text="Source Parameter:"/>
-                <ComboBox x:Name="combo_orig_param" Width="300" Margin="6,0,0,0"
+            <Grid Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="3*" MinWidth="110" MaxWidth="306"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="2*" MinWidth="110" MaxWidth="226"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*" MinWidth="108"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="Mode:"/>
+                    <ToggleButton x:Name="btn_mode" IsChecked="False" Margin="5,0,8,0"
+                                  AutomationProperties.Name="Mode: Type or Instance">
+                        <ToggleButton.Style>
+                            <Style TargetType="ToggleButton" BasedOn="{StaticResource NeutralSwitchStyle}">
+                                <Setter Property="Content" Value="Type"/>
+                                <Setter Property="Tag" Value="Instance"/>
+                                <Setter Property="ToolTip" Value="Type mode: works on element types. Click to switch to Instance mode."/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsChecked" Value="True">
+                                        <Setter Property="ToolTip" Value="Instance mode: works directly on selected instances, such as views and walls. Click to switch to Type mode."/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ToggleButton.Style>
+                    </ToggleButton>
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="Source:" ToolTip="Source parameter"/>
+                <ComboBox x:Name="combo_orig_param" Grid.Column="2" Margin="6,0,0,0"
                           ToolTip="The bracketed Default option uses the system name shown for this selection and mode. Select a parameter to use its value instead."/>
-            </StackPanel>
+                <TextBlock Grid.Column="3" Text="Sort by:" Margin="8,0,0,0"/>
+                <ComboBox x:Name="combo_sort_by" Grid.Column="4" Margin="6,0,0,0"
+                          ToolTip="Order the preview rows. The counter and sequences number rows in this order. Click the Current Value header to sort by Current Value."/>
+                <StackPanel Grid.Column="5" Orientation="Horizontal">
+                    <ToggleButton x:Name="btn_sort_direction" Margin="5,0,0,0"
+                                  AutomationProperties.Name="Sort direction: Ascending or Descending">
+                        <ToggleButton.Style>
+                            <Style TargetType="ToggleButton" BasedOn="{StaticResource NeutralSwitchStyle}">
+                                <Setter Property="Content" Value="Asc"/>
+                                <Setter Property="Tag" Value="Desc"/>
+                                <Setter Property="ToolTip" Value="Sorted ascending. Click to sort descending. Blank values always sort last."/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsChecked" Value="True">
+                                        <Setter Property="ToolTip" Value="Sorted descending. Click to sort ascending. Blank values always sort last."/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ToggleButton.Style>
+                    </ToggleButton>
+                </StackPanel>
+                <Grid Grid.Column="6" Width="105" HorizontalAlignment="Right">
+                    <Button x:Name="btn_clear_sort" Content="X" Width="24" Margin="0" Padding="2"
+                            HorizontalAlignment="Left"
+                            ToolTip="Clear sort order (restore selection order)."
+                            AutomationProperties.Name="Clear sort order"/>
+                </Grid>
+            </Grid>
 
             <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,8,6">
                 <ComboBox x:Name="combo_editor_mode" Width="130" SelectedIndex="0"
@@ -185,52 +237,18 @@
                 </Grid.ColumnDefinitions>
                 <TextBox x:Name="txt_pattern" Grid.Column="0"
                          Height="28" FontSize="12" FontFamily="Courier New"/>
-                <ToggleButton x:Name="btn_use_orig" Grid.Column="1" MinWidth="110"
-                              Margin="5,0" Padding="5,3" IsChecked="False">
+                <ToggleButton x:Name="btn_use_orig" Grid.Column="1"
+                              Margin="5,0" Padding="3,3" IsChecked="False"
+                              AutomationProperties.Name="Pattern input: Pattern or Source">
                     <ToggleButton.Style>
-                        <Style TargetType="ToggleButton">
-                            <Setter Property="Content" Value="Source"/>
-                            <Setter Property="ToolTip" Value="Switch to Source ({orig}, the complete source value)."/>
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ToggleButton">
-                                        <Border x:Name="switch_border" CornerRadius="4"
-                                                BorderThickness="1" BorderBrush="Transparent"
-                                                Background="Transparent" Padding="{TemplateBinding Padding}">
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Border x:Name="switch_track" Width="36" Height="20"
-                                                        CornerRadius="10" Background="#777777"
-                                                        Margin="0,0,7,0">
-                                                    <Ellipse x:Name="switch_thumb" Width="16" Height="16"
-                                                             Fill="White" Margin="2"
-                                                             HorizontalAlignment="Left"/>
-                                                </Border>
-                                                <ContentPresenter VerticalAlignment="Center"
-                                                                  RecognizesAccessKey="True"/>
-                                            </StackPanel>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsChecked" Value="True">
-                                                <Setter TargetName="switch_track" Property="Background" Value="#287D46"/>
-                                                <Setter TargetName="switch_thumb" Property="HorizontalAlignment" Value="Right"/>
-                                            </Trigger>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="switch_border" Property="Background" Value="#E8EEF4"/>
-                                            </Trigger>
-                                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                                <Setter TargetName="switch_border" Property="BorderBrush" Value="#0078D4"/>
-                                            </Trigger>
-                                            <Trigger Property="IsEnabled" Value="False">
-                                                <Setter TargetName="switch_border" Property="Opacity" Value="0.5"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
+                        <Style TargetType="ToggleButton" BasedOn="{StaticResource NeutralSwitchStyle}">
+                            <Setter Property="Content" Value="Pattern"/>
+                            <Setter Property="Tag" Value="Source"/>
+                            <Setter Property="ToolTip" Value="Using your pattern. Click to use Source ({orig}, the complete source value)."/>
                             <Style.Triggers>
                                 <Trigger Property="IsChecked" Value="True">
-                                    <Setter Property="Content" Value="Pattern"/>
-                                    <Setter Property="ToolTip" Value="Restore your previous pattern."/>
+                                    <Setter Property="Background" Value="#287D46"/>
+                                    <Setter Property="ToolTip" Value="Using Source ({orig}). Click to restore your previous pattern."/>
                                 </Trigger>
                             </Style.Triggers>
                         </Style>
@@ -239,11 +257,11 @@
                 <TextBlock Text="Final Case:" Grid.Column="2" Margin="12,0,6,0"/>
                 <ComboBox x:Name="combo_final_case" Grid.Column="3" Width="105"
                           ToolTip="Convert the complete generated value after Find/Replace.">
-                    <ComboBoxItem Content="None"/>
-                    <ComboBoxItem Content="upper"/>
-                    <ComboBoxItem Content="lower"/>
-                    <ComboBoxItem Content="title"/>
-                    <ComboBoxItem Content="sentence"/>
+                    <ComboBoxItem Content="None" Tag="None"/>
+                    <ComboBoxItem Content="UPPER" Tag="upper"/>
+                    <ComboBoxItem Content="lower" Tag="lower"/>
+                    <ComboBoxItem Content="Title Case" Tag="title"/>
+                    <ComboBoxItem Content="Sentence case" Tag="sentence"/>
                 </ComboBox>
             </Grid>
 
@@ -422,17 +440,27 @@
                     </Style>
                 </DataGrid.CellStyle>
                 <DataGrid.Columns>
-                    <DataGridCheckBoxColumn Header="Final" Binding="{Binding final}" Width="50"/>
-                    <DataGridTextColumn Binding="{Binding CurrentName}" SortMemberPath="CurrentName" Width="*" IsReadOnly="True">
+                    <DataGridCheckBoxColumn Header="Final" Binding="{Binding final}" Width="50"
+                                            CanUserSort="False"/>
+                    <DataGridTextColumn x:Name="col_sort_value" Binding="{Binding SortValue}"
+                                        SortMemberPath="SortValue" Width="150" IsReadOnly="True"
+                                        Visibility="Collapsed" Header="Sort Value"/>
+                    <DataGridTextColumn x:Name="col_current" Binding="{Binding CurrentName}" SortMemberPath="CurrentName" Width="*" IsReadOnly="True">
                         <DataGridTextColumn.Header>
                             <StackPanel>
-                                <TextBlock Text="Current Value"/>
+                                <StackPanel x:Name="current_header_sort_hint" Orientation="Horizontal"
+                                            ToolTip="Click to sort ascending.">
+                                    <TextBlock Text="Current Value"/>
+                                    <TextBlock x:Name="current_sort_hint" Text=" &#x2195;"
+                                               Foreground="#8A949E" FontWeight="SemiBold"/>
+                                </StackPanel>
                                 <TextBox x:Name="txt_filter_current" Margin="3" Padding="3"
                                          ToolTip="Filter Current Value (contains, case-insensitive). Clear to show all."/>
                             </StackPanel>
                         </DataGridTextColumn.Header>
                     </DataGridTextColumn>
-                    <DataGridTextColumn Binding="{Binding NewName}" SortMemberPath="NewName" Width="*" IsReadOnly="True">
+                    <DataGridTextColumn x:Name="col_new" Binding="{Binding NewName}" Width="*"
+                                        IsReadOnly="True" CanUserSort="False">
                         <DataGridTextColumn.Header>
                             <StackPanel>
                                 <TextBlock Text="New Value"/>
@@ -457,9 +485,22 @@
 
         <DockPanel Grid.Row="4" LastChildFill="False">
             <Button x:Name="btn_help" Content="Help" Width="80" DockPanel.Dock="Left"
-                    Background="#E67E22" Foreground="White" BorderBrush="#C96A12" FontWeight="Bold"/>
+                    Foreground="#492709" BorderBrush="#C96A12" FontWeight="Bold">
+                <Button.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#FFD4A8" Offset="0"/>
+                        <GradientStop Color="#F5A04C" Offset="0.45"/>
+                        <GradientStop Color="#E67E22" Offset="1"/>
+                    </LinearGradientBrush>
+                </Button.Background>
+            </Button>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                <Button x:Name="btn_apply" Content="Apply Re-Value" Width="140"/>
+                <Button x:Name="btn_apply" Content="Apply Re-Value" Width="140"
+                        ToolTipService.ShowOnDisabled="True">
+                    <Button.Resources>
+                        <TextBlock x:Key="NewValueFilterToolTip"><Run Text="Clear "/><Run Text="New Value" FontWeight="Bold"/><Run Text=" filter to apply"/></TextBlock>
+                    </Button.Resources>
+                </Button>
                 <Button x:Name="btn_close" Content="Close" Width="80"/>
             </StackPanel>
         </DockPanel>

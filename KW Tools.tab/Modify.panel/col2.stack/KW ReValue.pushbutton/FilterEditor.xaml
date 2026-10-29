@@ -3,7 +3,11 @@
         Title="Edit Parameter Filters" Width="920" Height="680"
         MinWidth="780" MinHeight="460" WindowStartupLocation="CenterOwner">
     <Window.Resources>
-        <Style TargetType="Button">
+        <ResourceDictionary>
+        <ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary Source="ButtonStyles.xaml"/>
+        </ResourceDictionary.MergedDictionaries>
+        <Style TargetType="Button" BasedOn="{StaticResource RaisedButtonStyle}">
             <Setter Property="Margin" Value="3"/>
             <Setter Property="Padding" Value="8,4"/>
         </Style>
@@ -16,6 +20,7 @@
             <Setter Property="MinHeight" Value="26"/>
             <Setter Property="Padding" Value="3"/>
         </Style>
+        </ResourceDictionary>
     </Window.Resources>
     <Grid Margin="10">
         <Grid.RowDefinitions>
