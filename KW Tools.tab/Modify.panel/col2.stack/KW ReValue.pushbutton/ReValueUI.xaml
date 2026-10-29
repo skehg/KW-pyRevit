@@ -167,10 +167,11 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="3*" MinWidth="110" MaxWidth="306"/>
+                    <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="2*" MinWidth="110" MaxWidth="226"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*" MinWidth="108"/>
+                    <ColumnDefinition Width="113"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Orientation="Horizontal">
                     <TextBlock Text="Mode:"/>
@@ -193,10 +194,10 @@
                 <TextBlock Grid.Column="1" Text="Source:" ToolTip="Source parameter"/>
                 <ComboBox x:Name="combo_orig_param" Grid.Column="2" Margin="6,0,0,0"
                           ToolTip="The bracketed Default option uses the system name shown for this selection and mode. Select a parameter to use its value instead."/>
-                <TextBlock Grid.Column="3" Text="Sort by:" Margin="8,0,0,0"/>
-                <ComboBox x:Name="combo_sort_by" Grid.Column="4" Margin="6,0,0,0"
+                <TextBlock Grid.Column="4" Text="Sort by:" Margin="8,0,0,0"/>
+                <ComboBox x:Name="combo_sort_by" Grid.Column="5" Margin="6,0,0,0"
                           ToolTip="Order the preview rows. The counter and sequences number rows in this order. Click the Current Value header to sort by Current Value."/>
-                <StackPanel Grid.Column="5" Orientation="Horizontal">
+                <StackPanel Grid.Column="6" Orientation="Horizontal">
                     <ToggleButton x:Name="btn_sort_direction" Margin="5,0,0,0"
                                   AutomationProperties.Name="Sort direction: Ascending or Descending">
                         <ToggleButton.Style>
@@ -213,7 +214,7 @@
                         </ToggleButton.Style>
                     </ToggleButton>
                 </StackPanel>
-                <Grid Grid.Column="6" Width="105" HorizontalAlignment="Right">
+                <Grid Grid.Column="7" Width="105" HorizontalAlignment="Right">
                     <Button x:Name="btn_clear_sort" Content="X" Width="24" Margin="0" Padding="2"
                             HorizontalAlignment="Left"
                             ToolTip="Clear sort order (restore selection order)."

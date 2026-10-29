@@ -307,7 +307,7 @@ if ($null -eq $currentSortHint -or $currentSortHint.Text -ne (' ' + [char]0x2195
     throw 'The unsorted Current Value header must show a muted sort cue and an explanatory tooltip.'
 }
 Write-Output 'PASS: header sorting limited to Current Value; Sort column hidden by default.'
-foreach ($size in @(@(1010, 880), @(720, 430))) {
+foreach ($size in @(@(1010, 880), @(720, 430), @(1440, 880), @(1920, 880))) {
     Measure-Layout $size[0] $size[1]
     foreach ($checked in @($true, $false)) {
         foreach ($spec in @(@('btn_mode', 'Type', 'Instance'),
@@ -328,8 +328,22 @@ foreach ($size in @(@(1010, 880), @(720, 430))) {
             $direction = $window.FindName('btn_sort_direction')
             $directionPosition = $direction.TranslatePoint([System.Windows.Point]::new(0, 0), $root)
             if ([Math]::Abs($clearPosition.X - $casePosition.X) -gt 0.1 -or
-                $directionPosition.X + $direction.ActualWidth + 3 -gt $clearPosition.X) {
+                [Math]::Abs($clearPosition.X - $directionPosition.X - $direction.ActualWidth - 8) -gt 0.1) {
                 throw "Clear sort must align with Final Case without overlapping direction (size $size, clear $($clearPosition.X), case $($casePosition.X), direction right $($directionPosition.X + $direction.ActualWidth))."
+            }
+            $desc = $direction.Template.FindName('switch_right_label', $direction)
+            $track = $direction.Template.FindName('switch_track', $direction)
+            $descPosition = $desc.TranslatePoint([System.Windows.Point]::new(0, 0), $root)
+            $trackPosition = $track.TranslatePoint([System.Windows.Point]::new(0, 0), $root)
+            $beforeDesc = $descPosition.X - $trackPosition.X - $track.ActualWidth
+            $afterDesc = $clearPosition.X - $descPosition.X - $desc.ActualWidth
+            if ([Math]::Abs($beforeDesc - $afterDesc) -gt 0.1) {
+                throw "Desc must have equal gaps to the switch track and the clear-sort button (before $beforeDesc, after $afterDesc)."
+            }
+            $sortBy = $window.FindName('combo_sort_by')
+            $sortPosition = $sortBy.TranslatePoint([System.Windows.Point]::new(0, 0), $root)
+            if ([Math]::Abs($directionPosition.X - $sortPosition.X - $sortBy.ActualWidth - 5) -gt 0.1) {
+                throw 'The sort dropdown and direction toggle must stay grouped beside Clear sort as the dialog widens.'
             }
         }
     }
