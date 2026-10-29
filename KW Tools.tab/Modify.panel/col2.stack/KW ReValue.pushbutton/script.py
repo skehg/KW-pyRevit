@@ -1770,30 +1770,36 @@ class ReValueDialog(object):
     
     def OnApply(self, sender, args):
         """Apply changes and reload the preview without closing the dialog."""
-        if not self.commit_preview_edits():
-            return
-        if self._parameter_filter_error:
-            forms.alert(self._parameter_filter_error)
-            return
-        revalue_map = self.get_revalue_map()
-        if not revalue_map:
-            forms.alert("No changes to apply.")
-            return
-        target_param_name = _resolve_target_param_name(
-            self.get_selected_original_param_name())
-        if not revalue_elements(revalue_map, self.is_instance_mode, target_param_name):
-            return
-
-        self._suspend_events = True
         try:
-            self.txt_find.Text = ''
-            self.txt_replace.Text = ''
-            for item in self.preview_items:
-                item.final = False
+            if not self.commit_preview_edits():
+                return
+            if self._parameter_filter_error:
+                forms.alert(self._parameter_filter_error)
+                return
+            revalue_map = self.get_revalue_map()
+            if not revalue_map:
+                forms.alert("No changes to apply.")
+                return
+            target_param_name = _resolve_target_param_name(
+                self.get_selected_original_param_name())
+            if not revalue_elements(revalue_map, self.is_instance_mode, target_param_name):
+                return
+
+            self._suspend_events = True
+            try:
+                self.txt_find.Text = ''
+                self.txt_replace.Text = ''
+                for item in self.preview_items:
+                    item.final = False
+            finally:
+                self._suspend_events = False
+            self.persist_settings()
+            self.update_preview()
         finally:
-            self._suspend_events = False
-        self.persist_settings()
-        self.update_preview()
+            # Revit-owned result alerts can leave the unowned WPF window behind Revit.
+            if self.window.IsVisible:
+                self.window.Activate()
+                self.window.Focus()
 
     def OnUseOriginal(self, sender, args):
         """Temporarily use the source value, or restore the previous pattern."""

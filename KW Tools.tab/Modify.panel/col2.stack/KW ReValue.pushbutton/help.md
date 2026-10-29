@@ -36,7 +36,7 @@ The **Final Case** dropdown converts the complete generated value, including lit
 8. Optionally set the counter in **More Settings** and final find/replace in the main controls.
 9. Review Current Value and New Value in the preview. Rows with different values are highlighted pale yellow.
 10. Optionally type into the Current Value and New Value header filters, then click Apply Re-Value. Only rows remaining in the filtered preview are eligible to be changed, including rows below the scroll area.
-11. After the result message, the dialog stays open and reloads current values from the model. Find and Replace are cleared, and Final rows are unfrozen so the next preview is recalculated. Pattern, mode, parameter choices, counter settings, case options and filters are preserved. Filters are re-evaluated against the updated values, so changed rows may no longer be visible.
+11. After the result message, the dialog stays open, reloads current values from the model, and returns to the foreground ready for another action. Focus also returns after validation or error messages. Find and Replace are cleared, and Final rows are unfrozen so the next preview is recalculated. Pattern, mode, parameter choices, counter settings, case options and filters are preserved. Filters are re-evaluated against the updated values, so changed rows may no longer be visible.
 12. Repeat as needed, then click **Close**. Closing does not apply pending changes or undo earlier applies.
 
 ## Visual token editor

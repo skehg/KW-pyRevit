@@ -373,6 +373,7 @@ class RepeatedApplyTests(unittest.TestCase):
     def setUp(self):
         self.dialog = ReValueDialog()
         self.dialog.window = mock.Mock()
+        self.dialog.window.IsVisible = True
         self.dialog.is_instance_mode = True
         self.dialog._suspend_events = False
         self.dialog._parameter_filter_error = ''
@@ -478,6 +479,8 @@ class RepeatedApplyTests(unittest.TestCase):
         self.assertEqual('Door-A', self.dialog.preview_items[0].CurrentName)
         self.dialog.persist_settings.assert_not_called()
         self.dialog.window.Close.assert_not_called()
+        self.dialog.window.Activate.assert_called_once_with()
+        self.dialog.window.Focus.assert_called_once_with()
 
     def test_no_changes_preserves_inputs_without_writing(self):
         for row in self.dialog.preview_items:
@@ -486,12 +489,16 @@ class RepeatedApplyTests(unittest.TestCase):
         self.globals['revalue_elements'].assert_not_called()
         self.globals['forms'].alert.assert_called_once_with("No changes to apply.")
         self.assertEqual('Door', self.dialog.txt_find.Text)
+        self.dialog.window.Activate.assert_called_once_with()
+        self.dialog.window.Focus.assert_called_once_with()
 
     def test_invalid_filter_prevents_writes(self):
         self.dialog._parameter_filter_error = 'Invalid filter'
         self.dialog.OnApply(None, None)
         self.globals['revalue_elements'].assert_not_called()
         self.globals['forms'].alert.assert_called_once_with('Invalid filter')
+        self.dialog.window.Activate.assert_called_once_with()
+        self.dialog.window.Focus.assert_called_once_with()
 
     def test_pending_cell_and_row_edits_are_committed_before_writing(self):
         self.dialog.OnApply(None, None)
@@ -503,11 +510,38 @@ class RepeatedApplyTests(unittest.TestCase):
         self.dialog.OnApply(None, None)
         self.globals['revalue_elements'].assert_not_called()
         self.assertEqual('Door', self.dialog.txt_find.Text)
+        self.dialog.window.Activate.assert_called_once_with()
+        self.dialog.window.Focus.assert_called_once_with()
 
     def test_close_does_not_apply_pending_changes(self):
         self.dialog.OnClose(None, None)
         self.dialog.window.Close.assert_called_once_with()
         self.globals['revalue_elements'].assert_not_called()
+
+    def test_apply_restores_focus_after_model_write_and_preview_reload(self):
+        events = mock.Mock()
+        events.attach_mock(self.globals['revalue_elements'], 'write')
+        events.attach_mock(self.dialog.persist_settings, 'persist')
+        events.attach_mock(self.dialog.window.Activate, 'activate')
+        events.attach_mock(self.dialog.window.Focus, 'focus')
+        self.dialog.window.Activate.side_effect = lambda: self.assertEqual(
+            'Entry-A', self.dialog.preview_items[0].CurrentName)
+        self.dialog.OnApply(None, None)
+        self.assertEqual(['write', 'persist', 'activate', 'focus'],
+                         [call[0] for call in events.mock_calls])
+
+    def test_apply_restores_focus_without_swallowing_unexpected_errors(self):
+        self.globals['revalue_elements'].side_effect = RuntimeError('Unexpected error')
+        with self.assertRaises(RuntimeError):
+            self.dialog.OnApply(None, None)
+        self.dialog.window.Activate.assert_called_once_with()
+        self.dialog.window.Focus.assert_called_once_with()
+
+    def test_apply_does_not_activate_a_closed_window(self):
+        self.dialog.window.IsVisible = False
+        self.dialog.OnApply(None, None)
+        self.dialog.window.Activate.assert_not_called()
+        self.dialog.window.Focus.assert_not_called()
 
     def test_original_toggle_restores_pattern_across_repeated_cycles(self):
         self.dialog.txt_pattern.Text = '{val1}-{count}'
