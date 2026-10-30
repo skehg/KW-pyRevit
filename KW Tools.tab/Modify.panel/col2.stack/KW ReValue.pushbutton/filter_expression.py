@@ -12,6 +12,8 @@ COMPARISONS = {
 FUNCTIONS = {
     'CONTAINS': 'Contains', 'STARTSWITH': 'Starts with',
     'ENDSWITH': 'Ends with', 'ISBLANK': 'Is blank',
+    'NOTCONTAINS': 'Does not contain', 'NOTSTARTSWITH': 'Does not begin with',
+    'NOTENDSWITH': 'Does not end with',
 }
 NUMBER = re.compile(r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?')
 

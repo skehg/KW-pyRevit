@@ -220,6 +220,7 @@ replace_final_value = PreviewItem.format_value.__globals__['replace_final_value'
 get_default_source_label = PreviewItem.format_value.__globals__['get_default_source_label']
 resolve_target = PreviewItem.format_value.__globals__['_resolve_target_param_name']
 matches_parameter_filter = PreviewItem.format_value.__globals__['matches_parameter_filter']
+compare_filter_rule = PreviewItem.format_value.__globals__['compare_filter_rule']
 parse_filter_number = PreviewItem.format_value.__globals__['parse_filter_number']
 
 
@@ -1289,6 +1290,25 @@ class TokenSampleSelectionTests(unittest.TestCase):
 
 
 class ParameterComparisonTests(unittest.TestCase):
+    def test_negative_text_conditions_are_case_insensitive_inverses(self):
+        for positive, negative in [
+                ('Contains', 'Does not contain'),
+                ('Starts with', 'Does not begin with'),
+                ('Ends with', 'Does not end with')]:
+            for value, expected in [
+                    ('External Door', 'EXTERNAL'), ('External Door', 'DOOR'),
+                    ('External Door', 'internal'), ('', 'door'),
+                    ('External Door', ''), ('', '')]:
+                with self.subTest(condition=negative, value=value, expected=expected):
+                    result = not matches_parameter_filter(value, positive, expected)
+                    self.assertEqual(result, matches_parameter_filter(value, negative, expected))
+                    node = parse_expression(serialize_expression(rule('Comments', negative, expected)))
+                    self.assertEqual(result, evaluate_expression(
+                        node, lambda parameter: value, compare_filter_rule))
+                    self.assertEqual(not result, evaluate_expression(
+                        parse_expression('NOT(' + serialize_expression(node) + ')'),
+                        lambda parameter: value, compare_filter_rule))
+
     def test_text_conditions_ignore_case(self):
         for condition, value, expected, result in [
                 ('Equals', 'External', 'EXTERNAL', True),

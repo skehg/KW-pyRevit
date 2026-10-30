@@ -105,6 +105,24 @@ def run_checks():
     assert editor.use_button.IsEnabled
     assert '[Comments] > 1200.5' in editor.expression_text.Text
 
+    for label, function in [
+            ('Does not contain', 'NOTCONTAINS'),
+            ('Does not begin with', 'NOTSTARTSWITH'),
+            ('Does not end with', 'NOTENDSWITH')]:
+        editor.expression_text.Text = '[Comments] = "External"'
+        condition = next(item for item in descendants(editor.rules_panel)
+                         if isinstance(item, ComboBox) and item.Width == 195)
+        assert label in list(condition.Items)
+        condition.SelectedItem = label
+        assert editor.use_button.IsEnabled
+        assert function + '([Comments], "External")' in editor.expression_text.Text
+        assert editor.tree['children'][0]['condition'] == label
+        editor.expression_text.Text = function.lower() + '([Comments], "Door")'
+        assert editor.use_button.IsEnabled
+        condition = next(item for item in descendants(editor.rules_panel)
+                         if isinstance(item, ComboBox) and item.Width == 195)
+        assert condition.SelectedItem == label
+
     editor.expression_text.Text = 'AND([Width] = 900, [Mark] = "A")'
     remove = next(item for item in descendants(editor.rules_panel)
                   if isinstance(item, Button) and item.Content == 'Remove')

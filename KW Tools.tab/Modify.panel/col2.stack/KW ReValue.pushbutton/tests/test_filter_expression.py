@@ -25,11 +25,24 @@ class ExpressionTests(unittest.TestCase):
             '[A] > 1', '[A] < 2', '[A] >= 3', '[A] <= 4',
             'CONTAINS([A], "x")', 'STARTSWITH([A], "x")',
             'ENDSWITH([A], "x")', 'ISBLANK([A])', 'NOT(ISBLANK([A]))',
+            'NOTCONTAINS([A], "x")', 'NOTSTARTSWITH([A], "x")',
+            'NOTENDSWITH([A], "x")',
         ]
         for text in expressions:
             node = parse_expression(text)
             validate_expression(node, ['A'])
             self.assertEqual(node, parse_expression(serialize_expression(node)))
+
+    def test_negative_text_conditions_keep_visual_rule_names(self):
+        for function, condition in [
+                ('NOTCONTAINS', 'Does not contain'),
+                ('NOTSTARTSWITH', 'Does not begin with'),
+                ('NOTENDSWITH', 'Does not end with')]:
+            node = rule('Comments', condition, 'A "quoted" value')
+            text = serialize_expression(node)
+            self.assertTrue(text.startswith(function + '('))
+            self.assertEqual(node, parse_expression(text))
+            self.assertEqual(node, parse_expression(text.replace(function, function.lower(), 1)))
 
     def test_escaped_parameter_and_text_are_literal(self):
         node = rule('Name] and [Code', 'Equals', 'a,"b"\\c\n\u00e9')

@@ -938,11 +938,14 @@ def load_xaml_window():
 # Preview Item Class
 # ============================================================================
 FILTER_CONDITIONS = (
-    'Equals', 'Does not equal', 'Contains', 'Starts with', 'Ends with',
+    'Equals', 'Does not equal', 'Contains', 'Does not contain',
+    'Starts with', 'Does not begin with', 'Ends with', 'Does not end with',
     'Is blank', 'Is not blank', 'Greater than', 'Less than',
     'Greater than or equal to', 'Less than or equal to',
 )
-NUMERIC_FILTER_CONDITIONS = FILTER_CONDITIONS[7:]
+NUMERIC_FILTER_CONDITIONS = (
+    'Greater than', 'Less than', 'Greater than or equal to', 'Less than or equal to',
+)
 
 
 def parse_filter_number(text, decimal_separator='.', group_separator=',',
@@ -1003,10 +1006,16 @@ def matches_parameter_filter(value, condition, expected, decimal_separator='.',
         return actual != target
     if condition == 'Contains':
         return target in actual
+    if condition == 'Does not contain':
+        return target not in actual
     if condition == 'Starts with':
         return actual.startswith(target)
+    if condition == 'Does not begin with':
+        return not actual.startswith(target)
     if condition == 'Ends with':
         return actual.endswith(target)
+    if condition == 'Does not end with':
+        return not actual.endswith(target)
     raise ValueError('Unknown parameter filter condition: {}'.format(condition))
 
 

@@ -16,7 +16,8 @@ from filter_expression import (
 
 
 CONDITIONS = (
-    'Equals', 'Does not equal', 'Contains', 'Starts with', 'Ends with',
+    'Equals', 'Does not equal', 'Contains', 'Does not contain',
+    'Starts with', 'Does not begin with', 'Ends with', 'Does not end with',
     'Is blank', 'Is not blank', 'Greater than', 'Less than',
     'Greater than or equal to', 'Less than or equal to',
     'Equals (numeric)', 'Does not equal (numeric)',
