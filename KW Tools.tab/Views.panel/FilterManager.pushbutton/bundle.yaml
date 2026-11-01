@@ -1,0 +1,11 @@
+title: Filter Manager
+tooltip: |
+  BETA - Browse, create, edit, rename and delete rule-based view filters.
+  Apply selected filters to one view or template; select unused filters or
+  matching model elements. Shared definition edits affect every consumer.
+author: Kent Watson
+context: doc-project
+min_revit_version: 2023
+is_beta: true
+engine:
+  clean: true

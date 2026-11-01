@@ -1,0 +1,27 @@
+{
+  "_notes": [
+    "Filter Manager naming settings (not shown in the UI). Save as UTF-8.",
+    "operator_symbols changes only the {rules} token in Rename Filters proposals.",
+    "Manager summaries and search keep the readable wording.",
+    "Remove a key to use the readable wording for that operator.",
+    "Every value is checked with Revit NamingUtils.IsValidName. An invalid file disables pattern rename with an error.",
+    "Revit rejects ASCII < > ~ : ; | [ ] { } \\ ? ` in names; the fullwidth characters below are accepted instead.",
+    "Operators wrapped by a native NOT rule render as 'NOT ' followed by the base operator text."
+  ],
+  "operator_symbols": {
+    "Equals": "=",
+    "NotEquals": "≠",
+    "Greater": "＞",
+    "GreaterOrEqual": "≥",
+    "Less": "＜",
+    "LessOrEqual": "≤",
+    "Contains": "contains",
+    "NotContains": "does not contain",
+    "BeginsWith": "begins with",
+    "NotBeginsWith": "does not begin with",
+    "EndsWith": "ends with",
+    "NotEndsWith": "does not end with",
+    "HasValue": "has a value",
+    "HasNoValue": "has no value"
+  }
+}

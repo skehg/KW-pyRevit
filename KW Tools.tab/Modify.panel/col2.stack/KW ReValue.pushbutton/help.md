@@ -44,6 +44,26 @@ All sliding switches show both options on opposite sides of the track, with the 
 11. After the result message, the dialog stays open, reloads current values from the model, and returns to the foreground ready for another action. Focus also returns after validation or error messages. Find and Replace are cleared, and Final rows are unfrozen so the next preview is recalculated. Pattern, mode, parameter choices, counter settings, case options and filters are preserved. Filters are re-evaluated against the updated values, so changed rows may no longer be visible.
 12. Repeat as needed, then click **Close**. Closing does not apply pending changes or undo earlier applies.
 
+## Filter Manager: Rename Filters
+
+Filter Manager can launch a separate **Rename Filters** context using its checked native filters. Revit selection is not substituted. The preview always reads and targets each filter's own **Name**: Type/Instance switching, source/target parameters, parameter tokens and Python parameter filters are unavailable. Token editing, counters, Current/New Value search, find/replace and case conversion remain available. This context starts with `{orig}` and fresh defaults; it neither reads nor overwrites ordinary ReValue session settings.
+
+Review the proposed names, then click **Rename Filters** to approve the changed rows currently displayed (including rows below the scroll area). Pending grid edits must be committed, and the New Value search must be cleared before applying. Blank or duplicate proposals are passed to the caller's validator, not silently skipped. Invalid names, stale filters or ownership errors display an error without resetting the preview or claiming success. Successful applies stay open and reload actual names; Close never applies pending changes.
+
+### Caller contract
+
+Load `script.py` with `imp.load_source` under IronPython, with `__revit__` available. Importing does not execute the ribbon entry point or select elements. The script adds its bundle directory to `sys.path` for local dependencies. Close the manager's modal loop before calling:
+
+```python
+changed = revalue_module.show_filter_names(elements, rename_writer)
+```
+
+- `elements`: iterable of native `Autodesk.Revit.DB.FilterElement` objects, not manager row wrappers or IDs. An empty iterable returns `False`; non-native objects or a non-callable writer raise `TypeError`.
+- `rename_writer(approved_names)`: receives a Python `dict` mapping the original native filters to approved proposed names. It alone must revalidate names/duplicates, document and live IDs, and ownership, then perform all writes atomically in an appropriate Revit transaction. It must raise on failure. Normal return (typically `None`) means the atomic write succeeded; explicit `False` is also treated as failure. ReValue never uses its ordinary name/parameter writer or opens a transaction in this context.
+- Return value: `True` if at least one Apply completed successfully before the modal dialog closed; otherwise `False`. Previously successful writes are not undone by a later failed Apply or Close.
+
+The manager owns restoring its search, checked rows and focus after this call returns. No live Revit mutations are covered by the offline tests.
+
 ## Visual token editor
 
 Palette and composition tokens use compact sky-blue pill buttons with semicircular ends (22 high, radius 11). A soft vertical gradient, fine highlight and small shadow give them a raised appearance. Icons and labels identify token kinds; a dark outline marks the selected token, with lighter hover feedback. Pressed tokens use darker shading without a shadow to appear pushed down.

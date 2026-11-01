@@ -10,7 +10,13 @@ __author__ = 'Kent Watson'
 import clr
 import os
 import re
+import sys
 from decimal import Decimal, InvalidOperation
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+
 clr.AddReference('PresentationCore')
 clr.AddReference('PresentationFramework')
 clr.AddReference('WindowsBase')
@@ -48,8 +54,6 @@ class ListSortDirection(object):
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
 element_id_value = get_elementid_value_func()
-
-SCRIPT_DIR = os.path.dirname(__file__)
 
 _ENV_PREFIX = 'KWReValue'
 _SESSION_SETTING_DEFAULTS = {
@@ -1124,8 +1128,17 @@ class PreviewItem(object):
 # Re-Value Dialog Class
 # ============================================================================
 class ReValueDialog(object):
-    def __init__(self, elements, is_instance_mode=False):
+    def __init__(self, elements, is_instance_mode=False, launch_context=None,
+                 rename_writer=None):
         """Initialize dialog with list of elements"""
+        if launch_context not in (None, 'filter_names'):
+            raise ValueError("Unsupported ReValue launch context.")
+        self.is_filter_name_context = launch_context == 'filter_names'
+        if self.is_filter_name_context and not callable(rename_writer):
+            raise TypeError("Filter-name mode requires a rename_writer callback.")
+        self.rename_writer = rename_writer
+        self.applied = False
+
         # Load XAML window
         self.window = load_xaml_window()
         
@@ -1250,6 +1263,18 @@ class ReValueDialog(object):
         
         self.btn_apply.Click += self.OnApply
         self.btn_close.Click += self.OnClose
+
+        if self.is_filter_name_context:
+            self.window.Title = 'KW ReValue - Rename Filters'
+            self.btn_apply.Content = 'Rename Filters'
+            self.btn_mode.IsEnabled = False
+            self.btn_mode.Parent.Visibility = WpfVisibility.Collapsed
+            self.combo_orig_param.IsEnabled = False
+            for combo in self.param_combos:
+                combo.IsEnabled = False
+            self.btn_edit_filters.IsEnabled = False
+            self.btn_clear_filters.IsEnabled = False
+            self.more_settings.Header = 'More Settings - Delimiters & Counter'
         
         # Initialize data
         self.initialize_data()
@@ -1259,10 +1284,15 @@ class ReValueDialog(object):
     def initialize_data(self):
         """Initialize parameter list and preview items"""
         self._suspend_events = True
-        session_settings = load_session_settings()
+        if self.is_filter_name_context:
+            session_settings = dict(_SESSION_SETTING_DEFAULTS)
+            session_settings['pattern'] = '{orig}'
+        else:
+            session_settings = load_session_settings()
 
         # Set mode
-        self.is_instance_mode = str(session_settings.get('mode', 'type')).lower() == 'instance'
+        self.is_instance_mode = (self.is_filter_name_context or
+                                str(session_settings.get('mode', 'type')).lower() == 'instance')
         self.btn_mode.IsChecked = self.is_instance_mode
         
         # Set delimiters
@@ -1291,8 +1321,11 @@ class ReValueDialog(object):
         self.chk_match_case.IsChecked = session_settings['match_case'].lower() == 'true'
         
         # Collect all parameters
-        self.available_params, self.param_values_map = collect_all_parameters(
-            self.elements, self.is_instance_mode)
+        if self.is_filter_name_context:
+            self.available_params, self.param_values_map = [], {}
+        else:
+            self.available_params, self.param_values_map = collect_all_parameters(
+                self.elements, self.is_instance_mode)
         
         self.populate_source_parameters(session_settings.get('orig_param', ''))
         self.populate_sort_options(session_settings)
@@ -1313,7 +1346,9 @@ class ReValueDialog(object):
         
         # Create preview items
         for elem in self.elements:
-            if self.is_instance_mode:
+            if self.is_filter_name_context:
+                current_name = self.get_original_source_text(elem)
+            elif self.is_instance_mode:
                 current_name = _safe_element_name(elem)
                 if not current_name:
                     try:
@@ -1370,8 +1405,9 @@ class ReValueDialog(object):
             return
         self.combo_orig_param.Items.Clear()
         self.default_source_item = ComboBoxItem()
-        self.default_source_item.Content = get_default_source_label(
-            self.elements, self.is_instance_mode)
+        self.default_source_item.Content = (
+            '<Filter Name>' if getattr(self, 'is_filter_name_context', False)
+            else get_default_source_label(self.elements, self.is_instance_mode))
         self.default_source_item.ToolTip = (
             'System default: use each element/type name, not a selected parameter.')
         self.combo_orig_param.Items.Add(self.default_source_item)
@@ -1579,6 +1615,8 @@ class ReValueDialog(object):
 
     def persist_settings(self):
         """Persist current UI settings for this Revit session only."""
+        if getattr(self, 'is_filter_name_context', False):
+            return
         mode = 'instance' if self.is_instance_mode else 'type'
         save_session_setting('mode', mode)
         save_session_setting('delimiters', self.get_delimiters())
@@ -1631,6 +1669,8 @@ class ReValueDialog(object):
     def _lookup_parameter(self, element, param_name):
         """Find a parameter using the mode rules: type mode reads the type;
         instance mode tries the instance first, then its type."""
+        if getattr(self, 'is_filter_name_context', False):
+            return None
         param_name = str(param_name or '').strip()
         if not param_name:
             return None
@@ -1690,6 +1730,8 @@ class ReValueDialog(object):
     
     def get_selected_param_values(self, element):
         """Get values for all 5 selected parameters"""
+        if getattr(self, 'is_filter_name_context', False):
+            return [''] * 5
         values = []
         for combo in self.param_combos:
             if combo:
@@ -1708,6 +1750,8 @@ class ReValueDialog(object):
     
     def get_original_source_text(self, element):
         """Get the text to use as source for tokenization"""
+        if getattr(self, 'is_filter_name_context', False):
+            return element.Name or ''
         param_name = self.get_selected_original_param_name()
         if param_name:
             return self.get_param_value(element, param_name)
@@ -1720,6 +1764,8 @@ class ReValueDialog(object):
 
     def get_selected_original_param_name(self):
         """Get selected original/source parameter name, or empty string for Name mode."""
+        if getattr(self, 'is_filter_name_context', False):
+            return ''
         if not self.combo_orig_param:
             return ''
 
@@ -1829,7 +1875,7 @@ class ReValueDialog(object):
     
     def OnModeChanged(self, sender, args):
         """Called when instance/type mode changes"""
-        if self._suspend_events:
+        if self._suspend_events or getattr(self, 'is_filter_name_context', False):
             return
 
         # Re-initialize with new mode
@@ -1929,6 +1975,12 @@ class ReValueDialog(object):
     def update_parameter_matches(self):
         """Cache read-only parameter filter matches for every row."""
         self._parameter_filter_error = ''
+        if getattr(self, 'is_filter_name_context', False):
+            self.parameter_filter = None
+            self._invalid_filter_values = 0
+            for item in self.preview_items:
+                item.FilterMatch = True
+            return
         try:
             validate_expression(self.parameter_filter, self.available_params)
         except ValueError as ex:
@@ -1962,6 +2014,8 @@ class ReValueDialog(object):
         rules = count_rules(self.parameter_filter)
         self.txt_filter_summary.Text = (
             '{} rule(s) - Custom grouping'.format(rules) if rules else 'No parameter filters')
+        if getattr(self, 'is_filter_name_context', False):
+            self.txt_filter_summary.Text = 'Filter names only (no parameter filters)'
         self.txt_filter_summary.ToolTip = serialize_expression(self.parameter_filter)
         self.btn_clear_filters.IsEnabled = self.parameter_filter is not None
         self.btn_apply.IsEnabled = not (
@@ -1989,6 +2043,8 @@ class ReValueDialog(object):
         return True
 
     def OnEditFilters(self, sender, args):
+        if getattr(self, 'is_filter_name_context', False):
+            return
         if not self.commit_preview_edits():
             return
         from filter_editor import FilterEditor
@@ -2045,10 +2101,22 @@ class ReValueDialog(object):
             if not revalue_map:
                 forms.alert("No changes to apply.")
                 return
-            target_param_name = _resolve_target_param_name(
-                self.get_selected_original_param_name())
-            if not revalue_elements(revalue_map, self.is_instance_mode, target_param_name):
-                return
+            if getattr(self, 'is_filter_name_context', False):
+                try:
+                    result = self.rename_writer(revalue_map)
+                    if result is False:
+                        forms.alert("Filter rename was not completed.")
+                        return
+                except Exception as ex:
+                    forms.alert("Could not rename filters: {}".format(str(ex)))
+                    return
+                self.applied = True
+                forms.alert("Renamed {} filter(s) successfully.".format(len(revalue_map)))
+            else:
+                target_param_name = _resolve_target_param_name(
+                    self.get_selected_original_param_name())
+                if not revalue_elements(revalue_map, self.is_instance_mode, target_param_name):
+                    return
 
             self._suspend_events = True
             try:
@@ -2088,9 +2156,30 @@ class ReValueDialog(object):
         """Get changes only for rows included in the filtered preview."""
         revalue_map = {}
         for item in self.preview_grid.Items:
-            if item.NewName and item.NewName != item.CurrentName:
+            if (item.NewName != item.CurrentName and
+                    (item.NewName or getattr(self, 'is_filter_name_context', False))):
                 revalue_map[item.Element] = item.NewName
         return revalue_map
+
+
+def show_filter_names(elements, rename_writer):
+    """Show a name-only modal preview; return whether any Apply succeeded.
+
+    rename_writer receives {native FilterElement: approved_name}. It must validate
+    names, IDs and ownership, write atomically, and raise on failure. ReValue never
+    starts a transaction or falls back to parameter/type writes in this context.
+    """
+    if not callable(rename_writer):
+        raise TypeError("rename_writer must be callable.")
+    elements = list(elements)
+    if any(not isinstance(element, FilterElement) for element in elements):
+        raise TypeError("Expected native Revit FilterElement objects.")
+    if not elements:
+        return False
+    dialog = ReValueDialog(elements, launch_context='filter_names',
+                          rename_writer=rename_writer)
+    dialog.show_dialog()
+    return dialog.applied
 
 
 # ============================================================================

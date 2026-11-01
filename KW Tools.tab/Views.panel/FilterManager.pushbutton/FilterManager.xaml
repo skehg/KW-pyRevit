@@ -1,0 +1,33 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Filter Manager - BETA" Width="1180" Height="860"
+        MinWidth="620" MinHeight="460" ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner" Background="#F4F6F8"
+        FontFamily="Inter, Segoe UI" FontSize="14">
+  <Window.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="ButtonStyles.xaml"/>
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Window.Resources>
+  <Grid Margin="20">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+    <StackPanel Margin="0,0,0,14">
+      <TextBlock x:Name="heading" FontSize="26" FontWeight="SemiBold"/>
+      <TextBlock x:Name="subtitle" Foreground="#6E6E71" Margin="0,6,0,0"/>
+    </StackPanel>
+    <Grid x:Name="body" Grid.Row="1"/>
+    <Border Grid.Row="2" BorderBrush="#D7E1E7" BorderThickness="0,1,0,0"
+            Margin="0,14,0,0" Padding="0,10,0,0">
+      <StackPanel>
+        <TextBlock x:Name="status" Foreground="#335D78" Margin="0,0,0,5"/>
+        <WrapPanel x:Name="actions" HorizontalAlignment="Right"/>
+      </StackPanel>
+    </Border>
+  </Grid>
+</Window>
