@@ -12,7 +12,7 @@ How-To:
 - choose a text type and enter the desired counter settings
 - click Place Text, pick a point in the view, and repeat for more notes
 _____________________________________________________________________
-Author: KoalaBIM Team"""
+Author: Kent Watson"""
 
 import os
 import traceback

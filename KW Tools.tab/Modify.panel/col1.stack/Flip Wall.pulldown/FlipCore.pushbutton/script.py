@@ -12,7 +12,7 @@ How-To:
 - Run tool
 - Select walls to flip (multiple selection allowed)
 _____________________________________________________________________
-Author: Xrev Team"""
+Author: Kent Watson"""
 from Autodesk.Revit.DB import *
 from Autodesk.Revit.UI.Selection import ObjectType, ISelectionFilter
 from Autodesk.Revit.Exceptions import OperationCanceledException

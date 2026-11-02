@@ -261,7 +261,13 @@ class FilterRecord(object):
         self.categories = sorted(id_value(c) for c in element.GetCategories())
         self.tree = read_tree(element.GetElementFilter())
         self.category_names = [service.category_name(c) for c in self.categories]
+        service.load_rule_metadata(self.tree, self.categories)
         self.rules = service.describe(self.tree)
+        self.search_text = u'{} {} {}'.format(
+            self.name, ', '.join(self.category_names), self.rules).lower()
+        self.search_fields = {'name': self.name.lower(),
+                              'category': ', '.join(self.category_names).lower(),
+                              'rule': self.rules.lower(), 'all': self.search_text}
         self.usage = []
         self.inherited = []
         self.problem = ''
@@ -305,6 +311,11 @@ class FilterService(object):
                       key=lambda p: p[1].lower())
 
     def parameter_name(self, pid):
+        if pid not in self.parameter_names:
+            self.parameter_names[pid] = self.read_parameter_name(pid)
+        return self.parameter_names[pid]
+
+    def read_parameter_name(self, pid):
         if pid < 0:
             return DB.LabelUtils.GetLabelFor(Enum.ToObject(DB.BuiltInParameter, Int32(pid)))
         element = self.doc.GetElement(element_id(pid))
@@ -312,13 +323,9 @@ class FilterService(object):
             raise ValueError('Parameter {} no longer exists.'.format(pid))
         return element.GetDefinition().Name
 
-    def eligible_parameters(self, categories):
-        if not categories:
-            return []
-        eligible = DB.ParameterFilterUtilities.GetFilterableParametersInCommon(
-            self.doc, ids(categories))
-        specimens = []
-        for cat in categories:
+    def category_specimens(self, cat):
+        if cat not in self.specimens:
+            specimens = []
             first = DB.FilteredElementCollector(self.doc).OfCategoryId(
                 element_id(cat)).WhereElementIsNotElementType().FirstElement()
             if first is not None:
@@ -330,6 +337,55 @@ class FilterService(object):
                 element_id(cat)).WhereElementIsElementType().FirstElement()
             if type_element is not None:
                 specimens.append(type_element)
+            self.specimens[cat] = specimens
+        return self.specimens[cat]
+
+    def load_rule_metadata(self, node, categories):
+        """Resolve units only for actual double rules, not every eligible parameter."""
+        if node['kind'] == 'group':
+            for child in node['children']:
+                self.load_rule_metadata(child, categories)
+            return
+        if node['kind'] != 'rule' or node['family'] != 'double':
+            return
+        pid = node['pid']
+        info = self.parameters.get(pid)
+        if info is not None and info.spec is not None:
+            return
+        key = (pid, tuple(sorted(categories)))
+        if key in self.rule_metadata:
+            return
+        spec = None
+        if pid > 0:
+            parameter = self.doc.GetElement(element_id(pid))
+            if isinstance(parameter, DB.ParameterElement):
+                spec = parameter.GetDefinition().GetDataType()
+        else:
+            identifier = Enum.ToObject(DB.BuiltInParameter, Int32(pid))
+            for cat in categories:
+                for specimen in self.category_specimens(cat):
+                    parameter = specimen.get_Parameter(identifier)
+                    if parameter is not None:
+                        spec = parameter.Definition.GetDataType()
+                        break
+                if spec is not None:
+                    break
+        info = ParameterInfo(pid, self.parameter_name(pid), 'Double', spec)
+        info.profile = 'number' if spec is not None else None
+        self.parameters[pid] = info
+        self.rule_metadata.add(key)
+
+    def eligible_parameters(self, categories):
+        if not categories:
+            return []
+        key = tuple(sorted(categories))
+        if key in self.eligible_cache:
+            result = self.eligible_cache[key]
+            self.parameters.update((info.id, info) for info in result)
+            return result
+        eligible = DB.ParameterFilterUtilities.GetFilterableParametersInCommon(
+            self.doc, ids(categories))
+        specimens = [specimen for cat in categories for specimen in self.category_specimens(cat)]
         sampled = {}
         for specimen in specimens:
             for param in specimen.Parameters:
@@ -371,7 +427,9 @@ class FilterService(object):
                 info.problem = 'Enumeration value mapping is not exposed by Revit. Use an existing rule or choose another parameter.'
             self.parameters[pid] = info
             result.append(info)
-        return sorted(result, key=lambda p: (p.name.lower(), p.id))
+        result.sort(key=lambda p: (p.name.lower(), p.id))
+        self.eligible_cache[key] = result
+        return result
 
     @staticmethod
     def storage_from_spec(spec):
@@ -488,12 +546,24 @@ class FilterService(object):
 
     def refresh(self):
         self.parameters = {}
+        self.parameter_names = {}
+        self.specimens = {}
+        self.rule_metadata = set()
+        self.eligible_cache = {}
         self.value_suggestions = {}
         self.views = list(DB.FilteredElementCollector(self.doc).OfClass(DB.View))
         self.records = [FilterRecord(self, e) for e in
                         DB.FilteredElementCollector(self.doc).OfClass(DB.ParameterFilterElement)]
         by_id = dict((r.id, r) for r in self.records)
+        inherited_by_template = {}
+        controls = {}
         for view in self.views:
+            if not view.IsTemplate:
+                tid = id_value(view.ViewTemplateId)
+                if tid not in controls:
+                    controls[tid] = self.template_controls(self.doc.GetElement(view.ViewTemplateId))
+                if controls[tid]:
+                    inherited_by_template.setdefault(tid, []).append(view)
             if not view.AreGraphicsOverridesAllowed():
                 continue
             for fid in view.GetFilters():
@@ -501,10 +571,8 @@ class FilterService(object):
                 if record:
                     record.usage.append(view)
         for record in self.records:
-            template_ids = set(id_value(v.Id) for v in record.usage if v.IsTemplate)
-            record.inherited = [v for v in self.views if not v.IsTemplate and
-                                id_value(v.ViewTemplateId) in template_ids and self.template_controls(
-                                    self.doc.GetElement(v.ViewTemplateId))]
+            record.inherited = [dependent for v in record.usage if v.IsTemplate
+                                for dependent in inherited_by_template.get(id_value(v.Id), [])]
         self.records.sort(key=lambda r: r.name.lower())
 
     def get_record(self, fid):
@@ -539,9 +607,13 @@ class FilterService(object):
                             key=lambda members: members[0].name.lower())
         return duplicates, [r for r in self.records if r.problem]
 
-    def name_errors(self, names):
-        all_names = dict((name_of(e).lower(), id_value(e.Id)) for e in
-                         DB.FilteredElementCollector(self.doc).OfClass(DB.FilterElement))
+    def filter_names(self):
+        return dict((name_of(e).lower(), id_value(e.Id)) for e in
+                    DB.FilteredElementCollector(self.doc).OfClass(DB.FilterElement))
+
+    def name_errors(self, names, all_names=None):
+        if all_names is None:
+            all_names = self.filter_names()
         proposed = {}
         for fid, name in names.items():
             proposed.setdefault(name.lower() if name else '', []).append(fid)

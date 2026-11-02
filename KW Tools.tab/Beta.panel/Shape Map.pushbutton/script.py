@@ -15,7 +15,7 @@ How-To:
 - Select destination element (Floor/Roof/Toposolid)
 - Confirm options in dialog and click Run
 _____________________________________________________________________
-Author: Xrev Team"""
+Author: Kent Watson"""
 
 import os
 import sys

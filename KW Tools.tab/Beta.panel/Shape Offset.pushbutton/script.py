@@ -15,7 +15,7 @@ How-To:
 - Choose mode (Add offset or Reset/Equalize)
 - Enter offset in current document units
 _____________________________________________________________________
-Author: Xrev Team"""
+Author: Kent Watson"""
 
 from Autodesk.Revit.DB import (
     BuiltInParameter,

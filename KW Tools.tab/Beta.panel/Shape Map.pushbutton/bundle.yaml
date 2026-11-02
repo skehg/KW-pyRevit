@@ -3,5 +3,5 @@ tooltip: >
   Copy shape-edited surface data from a source Floor/Roof/Toposolid
   to a destination host using vertical interpolation on the source top face.
   Supports optional destination Level/Offset alignment before mapping.
-author: Xrev Team
+author: Kent Watson
 highlight: new

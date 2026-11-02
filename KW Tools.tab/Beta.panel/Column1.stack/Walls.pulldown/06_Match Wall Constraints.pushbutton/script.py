@@ -2,7 +2,7 @@
 
 __title__ = "Wall Match: Constraints"
 __min_revit_ver__ = 2021
-__author__ = "Xrev Team"
+__author__ = "Kent Watson"
 __doc__ = """Version = 1.0
 Date    = 07.07.2026
 _____________________________________________________________________

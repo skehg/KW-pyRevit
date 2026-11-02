@@ -14,6 +14,20 @@ Implementation validation (2026-11-01), using the Revit 2023 and 2026 MCP connec
 - Test changes were rolled back or undone; no test definitions remain. Revit 2024/2025 have not been execution-tested. Intermediate/future compatibility relies on the shared 2023+ API surface, not a claim of certification.
 - Exact native dropdown parity for every parameter, complex/category-specific definition editing, saved-file reopen and manual visual checks across monitor/DPI configurations remain BETA acceptance work. Unsupported native structures are inspection-only; unresolved operand metadata is never guessed.
 
+### Performance follow-up (2026-11-02)
+
+- Manager browsing and rename previews no longer build every eligible parameter or sample every selected category. Resolve metadata only for actual double rules, preserving project-unit formatting; cache representative numeric specimens, parameter labels and editor eligibility until refresh.
+- Search uses cached rule text and reuses row controls while preserving independent checks/highlights. Build inherited usage through a per-template index instead of a filter-by-view nested scan.
+- Cancel from New/Edit/Rename does not refresh definitions or usage. Successful results still refresh; rename previews use a name snapshot while commits revalidate live names.
+- Revit 2023 / IronPython 2.7 validation used 165 filters and 171 views. Representative measured search changed from approximately 452 ms to 57 ms and summary rendering from 199 ms to 3 ms. Timings are diagnostic measurements, not guaranteed limits.
+- Seven new read-only performance checks, six existing selection/template checks and nine rename/settings checks passed. The 15 native-operation, seven WPF/controller and seven suggestion/application checks also passed in a dry run with every model fixture rolled back. No 2025/2026 MCP connection was used for this follow-up.
+
+### Search-scope follow-up (2026-11-02)
+
+- Add a dropdown beside manager Search: Name (default), Category, Rule and All. Rule includes readable parameter names, operators and operands. Match case-insensitively against cached field text, without additional Revit collection.
+- Changing scope retains the query and checked filters; category/current-view constraints remain independent. Preserve scope in the manager state used for the ReValue handoff; newly opened sessions default to Name.
+- Nine performance/search checks and six selection/template checks passed read-only in Revit 2023 / IronPython 2.7, including all scopes, state restoration, cached row reuse and search-control widths at the manager's minimum size.
+
 ### Historical feasibility evidence
 
 Investigation used the Revit 2023 MCP connection (build 23.1.80.30, IronPython 2.7.12) on 2026-10-30:

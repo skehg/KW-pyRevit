@@ -4,7 +4,7 @@
 
 ## Working with filters
 
-- Search names, categories and rule parameters. Filter by category or direct application to the current view. Click a filter's name or row to focus its rule tree and project-wide usage without changing the checked set. **Ctrl-click** adds/removes highlighted rows; **Shift-click** selects a contiguous range; **Ctrl+Shift-click** adds a range to the highlights.
+- Use the dropdown beside Search to search **Name** (the default), **Category**, **Rule** (parameter names, operators and values), or **All**. Search is case-insensitive; changing scope immediately updates results without clearing the search or checked filters. The scope is preserved when returning from ReValue. Filter by category or direct application to the current view independently. Click a filter's name or row to focus its rule tree and project-wide usage without changing the checked set. **Ctrl-click** adds/removes highlighted rows; **Shift-click** selects a contiguous range; **Ctrl+Shift-click** adds a range to the highlights.
 - Click a checkbox in the highlighted group to check or uncheck the whole highlighted group, following the clicked box's new state. Clicking an unhighlighted checkbox affects only that filter. Highlighting is separate from checking: Apply/Rename/Delete still act only on checked filters. The manager shows both counts.
 - **New Filter / Edit Filter:** choose categories first, then typed rules and nested AND/OR groups. Only parameters eligible for the entire category selection are offered for new rules. Presence conditions hide the operand control.
 - **Equals / Not Equals:** recognised text, integer and numeric parameters offer editable autofill/dropdown suggestions from values assigned to instances and types in the selected categories. Suggestions are collected lazily and cached until refresh, use exact parameter IDs, and retain distinct stored values. Choose one or enter any custom value; suggestions do not constrain valid rules. Numeric labels use project units, but selecting a suggestion retains the exact stored number. Reference and Yes/No parameters keep their existing typed pickers.
@@ -28,6 +28,14 @@
 - Right-click a checked row to act on the checked set. Right-click an unchecked row to explicitly make that row the sole context-action selection.
   - **Rename Filters with ReValue** closes the manager, opens a restricted filter-own-Name preview, then returns with the manager state preserved. Ordinary ReValue type/parameter settings and Revit selection are unchanged.
   - **Select Matching Elements in Revit** supports current view/project and ANY/ALL selected definitions. Refresh the native match count, then confirm selection replacement. Confirmation closes the manager; no matches/cancel/errors preserve selection. Use ReValue normally afterward if desired.
+
+## Performance and model reads
+
+- Browsing, searching, focusing a filter and generating rename previews do **not** evaluate filters against all model elements. Search uses cached names, categories and rule descriptions and reuses list-row controls.
+- Loading/refreshing reads filter definitions and view/template attachments for usage reporting. Inherited usage is indexed once by template rather than rescanning every view for every filter.
+- Numeric rule formatting needs parameter units. Project/shared parameter definitions supply these directly; built-in numeric rules can sample the first instance/type in a relevant category. These small samples are cached until refresh; category-only and nonnumeric summaries do not need them. Browsing does not build the editor's complete eligible-parameter list.
+- **Cancel** in New/Edit/Rename returns without reloading filters or usage. Successful saves/renames still refresh, and write-time stale-definition, collision and usage checks remain in place. Rename preview validation uses a name snapshot, but committing rechecks live names.
+- Rule-editor Equals/NotEquals suggestions can still enumerate instances/types in the selected categories when the operand control is configured. **Select Matching Elements > Refresh Count** explicitly evaluates matching elements. These reads are separate from manager search/summary/rename browsing.
 
 ## BETA boundaries
 

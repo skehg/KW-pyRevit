@@ -5,7 +5,7 @@ Mix extracted name parts with parameter values in any order.
 """
 
 __title__ = 'Rename\nTypes'
-__author__ = 'Xrev'
+__author__ = 'Kent Watson'
 
 import clr
 import os

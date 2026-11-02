@@ -775,6 +775,7 @@ class RenameDialog(Dialog):
     def __init__(self, service, records):
         Dialog.__init__(self, 'Rename Filters', 'Pattern preview and manual corrections. Only approved rows are renamed.')
         self.service, self.records = service, records
+        self.existing_names = service.filter_names()
         self.config = script.get_config('filter_manager')
         self.pattern = field(getattr(self.config, 'name_pattern', '{categories} - {rules}'))
         self.rows = []
@@ -815,7 +816,6 @@ class RenameDialog(Dialog):
                     if self.settings_error:
                         break
                     try:
-                        self.service.eligible_parameters(record.categories)
                         record.rules = self.service.describe(record.tree)
                         value.Text = self.service.pattern_name(record, self.pattern.Text, symbols)
                     except ValueError as error:
@@ -833,7 +833,7 @@ class RenameDialog(Dialog):
                 if sender is value:
                     self.preview_errors.pop(r.id, None)
         names = dict((r.id, value.Text) for r, check, value, validation in self.rows if check.IsChecked)
-        errors = self.service.name_errors(names)
+        errors = self.service.name_errors(names, self.existing_names)
         for fid, error in self.preview_errors.items():
             if fid in names:
                 errors[fid] = error + (' ' + errors[fid] if fid in errors else '')
@@ -913,7 +913,8 @@ class MatchingDialog(Dialog):
 
 class ManagerDialog(Dialog):
     def __init__(self, service, uidoc, checked=None, focused=None, search='', target_mode='view',
-                 selected_template=None, category=None, applied_only=False, highlighted=None):
+                 selected_template=None, category=None, applied_only=False, highlighted=None,
+                 search_scope='name'):
         Dialog.__init__(self, 'Filter Manager', 'BETA - inspect, create, rename, delete and apply filters to one target.', 1180, 870)
         self.service, self.uidoc = service, uidoc
         self.checked = set(checked or [])
@@ -925,8 +926,24 @@ class ManagerDialog(Dialog):
         self.selection_anchor = focused
         self.MinHeight = min(680, SystemParameters.WorkArea.Height - 40)
         self.loading = False
+        self.row_items = {}
+        self.row_checks = {}
+        self.row_records = None
         self.search = field(search)
-        self.search.ToolTip = 'Search names, categories and rule parameters'
+        self.search.ToolTip = 'Search within the selected scope (case-insensitive)'
+        self.search_scope = combo([('name', 'Name'), ('category', 'Category'),
+                                   ('rule', 'Rule'), ('all', 'All')], search_scope)
+        self.search_scope.Width = 105
+        self.search_scope.ToolTip = 'Search in: Name, Category, Rule or All'
+        AutomationProperties.SetName(self.search_scope, 'Search in')
+        search_row = Grid()
+        for width in (GridLength(1, GridUnitType.Star), GridLength.Auto):
+            column = ColumnDefinition()
+            column.Width = width
+            search_row.ColumnDefinitions.Add(column)
+        search_row.Children.Add(self.search)
+        Grid.SetColumn(self.search_scope, 1)
+        search_row.Children.Add(self.search_scope)
         self.category = combo([(None, 'All categories')] + service.all_categories(), category)
         self.category.SelectionChanged += self.search_changed
         self.applied_only = CheckBox()
@@ -940,6 +957,7 @@ class ManagerDialog(Dialog):
         self.list.Margin = Thickness(4)
         self.description = StackPanel()
         self.search.TextChanged += self.search_changed
+        self.search_scope.SelectionChanged += self.search_changed
         self.list.SelectionChanged += self.focus_changed
         root = Grid()
         for size in ('*', 'Auto', 'Auto'):
@@ -957,7 +975,7 @@ class ManagerDialog(Dialog):
             row.Height = GridLength(1, GridUnitType.Star) if size == '*' else GridLength.Auto
             left.RowDefinitions.Add(row)
         add_row(left, label('PROJECT FILTERS - check for actions; focus to inspect', 12, MUTED), 0)
-        add_row(left, self.search, 1)
+        add_row(left, search_row, 1)
         add_row(left, panel(self.category, self.applied_only), 2)
         add_row(left, self.list, 3)
         leftcard, rightcard = card(left), card(scroll(self.description))
@@ -1035,25 +1053,35 @@ class ManagerDialog(Dialog):
 
     def state(self):
         return {'checked': self.checked, 'focused': self.focused, 'search': self.search.Text,
+                'search_scope': chosen(self.search_scope),
                 'target_mode': chosen(self.target), 'selected_template': self.selected_template,
                 'category': chosen(self.category), 'applied_only': self.applied_only.IsChecked is True,
                 'highlighted': list(self.highlighted)}
 
     def populate(self):
         self.loading = True
+        if self.row_records is not self.service.records:
+            self.row_items.clear()
+            self.row_checks.clear()
+            self.row_records = self.service.records
         self.checked.intersection_update(r.id for r in self.service.records)
         if self.focused not in set(r.id for r in self.service.records):
             self.focused = None
         self.list.Items.Clear()
-        self.row_checks = {}
         query = self.search.Text.lower()
+        scope = chosen(self.search_scope)
         applied = set(model.id_value(i) for i in self.uidoc.ActiveView.GetFilters()) if (
             self.applied_only.IsChecked and self.uidoc.ActiveView.AreGraphicsOverridesAllowed()) else set()
         for record in self.service.records:
-            text = '{} {} {}'.format(record.name, ', '.join(record.category_names), record.rules)
-            if (query not in text.lower() or
+            if (query not in record.search_fields[scope] or
                     (chosen(self.category) is not None and chosen(self.category) not in record.categories) or
                     (self.applied_only.IsChecked and record.id not in applied)):
+                continue
+            if record.id in self.row_items:
+                item = self.row_items[record.id]
+                self.row_checks[record.id].IsChecked = record.id in self.checked
+                self.list.Items.Add(item)
+                item.IsSelected = record.id in self.highlighted
                 continue
             item = ListBoxItem()
             item.Tag = record.id
@@ -1089,6 +1117,7 @@ class ManagerDialog(Dialog):
                 action.Click += handler
                 menu.Items.Add(action)
             item.ContextMenu = menu
+            self.row_items[record.id] = item
             self.list.Items.Add(item)
             item.IsSelected = record.id in self.highlighted
         if not self.list.SelectedItems.Count and self.list.Items.Count and not self.highlighted:
@@ -1200,8 +1229,6 @@ class ManagerDialog(Dialog):
             return
         record = self.service.get_record(self.focused)
         def display():
-            self.service.eligible_parameters(record.categories)
-            record.rules = self.service.describe(record.tree)
             self.description.Children.Add(label(record.name, 23))
             self.description.Children.Add(label('RULE-BASED FILTER - id {}'.format(record.id), 12, MUTED))
             self.description.Children.Add(label('CATEGORIES', 12, MUTED))
@@ -1295,8 +1322,8 @@ class ManagerDialog(Dialog):
 
     def open_editor(self, record):
         result = EditorDialog(self.service, record).show(self)
-        self.refresh(result)
         if result is not None:
+            self.refresh(result)
             self.status.Text = 'Definition ready. Apply separately; configure graphics in Revit.'
 
     def select_unused(self, sender, event):
@@ -1322,7 +1349,6 @@ class ManagerDialog(Dialog):
             rows = []
             for index, members in enumerate(groups):
                 for r in members:
-                    self.service.eligible_parameters(r.categories)
                     r.rules = self.service.describe(r.tree)
                     rows.append((r.id, 'Group {} - {}'.format(index + 1, r.name),
                                  r.rules + '\n' + r.usage_text))
@@ -1344,8 +1370,8 @@ class ManagerDialog(Dialog):
 
     def rename_clicked(self, sender, event):
         def rename():
-            RenameDialog(self.service, self.selected_records()).show(self)
-            self.refresh()
+            if RenameDialog(self.service, self.selected_records()).show(self):
+                self.refresh()
         self.run(rename)
 
     def delete_clicked(self, sender, event):

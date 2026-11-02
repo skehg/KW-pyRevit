@@ -12,7 +12,7 @@ How-To:
 - Choose the style
 - Select objects to apply the style to
 _____________________________________________________________________
-Author: KoalaBIM Team"""
+Author: Kent Watson"""
 
 import os
 import traceback

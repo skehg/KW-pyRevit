@@ -14,7 +14,7 @@ How-To:
 - Select/confirm elements
 - Pick the new target Level
 _____________________________________________________________________
-Author: Xrev Team"""
+Author: Kent Watson"""
 
 # ╦╔╦╗╔═╗╔═╗╦═╗╔╦╗╔═╗
 # ║║║║╠═╝║ ║╠╦╝ ║ ╚═╗
