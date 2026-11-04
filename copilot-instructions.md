@@ -42,9 +42,10 @@ If any item is unknown, label the snippet as unverified rather than presenting i
 
 ## Transactions (CRITICAL)
 - ALL document modifications MUST be inside a Transaction
-- Use TransactionGroup for batch operations
+- Use TransactionGroup when multiple transactions need explicit grouping/Undo semantics, not for every loop
 - NEVER modify the document outside a transaction
 - Keep transactions as short as possible
+- Read-only operations need no transaction
 
 Python (pyRevit):
 with Transaction(doc, "Action") as t:
@@ -63,7 +64,7 @@ using (Transaction t = new Transaction(doc, "Action"))
 ---
 
 ## Element Collection
-- ALWAYS use FilteredElementCollector
+- Use FilteredElementCollector for document-wide searches; reuse validated selections/known IDs when those define the scope
 - ALWAYS filter early (by class, category, or parameter)
 - NEVER collect all elements and filter in Python/C#
 - Avoid collectors inside loops
@@ -109,19 +110,20 @@ FilteredElementCollector(doc)\
 
 # PYREVIT ENGINE AWARENESS (CRITICAL)
 
-This environment supports BOTH:
+This project's guidance covers:
 
-- IronPython2 (2712) → default pyRevit engine
-- CPython (3123) → optional modern Python engine
+- IronPython 2.7
+- CPython 3.12
 
-You MUST determine which engine is being used before generating code.
+Confirm installed runtime availability, the target bundle's engine, and supported Revit versions before generating code. The editor interpreter and an MCP query's engine do not establish the deployed button engine.
 
 ---
 
-## DEFAULT ASSUMPTION
+## TARGET RESOLUTION
 
-- Assume IronPython 2.7 unless explicitly told otherwise
-- Prioritize compatibility with pyRevit default engine
+- Inspect bundle/entry-point configuration and relevant installed pyRevit documentation
+- If engine or target versions are missing or conflicting, list the evidence and ask the user before implementation
+- Do not silently choose an engine, expand the support range, or reinterpret static checks as runtime proof
 
 ---
 
@@ -165,8 +167,8 @@ When explicitly targeting CPython:
 
 When generating code:
 
-- If user does NOT specify engine → use IronPython-safe code
-- If user specifies "CPython" → switch to Python 3.12 style
+- If the user does not specify an engine, determine it from the target command's verified configuration; ask if unresolved
+- If the user requests CPython, confirm the embedded version and dependencies and explicitly scope any engine/configuration change
 - If code uses modern Python features → clearly label it as CPython-only
 
 ---
@@ -190,8 +192,8 @@ name = f"Wall_{i}"
 
 ## WHEN UNSURE
 
-- Default to IronPython-compatible code
-- Or ask which engine should be used
+- Ask which engine should be used when repository evidence cannot resolve it
+- Keep dependent implementation blocked; continue only independent research or clearly labeled provisional work
 
 ---
 
@@ -216,7 +218,7 @@ name = f"Wall_{i}"
 
 # CODE STRUCTURE
 
-Always follow this structure:
+Separate reads/validation from writes using this structure where applicable:
 
 1. Collect elements
 2. Filter elements
@@ -224,6 +226,8 @@ Always follow this structure:
 4. Modify elements
 5. Commit transaction
 6. Output/log results
+
+Skip transaction and modification steps for read-only commands. Do not hold transactions open for user input, network calls, or background work.
 
 ---
 
@@ -256,7 +260,7 @@ Always follow this structure:
 
 Always:
 - Include necessary imports/usings
-- Assume `doc` is available unless told otherwise
+- Resolve and validate document/UI context through the target button's established imports; MCP-injected globals are not automatically available in deployed scripts
 - Ask for clarification if requirements are ambiguous
 - Prefer safe, correct code over clever shortcuts
 

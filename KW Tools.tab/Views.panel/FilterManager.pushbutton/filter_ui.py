@@ -947,7 +947,9 @@ class ManagerDialog(Dialog):
         self.category = combo([(None, 'All categories')] + service.all_categories(), category)
         self.category.SelectionChanged += self.search_changed
         self.applied_only = CheckBox()
-        self.applied_only.Content = label('Applied to current view (direct attachments)', 12)
+        self.applied_only.Content = label('Applied to current view or its template', 12)
+        self.applied_only.ToolTip = ('Show only filters attached directly to the current view '
+                                     'or to its assigned view template.')
         self.applied_only.IsChecked = applied_only
         self.applied_only.Checked += self.search_changed
         self.applied_only.Unchecked += self.search_changed
@@ -1070,8 +1072,14 @@ class ManagerDialog(Dialog):
         self.list.Items.Clear()
         query = self.search.Text.lower()
         scope = chosen(self.search_scope)
-        applied = set(model.id_value(i) for i in self.uidoc.ActiveView.GetFilters()) if (
-            self.applied_only.IsChecked and self.uidoc.ActiveView.AreGraphicsOverridesAllowed()) else set()
+        applied = set()
+        if self.applied_only.IsChecked:
+            view = self.uidoc.ActiveView
+            if view.AreGraphicsOverridesAllowed():
+                applied.update(model.id_value(i) for i in view.GetFilters())
+            template = self.service.doc.GetElement(view.ViewTemplateId)
+            if template is not None and template.AreGraphicsOverridesAllowed():
+                applied.update(model.id_value(i) for i in template.GetFilters())
         for record in self.service.records:
             if (query not in record.search_fields[scope] or
                     (chosen(self.category) is not None and chosen(self.category) not in record.categories) or

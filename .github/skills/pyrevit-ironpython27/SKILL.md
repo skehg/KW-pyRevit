@@ -1,6 +1,6 @@
 ---
 name: pyrevit-ironpython27
-description: 'Write and review pyRevit tools for IronPython 2.7 with safe Revit API patterns, transaction discipline, and pyRevit-compatible UI. Use when creating or modifying script.py tools, bundle.yaml-backed commands, or Revit element mutation logic.'
+description: 'Use when creating, modifying, or reviewing pyRevit commands confirmed to target IronPython 2.7. Provides an end-to-end workflow for API verification, transactions, UI, and regression testing; not for CPython-only tools.'
 argument-hint: 'Task or feature to implement in a pyRevit IronPython 2.7 tool'
 user-invocable: true
 disable-model-invocation: false
@@ -9,7 +9,9 @@ disable-model-invocation: false
 # pyRevit IronPython 2.7 Coding Workflow
 
 ## Outcome
-Produce production-ready pyRevit code that runs on IronPython 2.7, follows repository conventions, and behaves safely in Revit (including Undo-friendly transactions).
+Produce pyRevit code for the confirmed IronPython 2.7 runtime, following repository conventions and safe, Undo-friendly behavior. Claim runtime readiness only when the corresponding checks have actually passed.
+
+Use [workspace-tooling](../workspace-tooling/SKILL.md) for extension/MCP discovery and evidence rules. This is the end-to-end workflow; `ironpython-27` supplies the focused language/runtime rules, while `revit-api` and `revit-transactions` supply API and write-safety rules.
 
 ## When To Use
 - Creating a new `.pushbutton` command with `bundle.yaml` and `script.py`
@@ -19,6 +21,7 @@ Produce production-ready pyRevit code that runs on IronPython 2.7, follows repos
 - Reviewing pyRevit code for correctness before release
 
 ## Inputs
+- Confirmed IronPython bundle engine and target Revit releases; resolve missing/conflicting configuration before implementation
 - Target command folder and files (typically `bundle.yaml`, `script.py`, optional `.xaml`)
 - Desired behavior (read-only analysis vs model mutation)
 - Revit context constraints (project vs family document, selection requirements)
@@ -54,18 +57,19 @@ If any item is uncertain, mark the snippet as provisional or ask for clarificati
 - Keep imports and error handling simple and explicit for pyRevit runtime stability.
 
 3. Resolve Revit context up front.
-- Use `__revit__` as `UIApplication`; use `.Application` once to access DB application.
-- Avoid chaining `.Application.Application`.
+- Use the repository's verified button context/import pattern; do not copy MCP-injected `doc`, `inputs`, or `result` conventions into a deployed command.
+- If using `__revit__`, confirm it is a `UIApplication`; its `.Application` is the DB application. Do not chain `.Application.Application`.
 - Determine active document type and guard operations accordingly.
 
 4. Choose transaction strategy using decision points.
 - If operation is read-only: do not start a transaction.
 - If operation mutates elements: wrap writes in `with revit.Transaction("Action Name"):` when possible.
-- For renaming or parameter edits, prefer direct native setters inside the transaction first, then fallback patterns only if needed.
+- For renaming or parameter edits, use verified native setters inside the transaction. Add a fallback only for a documented failure mode, with clear reporting rather than hidden partial success.
 
 5. Implement UI and user flow in pyRevit-safe patterns.
 - Prefer `pyrevit.forms` for lightweight prompts and selections.
 - If WPF/XAML is used, keep bindings and event handlers simple and deterministic.
+- Use `wpf-xaml-ui` for custom dialogs; `pyrevit.forms` prompts and existing WPF-based forms remain appropriate for lightweight interactions.
 - Validate all user inputs before modifying the model.
 
 6. Add robust guardrails and messages.
@@ -74,6 +78,7 @@ If any item is uncertain, mark the snippet as provisional or ask for clarificati
 - Fail early when prerequisites are missing.
 
 7. Validate behavior and quality checks.
+- Add a regression test for changed behavior where feasible and run the smallest relevant existing checks. Report unavailable runtime checks as blocked/not run, not passed.
 - Confirm command executes without syntax/runtime incompatibilities in IronPython 2.7.
 - Confirm transaction boundaries are minimal and Undo stack behavior is correct.
 - Confirm no unintended document writes in read-only paths.
@@ -96,7 +101,7 @@ If any item is uncertain, mark the snippet as provisional or ask for clarificati
   - Try native setter first inside transaction.
   - Use fallback only when API requires it.
 - UI-heavy task:
-  - Prefer `pyrevit.forms`; use WPF only when necessary.
+  - Use WPF/XAML for custom interfaces; reuse `pyrevit.forms` for suitable lightweight prompts/selections.
 
 ## Definition Of Done
 - Script is IronPython 2.7 compatible.
@@ -104,6 +109,7 @@ If any item is uncertain, mark the snippet as provisional or ask for clarificati
 - User input and context checks prevent invalid operations.
 - Undo behavior is preserved for mutating commands.
 - Command remains consistent with repository structure and patterns.
+- Return actual test/tool evidence and unresolved checks for independent QA. Static or mocked tests alone do not establish IronPython/Revit readiness.
 
 ## Example Invocations
 - `/pyrevit-ironpython27 Add a new command that batch renames family types using a safe transaction and preview step.`
