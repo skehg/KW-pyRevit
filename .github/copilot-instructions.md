@@ -5,3 +5,10 @@
 - Use only task-relevant skills and agents. Keep simple work direct; use bounded specialist handoffs for substantial independent work.
 - Resolve unknown or conflicting target engine/Revit versions before implementation. Never infer the deployed engine from the editor interpreter or an MCP query's engine.
 - Preserve unrelated work. Use focused tests and report passed, failed, blocked, and not-run checks honestly; never equate static checks with live Revit/UI verification.
+
+<!-- mermaid-ai-skills:start -->
+## Mermaid Diagrams
+
+When the user asks to create, edit, or visualize a diagram, follow the
+instructions in `.github/instructions/mermaid.instructions.md`.
+<!-- mermaid-ai-skills:end -->

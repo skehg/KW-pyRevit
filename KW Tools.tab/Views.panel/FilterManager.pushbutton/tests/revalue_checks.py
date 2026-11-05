@@ -65,3 +65,57 @@ def run(doc, uidoc, uiapp):
                    'invalid proposal preserves existing name and ordinary ReValue settings',
                    'handoff restores module search paths and preserves Revit selection'])
     return {'version': doc.Application.VersionNumber, 'checks_passed': len(checks), 'checks': checks}
+
+
+def run_drafts(doc, uidoc, uiapp):
+    """Read-only: use the actual ReValue draft window without showing a modal."""
+    path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, 'script.py'))
+    entry = imp.new_module('filter_manager_draft_entry_test')
+    entry.__file__ = path
+    with io.open(path, encoding='utf-8-sig') as source:
+        eval(compile(source.read(), path, 'exec'), entry.__dict__)
+    service = fm.FilterService(doc)
+    record = service.records[0]
+    original_name = record.name
+    initial = {record.id: 'FM proposed name'}
+    paths_before = list(sys.path)
+    selection_before = set(fm.id_value(i) for i in uidoc.Selection.GetElementIds())
+    modified_before = doc.IsModified
+    original_load = entry.load_revalue
+
+    def load(uiapp):
+        module = original_load(uiapp)
+        settings_before = module.load_session_settings()
+
+        def show(dialog):
+            assert dialog.draft_only and dialog.preview_items.Count == 1
+            assert dialog.preview_items[0].CurrentName == initial[record.id]
+            assert dialog.btn_apply.Content == 'Use Proposals'
+            dialog.preview_items[0].NewName = 'Invalid | proposal retained for correction'
+            dialog.OnApply(None, None)
+            assert dialog.applied
+            assert fm.name_of(doc.GetElement(fm.element_id(record.id))) == original_name
+            assert module.load_session_settings() == settings_before
+
+        module.ReValueDialog.show_dialog = show
+        return module
+
+    entry.load_revalue = load
+    assert entry.revalue_drafts(service, [record], initial, uiapp) == {
+        record.id: 'Invalid | proposal retained for correction'}
+
+    def cancel(uiapp):
+        module = original_load(uiapp)
+        module.ReValueDialog.show_dialog = lambda dialog: dialog.OnClose(None, None)
+        return module
+
+    entry.load_revalue = cancel
+    assert entry.revalue_drafts(service, [record], initial, uiapp) is None
+    assert initial == {record.id: 'FM proposed name'}
+    assert sys.path == paths_before
+    assert set(fm.id_value(i) for i in uidoc.Selection.GetElementIds()) == selection_before
+    assert doc.IsModified == modified_before
+    assert service.assert_current(record).UniqueId == record.unique_id
+    return ['current grid proposals initialise native ReValue',
+            'accept returns proposals without any model writes or success alert',
+            'cancel preserves proposals, settings, selection and import paths']

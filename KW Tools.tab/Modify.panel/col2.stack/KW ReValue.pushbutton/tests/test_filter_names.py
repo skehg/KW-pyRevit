@@ -11,6 +11,7 @@ COMMAND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 class FilterElement(object):
     def __init__(self, name):
         self.Name = name
+        self.UniqueId = 'filter-' + name
 
     def GetTypeId(self):
         raise AssertionError('Filters must never resolve a type')
@@ -345,6 +346,75 @@ class FilterNameTests(unittest.TestCase):
             self.script.show_filter_names(self.elements, None)
         self.assertFalse(self.script.show_filter_names([], self.writer))
         self.window.ShowDialog.assert_not_called()
+
+    def draft_dialog(self, receiver):
+        return self.script.ReValueDialog(
+            self.elements, launch_context='filter_names', rename_writer=receiver,
+            initial_names=dict(zip([e.UniqueId for e in self.elements],
+                                   ['Proposal-A', 'Proposal-B'])), draft_only=True)
+
+    def test_drafts_start_from_grid_proposals_and_transform_without_writes(self):
+        receiver = mock.Mock()
+        dialog = self.draft_dialog(receiver)
+        self.assertEqual(['Proposal-A', 'Proposal-B'], [r.CurrentName for r in dialog.preview_items])
+        dialog.txt_find.Text = 'Proposal'
+        dialog.txt_replace.Text = 'Corrected'
+        dialog.OnSettingsChanged(None, None)
+        receiver.assert_not_called()
+        dialog.OnApply(None, None)
+        receiver.assert_called_once_with(dict(zip(self.elements, ['Corrected-A', 'Corrected-B'])))
+        self.assertTrue(dialog.applied)
+        self.window.Close.assert_called_once()
+        self.assertEqual('Use Proposals', dialog.btn_apply.Content)
+        self.forms.alert.assert_not_called()
+        self.assertEqual(['Wall-A', 'Wall-B'], [e.Name for e in self.elements])
+        self.settings.set_envvar.assert_not_called()
+
+    def test_draft_accept_returns_unchanged_and_blank_rows_for_grid_validation(self):
+        receiver = mock.Mock()
+        dialog = self.draft_dialog(receiver)
+        dialog.preview_items[1].NewName = ''
+        dialog.OnApply(None, None)
+        receiver.assert_called_once_with(dict(zip(self.elements, ['Proposal-A', ''])))
+        self.assertTrue(dialog.applied)
+        self.forms.alert.assert_not_called()
+
+    def test_draft_callback_failure_does_not_close_or_report_success(self):
+        receiver = mock.Mock(return_value=False)
+        dialog = self.draft_dialog(receiver)
+        dialog.OnApply(None, None)
+        self.assertFalse(dialog.applied)
+        self.window.Close.assert_not_called()
+        receiver.side_effect = ValueError('Project changed')
+        dialog.OnApply(None, None)
+        self.assertFalse(dialog.applied)
+        self.window.Close.assert_not_called()
+        self.forms.alert.assert_called_once_with(
+            'Could not return filter-name proposals: Project changed')
+
+    def test_draft_cancel_keeps_proposals_and_model_unchanged(self):
+        receiver = mock.Mock()
+        dialog = self.draft_dialog(receiver)
+        dialog.OnClose(None, None)
+        receiver.assert_not_called()
+        self.assertFalse(dialog.applied)
+        self.assertEqual(['Wall-A', 'Wall-B'], [e.Name for e in self.elements])
+
+    def test_draft_entry_checks_exact_native_identity_and_proposal_text(self):
+        receiver = mock.Mock()
+        proposals = dict((e.UniqueId, e.Name) for e in self.elements)
+        with self.assertRaises(ValueError):
+            self.script.show_filter_name_drafts(self.elements, {}, receiver)
+        with self.assertRaises(TypeError):
+            self.script.show_filter_name_drafts(
+                self.elements, dict.fromkeys(proposals, None), receiver)
+        dialog = self.draft_dialog(receiver)
+        with mock.patch.object(self.script, 'ReValueDialog', return_value=dialog) as constructor:
+            self.assertFalse(self.script.show_filter_name_drafts(
+                self.elements, proposals, receiver))
+            constructor.assert_called_once_with(
+                self.elements, launch_context='filter_names', rename_writer=receiver,
+                initial_names=proposals, draft_only=True)
 
 
 if __name__ == '__main__':

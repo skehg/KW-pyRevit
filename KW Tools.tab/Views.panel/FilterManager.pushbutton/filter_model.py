@@ -662,7 +662,7 @@ class FilterService(object):
                 raise ValueError('This rule structure is not accepted by Revit.')
         return native
 
-    def atomic(self, title, action):
+    def atomic(self, title, action, verify=None):
         if self.doc.IsReadOnly or self.doc.IsModifiable:
             raise ValueError('The document is read-only or another transaction is open.')
         tg = DB.TransactionGroup(self.doc, 'Filter Manager: ' + title)
@@ -678,6 +678,8 @@ class FilterService(object):
             result = action()
             if tx.Commit() != DB.TransactionStatus.Committed:
                 raise ValueError('Revit did not commit the operation. ' + '\n'.join(failure_handler.messages))
+            if verify is not None:
+                verify(result)
             if tg.Assimilate() != DB.TransactionStatus.Committed:
                 raise ValueError('Revit did not finish the Undo group.')
             return result
@@ -716,7 +718,17 @@ class FilterService(object):
                 if native is not None and not e.SetElementFilter(native):
                     raise ValueError('Revit rejected the new rules.')
             return id_value(e.Id)
-        return self.atomic('Save filter definition', write)
+        expected = definition_signature(categories, tree)
+
+        def verify(fid):
+            element = self.doc.GetElement(element_id(fid))
+            if element is None or name_of(element) != name:
+                raise ValueError('Revit did not retain the requested filter definition.')
+            actual_categories = [id_value(i) for i in element.GetCategories()]
+            actual = definition_signature(actual_categories, read_tree(element.GetElementFilter()))
+            if actual != expected:
+                raise ValueError('Revit changed the requested category/rule definition; saving was rolled back.')
+        return self.atomic('Save filter definition', write, verify)
 
     def rename(self, records, names):
         if not names or set(names) != set(r.id for r in records):
@@ -731,7 +743,83 @@ class FilterService(object):
                 e.Name = 'FM temporary ' + str(uuid.uuid4())
             for fid, e in elements.items():
                 e.Name = names[fid]
-        self.atomic('Rename filters', write)
+        def verify(result):
+            for fid, proposed in names.items():
+                element = self.doc.GetElement(element_id(fid))
+                if element is None or name_of(element) != proposed:
+                    raise ValueError('Revit did not retain the requested filter names; renaming was rolled back.')
+        self.atomic('Rename filters', write, verify)
+
+    def rename_preview(self, records, names):
+        """Return row errors after checking vacancies retained by invalid proposals."""
+        if set(names) != set(r.id for r in records):
+            raise ValueError('Rename proposals must match the current grid exactly.')
+        live_names = self.filter_names()
+        errors = self.name_errors(names, live_names)
+        eligible = set(names) - set(errors)
+        while True:
+            blocked = {}
+            for fid in eligible:
+                owner = live_names.get(names[fid].lower())
+                if owner is not None and owner != fid and owner not in eligible:
+                    blocked[fid] = 'Name is retained by an unresolved or unselected filter: "{}".'.format(names[fid])
+            if not blocked:
+                break
+            errors.update(blocked)
+            eligible.difference_update(blocked)
+        return dict((fid, reason.replace('approved proposed', 'proposed'))
+                    for fid, reason in errors.items())
+
+    def rename_partial(self, records, names):
+        """Commit valid changed rows atomically; retain known invalid proposals."""
+        records = list(records)
+        if not records:
+            raise ValueError('Choose filters to rename.')
+        elements = dict((r.id, self.assert_current(r)) for r in records)
+        errors = self.rename_preview(records, names)
+        unchanged = [r.id for r in records if r.id not in errors and
+                     name_of(elements[r.id]) == names[r.id]]
+        changed = [r for r in records if r.id not in errors and r.id not in unchanged]
+        if changed:
+            self.rename(changed, dict((r.id, names[r.id]) for r in changed))
+            self.refresh()
+        return {'renamed': [r.id for r in changed], 'unchanged': unchanged, 'errors': errors}
+
+    def duplicate_draft(self, record):
+        """Independent lossless definition draft; never copy attachment settings."""
+        self.assert_current(record)
+        if record.problem:
+            raise ValueError('Cannot duplicate this definition losslessly: ' + record.problem)
+        existing = self.filter_names()
+        stem = record.name[:240].rstrip() + ' Copy'
+        name, index = stem, 2
+        while name.lower() in existing:
+            name = '{} {}'.format(stem, index)
+            index += 1
+        return {'name': name, 'categories': list(record.categories),
+                'tree': clone_tree(record.tree), 'source_id': record.id,
+                'source_token': record.token}
+
+    def unused_records(self):
+        """Refresh complete project usage; hidden/disabled attachments count."""
+        self.refresh()
+        return [r for r in self.records if not r.usage]
+
+    def purge_unused(self, records, approved_usage):
+        records = list(records)
+        if not records:
+            raise ValueError('Choose unused filters to purge.')
+        for record in records:
+            self.assert_current(record)
+        self.refresh()
+        for record in records:
+            current = self.get_record(record.id)
+            if current.usage or current.inherited:
+                raise ValueError('Filter "{}" is now used. Refresh the purge review; nothing was deleted.'.format(
+                    current.name))
+            if approved_usage.get(record.id) != self.usage_token(current):
+                raise ValueError('Purge usage changed. Refresh the review; nothing was deleted.')
+        return self.delete(records, approved_usage)
 
     def delete(self, records, approved_usage):
         if not records or not set(r.id for r in records).issubset(approved_usage):
@@ -749,7 +837,10 @@ class FilterService(object):
             if removed != wanted:
                 raise ValueError('Revit attempted unexpected dependent deletions; the entire operation was rolled back.')
             return removed
-        return self.atomic('Delete selected filters', write)
+        def verify(deleted):
+            if any(self.doc.GetElement(element_id(fid)) is not None for fid in deleted):
+                raise ValueError('Revit did not delete every reviewed filter; deletion was rolled back.')
+        return self.atomic('Delete selected filters', write, verify)
 
     def template_controls(self, template):
         if template is None or not template.IsTemplate:

@@ -46,13 +46,24 @@ All sliding switches show both options on opposite sides of the track, with the 
 
 ## Filter Manager: Rename Filters
 
-Filter Manager can launch a separate **Rename Filters** context using its checked native filters. Revit selection is not substituted. The preview always reads and targets each filter's own **Name**: Type/Instance switching, source/target parameters, parameter tokens and Python parameter filters are unavailable. Token editing, counters, Current/New Value search, find/replace and case conversion remain available. This context starts with `{orig}` and fresh defaults; it neither reads nor overwrites ordinary ReValue session settings.
+Filter Manager launches **Filter Name Proposals** from its remaining rename grid. Revit selection is not substituted. The preview starts from the grid's current proposed text, not an earlier model name. Type/Instance switching, source/target parameters, parameter tokens and Python parameter filters are unavailable. Token editing, counters, Current/New Value search, find/replace and case conversion remain available. This context starts with `{orig}` and fresh defaults; it neither reads nor overwrites ordinary ReValue session settings.
 
-Review the proposed names, then click **Rename Filters** to approve the changed rows currently displayed (including rows below the scroll area). Pending grid edits must be committed, and the New Value search must be cleared before applying. Blank or duplicate proposals are passed to the caller's validator, not silently skipped. Invalid names, stale filters or ownership errors display an error without resetting the preview or claiming success. Successful applies stay open and reload actual names; Close never applies pending changes.
+Click **Use Proposals** to return the displayed rows to Filter Manager without renaming anything. Pending grid edits must be committed, and the New Value search must be cleared. Blank or duplicate proposals return for correction in the rename grid. Filter Manager's **Rename** performs the actual writes. Closing ReValue without accepting leaves the grid unchanged.
 
 ### Caller contract
 
 Load `script.py` with `imp.load_source` under IronPython, with `__revit__` available. Importing does not execute the ribbon entry point or select elements. The script adds its bundle directory to `sys.path` for local dependencies. Close the manager's modal loop before calling:
+
+```python
+accepted = revalue_module.show_filter_name_drafts(
+    elements, proposed_names_by_unique_id, accept_proposals)
+```
+
+- `proposed_names_by_unique_id`: exact native UniqueId-to-text mapping for the supplied remaining grid rows.
+- `accept_proposals`: receives native filters mapped to proposal text; it must not write the model. Normal return accepts the proposals and closes ReValue. `False` or an exception retains the preview without reporting success.
+- The return value is `True` on acceptance; otherwise `False`. The caller preserves omitted rows when Current Value search limits the displayed subset.
+
+The older direct-write entry remains available for existing callers:
 
 ```python
 changed = revalue_module.show_filter_names(elements, rename_writer)

@@ -1,91 +1,103 @@
 # Filter Manager - BETA
 
-**KW Tools > Views > Filter Manager** requires an open project in Revit 2023 or newer. The dialogs are modal, movable and resizable; this is not a modeless/live-preview editor.
+**KW Tools > Views > Filter Manager** requires an open project, Revit 2023 minimum and IronPython 2.7. It is one persistent, movable, resizable modal WPF workspace, not a modeless/live-preview editor.
 
-## Working with filters
+## Sources and destinations
 
-- Use the dropdown beside Search to search **Name** (the default), **Category**, **Rule** (parameter names, operators and values), or **All**. Search is case-insensitive; changing scope immediately updates results without clearing the search or checked filters. The scope is preserved when returning from ReValue. Filter by category or by application to the current view or its assigned template independently. Click a filter's name or row to focus its rule tree and project-wide usage without changing the checked set. **Ctrl-click** adds/removes highlighted rows; **Shift-click** selects a contiguous range; **Ctrl+Shift-click** adds a range to the highlights.
-- Click a checkbox in the highlighted group to check or uncheck the whole highlighted group, following the clicked box's new state. Clicking an unhighlighted checkbox affects only that filter. Highlighting is separate from checking: Apply/Rename/Delete still act only on checked filters. The manager shows both counts.
-- **New Filter / Edit Filter:** choose categories first, then typed rules and nested AND/OR groups. Only parameters eligible for the entire category selection are offered for new rules. Presence conditions hide the operand control.
-- **Equals / Not Equals:** recognised text, integer and numeric parameters offer editable autofill/dropdown suggestions from values assigned to instances and types in the selected categories. Suggestions are collected lazily and cached until refresh, use exact parameter IDs, and retain distinct stored values. Choose one or enter any custom value; suggestions do not constrain valid rules. Numeric labels use project units, but selecting a suggestion retains the exact stored number. Reference and Yes/No parameters keep their existing typed pickers.
-- Saving creates/updates the native definition and returns directly to the manager. Applied definitions keep their identity and graphics; edits affect every consumer. Drafts never change the drawing.
-- Identical definitions alone open **Confirm Duplicate Definition**. Explicitly acknowledge intentional duplicates, return to the draft, or **Use Existing** to discard the draft and focus a match without applying/merging it.
-- **Review & Apply** adds selected filters to exactly one current view or template. Choose an eligible template in the searchable, single-selection picker. Template-controlled/unsupported current-view targets are blocked. Existing attachments, order, visibility, enable state and overrides are preserved.
-- Selecting **One selected view template** opens the **Select View Template** dialog, not a template dropdown. Search names, optionally filter by view type, inspect the compatible template list and dependent-view impact, then **Use This Template**. The chosen name appears in the manager; **Choose Template...** reopens the picker. Cancel preserves the previously chosen template and never assigns a template to a view.
-- Successful application (including already-applied skips) returns directly to the refreshed manager with an inline added/skipped summary, without an Application Results dialog. The application review remains; errors still display an explicit reason and roll back the batch.
-- Configure graphics in Revit afterward. There is no multi-view application or graphics-copy operation.
+- **Current View / Template** reads the current view's template only when that template controls Filters. Otherwise it reads the view. The actual origin is shown. Unsupported current views remain explicitly unavailable.
+- **Browser View / Template** uses view/template selections captured before the dialog opens. Shared effective template sources are deduplicated.
+- **Selected Views / Templates** opens a searchable multi-picker. **All Project Filters** lists shared definitions without inventing attachment settings for them.
+- Source and target selections are independent. Targets are **View**, **Template**, **Browser** or **Project**. Project loads the full name/type catalogue on demand. Checking a template explicitly changes that template and affects its dependent views; checking a template-controlled view does not silently redirect to its template.
+- Search by filter Name, Category, Rule or All, with category/project-unused restrictions. Target search supports names, Views/Templates/Both and view type. Search changes preserve checked rows, including hidden rows.
+- Highlighting inspects; checking defines an action's scope. Ctrl/Shift ranges and group checkbox changes keep those concepts separate. Counts include hidden selections.
+- **Clear filters** clears filter checks. **Clear targets** clears all destination checks and returns to Project. **Clear Selection** clears action-selection/approval checkboxes across the workspace, not graphics values or copy-channel choices. Reset search clears restrictions, not selections.
 
-## Management and selection
+## Graphics and application
 
-- **Analyse Duplicates** scans the entire project and groups identical categories, parameter identities, typed operands and complete supported logic. Names/graphics/current element matches do not determine duplicates. Unsupported definitions are reported separately.
-- **Rename Selected** previews a naming pattern and permits manual corrections/row approval. Tokens are `{categories}` and `{rules}`; unknown/malformed tokens and colliding/invalid names block saving. The saved default is `{categories} - {rules}`: the illustrative `|` separator is not a valid Revit name character. BETA names have a conservative 255-character limit; shorten lengthy proposals explicitly.
-- Generated rule names omit redundant outer/single-rule/same-operator parentheses, retaining brackets needed to distinguish mixed AND/OR groups and any parentheses in literal values. Category-only naming uses `Category-only - no additional conditions` rather than introducing Revit's invalid `:` character.
-- Validation is specific to each approved row: valid proposals remain **Ready** even when another row fails. Invalid-character warnings identify the character; overlong proposals show their actual length and the 255-character limit. Both participants in a proposed-name collision are flagged. Correct or unapprove offending rows to enable **Rename Approved**; nothing is automatically truncated or renamed.
-- Operator text in the `{rules}` naming token comes from the bundle-local, hidden settings file `naming_settings.json` (see [Naming settings](#naming-settings-advanced)). By default, generated names use `Comments = Alpha` and `Comments ≠ Alpha`, while the manager summary and search still show `Comments equals Alpha`.
-- **Select Unused** replaces the manager checks with definitions attached to no view or template, including templates assigned to zero views. It reveals those results but never deletes them.
-- **Unselect All** clears every manager check, including hidden rows, without changing search, focus, row highlights, target or Revit selection.
-- **Delete Selected** requires approved rows and used-filter impact acknowledgement. Deleting a used definition removes its attachments/graphics everywhere, not matching model elements. Any unexpected dependent deletion rolls back the entire batch.
-- Right-click a checked row to act on the checked set. Right-click an unchecked row to explicitly make that row the sole context-action selection.
-  - **Rename Filters with ReValue** closes the manager, opens a restricted filter-own-Name preview, then returns with the manager state preserved. Ordinary ReValue type/parameter settings and Revit selection are unchanged.
-  - **Select Matching Elements in Revit** supports current view/project and ANY/ALL selected definitions. Refresh the native match count, then confirm selection replacement. Confirmation closes the manager; no matches/cancel/errors preserve selection. Use ReValue normally afterward if desired.
+- The centre tabs are **Graphics / Edit Rules / Rename**. Switching tabs does not apply or discard drafts.
+- The compact grid loads the checked targets' current values on demand. Common values display normally; differences show **Mixed**, and genuine missing overrides show **Unset**. Loaded/displayed values alone never request writes.
+- Source selection browses filters only. Click **Load from source** to fill the same proposed-value grid with a chosen view/template's settings, including its unsets. **Graphics** and **Visibility** default checked for valid sources and configure the next load only; toggling them does not change existing drafts. All Project Filters disables loading because it has no source attachment.
+- Loaded source values and custom edits remain drafts until Apply. Differing source variants require one chosen attachment per filter; there is no automatic first-source choice or field-by-field merge. Loading affects only current checked pairs, not future selections.
+- Graphics supports filter visibility, halftone, projection/cut line colour, weight and pattern, surface/cut foreground/background fill patterns, colours and visibility, and transparency. Colours use visual swatches/native Revit colour selection. Line patterns come from document LinePatternElements, not named Line Styles; fills are drafting patterns, including the actual solid fill.
+- **Per Filter** uses Previous/Next over the stable checked-filter set, including hidden checks. **Together** applies only fields explicitly edited in that mode to the current checked filter/target pairs; toggling modes or checking new targets does not replay earlier edits. Choose destinations before editing custom values; unchecked pairs retain inactive drafts.
+- Leave a cell untouched to retain each target's setting. Change a value to request that value; click its small **×** to remove the override on Apply. The cell immediately displays Unset, without the previous colour/pattern. Crosses appear only where genuine native reset values exist; Off and 0% are explicit values, not Unset.
+- There are no Keep buttons. Right-click **Revert this edit** to remove that field's source-loaded/custom contribution and restore the original target value. Changed cells are highlighted and routine edits retain scroll position. Solid line, solid fill and Unset are distinct.
+- New attachments are always enabled, even when their source is disabled. Existing attachments retain their enabled state. Source visibility Off is a separate supported choice; enabled state is read-only.
+- Applying blank All Project drafts adds missing attachments with Revit defaults and preserves existing settings. Existing filter order is preserved; additions append.
+- **Apply** commits ready additions immediately and approved existing-setting changes. It never forces a review visit for additions. Existing requested changes await individual approval or **Approve All Updates**; **Changes** is an optional before/after drawer, not a wizard step.
+- **Apply and Close** runs that same attachment/graphics action, then closes only if no unapplied drafts remain. It does not save rules, rename proposals or new definitions; save those explicitly. Invalid, unapproved and inactive drafts keep the workspace open. The dynamic Add/Apply label remains, with fixed-size footer buttons.
+- Successful/unchanged work-list entries leave the queue after native readback. Unapproved/unresolved entries remain, with an inline summary. Retained checks do not requeue completed additions without a new requested change.
+- A newly added filter can be inspected and its actual graphics edited without closing the workspace. Drafting never changes the drawing.
 
-## Performance and model reads
+## Definitions and rules
 
-- Browsing, searching, focusing a filter and generating rename previews do **not** evaluate filters against all model elements. Search uses cached names, categories and rule descriptions and reuses list-row controls.
-- Loading/refreshing reads filter definitions and view/template attachments for usage reporting. Inherited usage is indexed once by template rather than rescanning every view for every filter.
-- Numeric rule formatting needs parameter units. Project/shared parameter definitions supply these directly; built-in numeric rules can sample the first instance/type in a relevant category. These small samples are cached until refresh; category-only and nonnumeric summaries do not need them. Browsing does not build the editor's complete eligible-parameter list.
-- **Cancel** in New/Edit/Rename returns without reloading filters or usage. Successful saves/renames still refresh, and write-time stale-definition, collision and usage checks remain in place. Rename preview validation uses a name snapshot, but committing rechecks live names.
-- Rule-editor Equals/NotEquals suggestions can still enumerate instances/types in the selected categories when the operand control is configured. **Select Matching Elements > Refresh Count** explicitly evaluates matching elements. These reads are separate from manager search/summary/rename browsing.
+- **New Filter** and **Duplicate Filter** create inline independent drafts. Duplicate copies one focused definition's categories/rules, not its attachments/graphics, and never edits the original. Cancel creates nothing.
+- **Edit Rules** retains independent category/rule drafts per checked filter. Previous/Next shares Graphics' checked-filter navigator. **Save Rule Changes** saves only the displayed definition, affecting every project-wide consumer; it is independent of attachment Apply.
+- Categories determine the eligible parameter intersection. Supported text, numeric/integer, Yes/No, level/phase/material operands have typed controls. Nested AND/OR groups and untouched native operands/tolerances are preserved.
+- Equals/Not Equals offers lazily collected assigned-value suggestions. Choose one or enter custom text; suggestions are not a validity restriction. Numeric labels use project units while selected suggestions retain exact stored values. Double tolerances are in internal units.
+- Identical definitions require explicit inline acknowledgement or **Use Existing**. Unsupported native structures remain inspection-only rather than being approximated.
+- **Analyse Duplicates** compares complete supported categories/parameter identities/typed operands/logic across the project. Names, graphics and current matching elements do not define duplicates. It never merges or deletes automatically.
 
-## BETA boundaries
+## Rename and ReValue
 
-- Text, numeric/integer, Yes/No and recognised level/phase/material operands have typed controls. Numbers use project display units and native parsing; double tolerances are explicitly in internal units. Untouched native operands/tolerances retain full precision.
-- Built-in parameter metadata can be unavailable in projects without representative elements/types. Enumeration mappings and unfamiliar reference kinds are not guessed. Existing supported native rules are retained; new unknown operands are blocked. Applicable presence-only rules still require native validation.
-- Category-specific/unfamiliar/inverted filter groups are inspection-only and excluded from complete duplicate comparisons. They may still be applied, renamed, deleted or used for native matching; their definitions are never approximated.
-- Work writes are atomic and Undo-grouped. Read-only projects permit inspection/previews/matching but disable manager writes. Recheck stale definitions, usage and duplicate acknowledgements before committing.
-- Tested inside Revit **2023 and 2026**, both on IronPython 2.7. Middle versions are compatibility targets, not executed certifications. Full native-menu parity, saved-file reopening and hands-on visual/DPI testing remain outstanding.
+- Rename is a grid. Proposed Name starts exactly at the current name; edit directly or optionally generate `{categories}` / `{rules}` names.
+- **Rename** processes valid changed rows atomically. Successful and unchanged rows leave the grid. Clashes/invalid proposals remain for correction and retry, without an approval checkbox. An unresolved row cannot falsely vacate its current name for another proposal. Swaps are supported when the final namespace is valid.
+- Unexpected stale/ownership/write/readback failures roll back the attempted subset and retain proposals. Each successful retry has its own Undo operation.
+- **Edit in ReValue** starts from the remaining grid's proposed text. Find/replace, tokens, rearrangement, prefixes/suffixes and case return proposals only. **Use Proposals** does not rename the model; cancel leaves the grid unchanged. Ordinary ReValue settings and Revit selection are preserved.
+- Unknown/malformed naming tokens, invalid characters and names over the conservative 255-character BETA limit are explicit errors. Nothing is silently truncated.
+
+## Deletion, purge and selection
+
+- **Delete Selected** reviews exact definitions and project-wide usage inline. Deleting a used definition removes all its attachments/graphics, not matching model elements; used impact requires acknowledgement.
+- **Purge Unused** reviews definitions with zero attachments anywhere, including unassigned templates and hidden/disabled attachments. It rechecks exact identities and usage before deletion. Project-unused browsing is non-destructive.
+- Unexpected dependent deletions or failed native readback roll back the whole operation.
+- **Select Matching Elements in Revit** explicitly evaluates current-view/project matches using ANY/ALL selected definitions. A successful confirmed handoff closes the workspace and replaces selection. Cancel/no matches/errors leave selection unchanged.
+- **Cancel** discards all unapplied drafts and closes without another prompt. Escape does the same from the main workspace; inside a management panel it returns to the workspace. During a read, Cancel/Escape only cancels the read. Discarding never undoes previously applied operations.
+- The window's **X** warns only about actual unapplied drafts, including unchecked graphics and rename drafts. Selecting sources/filters/targets or reviewing attachment additions alone does not trigger a discard warning.
+
+## Loading and safety
+
+- Opening, searching or checking names does not preload every project's graphic overrides. Definitions/complete attachment usage, project search metadata, resources and actual graphics have separate caches.
+- Project target metadata and line/fill resources load on demand. Graphics loads only for explicit attachment inspection, checked-source comparison or destination planning. Cached repeats reuse immutable snapshots; source/target identities and approvals are revalidated before writing.
+- Multi-attachment reads use cancellable slices of at most five pairs with progress for longer loads. All API access stays on Revit's valid UI/API thread.
+- Read-only projects allow inspection/previews but not writes. Every definition operation and each eligible attachment batch has an independent transaction/Undo boundary; native post-commit readback occurs before the transaction group is assimilated.
+- Built-in metadata without representative project elements is not guessed. Unfamiliar/category-specific/inverted filter structures are inspection-only and excluded from complete duplicate comparisons.
 
 ## Naming settings (advanced)
 
-`naming_settings.json` sits beside `script.py` and is not exposed in the UI. Its `operator_symbols` object maps operator keys to the text used **only** in the `{rules}` naming token. Summaries, search, duplicate signatures and native rules are unaffected. Edit the file as UTF-8, then use **Update Preview** or reopen Rename; no pyRevit reload is needed.
+`naming_settings.json` sits beside `script.py`. Its `operator_symbols` object changes only generated `{rules}` text, not summaries/search/native rules. Reopen or regenerate the preview after editing it as UTF-8.
 
 | Key | Default | Key | Default |
 |---|---|---|---|
 | `Equals` | `=` | `NotEquals` | `≠` |
-| `Greater` | `＞` (fullwidth) | `GreaterOrEqual` | `≥` |
-| `Less` | `＜` (fullwidth) | `LessOrEqual` | `≤` |
+| `Greater` | `＞` | `GreaterOrEqual` | `≥` |
+| `Less` | `＜` | `LessOrEqual` | `≤` |
 
-The text operators (`Contains`, `NotContains`, `BeginsWith`, `NotBeginsWith`, `EndsWith`, `NotEndsWith`) and presence operators (`HasValue`, `HasNoValue`) are listed with their readable wording, so they can be changed too. Level rules use the same keys. A native inverted rule without a dedicated key renders as `NOT ` plus the base operator's text.
+Text/presence operators also have readable mappings. Remove a key to use readable wording; a missing file uses readable wording throughout. Unknown keys, empty/padded/non-text values and Revit-invalid name characters produce explicit generation errors, never guessed replacements. Existing proposals are not silently rewritten.
 
-- Remove a key to use the readable wording for that operator. If the file is missing, all naming uses readable wording.
-- Top-level keys beginning with `_` are notes. Any other unknown top-level or operator key, empty, padded or non-text value, or character that Revit `NamingUtils.IsValidName` rejects makes the whole file invalid. Nothing is skipped or guessed.
-- When the file is invalid, Rename shows one dialog-level error with the file path and problem list, leaves proposals unchanged and disables **Rename Approved** until the file is fixed.
-- Revit 2023 and 2026 both reject ASCII `<`, `>`, `<=`, `>=` and `~`. They accept `=`, `≠`, `≥`, `≤` and fullwidth `＞`/`＜`.
+## Validation and BETA limits
 
-## Validation
+`workspace_checks.run_close_actions(doc, uidoc)` is a Revit 2023-only, read-only WPF regression check for selection-only closing, Cancel/Escape, Apply and Close, inactive drafts, read cancellation and fixed footer geometry. Apply writes are replaced with controller receipt stubs; it does not verify native commits or Undo.
 
-The MCP acceptance modules in [tests](tests) are for disposable projects only:
+Native MCP acceptance modules in [tests](tests) require the intended IronPython engine. Mutation tests are only for explicitly approved sample projects and should be previewed with `run_modify(dry_run=True)`:
 
 ```python
-# Run with MCP run_modify(dry_run=True), workspace set to this bundle.
 import os
 import sys
 import filter_model
 sys.path.insert(0, os.path.join(os.path.dirname(filter_model.__file__), 'tests'))
-import revit_checks, ui_checks, revalue_checks
-result = {
-    'native': revit_checks.run(doc, uidoc),
-    'ui': ui_checks.run(doc, uidoc),
-    'revalue': revalue_checks.run(doc, uidoc, uiapp),
-}
+import definition_workflow_checks
+result = definition_workflow_checks.run(doc, uidoc)
 ```
 
-Tests create disposable definitions, a wall and a template; keep `dry_run=True`. They exercise 26 grouped assertions per version (15 native, 7 WPF/controller, 4 ReValue). Committed persistence and genuine single-step Undo were additionally verified in both versions. No test definitions remain. Ribbon registration, visible title and enabled state were verified after reloading pyRevit in both versions.
+`run_readonly` checks rename vacancies and duplicate drafts without mutation. The definition preview passed four native groups in Revit 2023 and 2025, including partial swaps/retry, post-commit verification rollback and exact unused purge. All 173 offline ReValue tests passed, including 16 filter-name tests for legacy compatibility and draft-return/cancel/failure behaviour.
 
-The follow-up `improvement_checks.run(doc, uidoc)` suite adds 7 focused checks for independent row/checkbox selection, success-only application flow, assigned-value suggestions, exact numeric operands and cache refresh. It and the 7 existing WPF checks passed in both Revit 2023 and 2026 with all test changes rolled back.
+Final native read-only checks passed 20 graphics, 19 WPF/controller and three ReValue groups in each of Revit 2023/2025. Eight native graphics mutation-preview groups per version and user-approved commit/fresh-readback checks passed. The user reported no Undo options after the MCP persistence test; Undo is not verified. All temporary fixture elements were removed through separately approved exact cleanup and baseline view/filter counts restored. No files were saved.
 
-The read-only `selection_template_checks.run(doc, uidoc)` suite checks Ctrl/Shift range highlights, group checkbox toggling, highlighted-state retention, the searchable Penpot page 04 picker, its confirm/cancel target handoff and usable minimum layout. It passed 6 grouped checks in each version without model writes.
+In an attended actual-ribbon check, the user confirmed the workspace opens, native colour-picker Cancel returns correctly, and Undo works after a direct UI operation. That does not establish Undo availability for MCP-driven runs. The reported colour Clear feedback and graphics scroll-retention defects were fixed; three focused actual-WPF groups passed in Revit 2025 without model changes. The user deferred further live/full-suite and attended retesting; see [WORKFLOW.md](WORKFLOW.md) for details.
 
-The read-only `rename_checks.run(doc)` suite passed 9 grouped checks in Revit 2023 and 2026 for unambiguous bracket rendering, valid category-only tokens, row-specific errors, length/character feedback, collisions/swaps, manual correction of a single failed preview, naming-only operator symbols, settings fallback/rejection and dialog-level settings errors. The write-time validator uses the same per-name checks as the dialog.
+The compact-grid revision supersedes those earlier graphics controls. Revit 2023-only checks passed eight user-approved native rollback groups (`68f54726617c`), including exact scoped loads, native clears, approvals and failure rollback. Follow-up run `c23c0b0b6117` passed 59 read-only groups: three checkbox-event, three token-lifecycle, eleven compact-grid, nineteen preserved workspace and twenty-three graphics backend groups. The initial Per Filter and **Select controlling template** refresh paths were fixed; four selection-event groups then passed (`fe2b4dc738bb`), and the user confirmed immediate editing in the actual ribbon window. Independent targeted review found no remaining high-confidence issues after fixing source-token retention. Full visual, keyboard/DPI and attended picker checks remain not run for this revision. Revit 2025 was not used. Penpot's single Current UI page is updated and validates without errors; image export failed, so rendered-image review is not claimed.
 
-See [SCOPE.md](SCOPE.md) for the complete scope and design history.
+Historical single-target BETA checks ran in Revit 2023/2026; those are not certification of the new workspace. See [WORKFLOW.md](WORKFLOW.md) for detailed evidence and outstanding acceptance checks. Representative large-project timings, full modal handoffs/colour-picker OK/ownership, manual monitor/DPI review and saved-file reopen require separate verification; static design or service tests do not establish them.
+
+See [SCOPE.md](SCOPE.md) for the full requirements and design history.

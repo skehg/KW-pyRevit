@@ -1129,7 +1129,7 @@ class PreviewItem(object):
 # ============================================================================
 class ReValueDialog(object):
     def __init__(self, elements, is_instance_mode=False, launch_context=None,
-                 rename_writer=None):
+                 rename_writer=None, initial_names=None, draft_only=False):
         """Initialize dialog with list of elements"""
         if launch_context not in (None, 'filter_names'):
             raise ValueError("Unsupported ReValue launch context.")
@@ -1137,6 +1137,10 @@ class ReValueDialog(object):
         if self.is_filter_name_context and not callable(rename_writer):
             raise TypeError("Filter-name mode requires a rename_writer callback.")
         self.rename_writer = rename_writer
+        self.initial_names = dict(initial_names or {})
+        self.draft_only = bool(draft_only)
+        if self.draft_only and not self.is_filter_name_context:
+            raise ValueError("Draft return is only available in filter-name mode.")
         self.applied = False
 
         # Load XAML window
@@ -1265,8 +1269,9 @@ class ReValueDialog(object):
         self.btn_close.Click += self.OnClose
 
         if self.is_filter_name_context:
-            self.window.Title = 'KW ReValue - Rename Filters'
-            self.btn_apply.Content = 'Rename Filters'
+            self.window.Title = ('KW ReValue - Filter Name Proposals' if self.draft_only
+                                 else 'KW ReValue - Rename Filters')
+            self.btn_apply.Content = 'Use Proposals' if self.draft_only else 'Rename Filters'
             self.btn_mode.IsEnabled = False
             self.btn_mode.Parent.Visibility = WpfVisibility.Collapsed
             self.combo_orig_param.IsEnabled = False
@@ -1751,7 +1756,8 @@ class ReValueDialog(object):
     def get_original_source_text(self, element):
         """Get the text to use as source for tokenization"""
         if getattr(self, 'is_filter_name_context', False):
-            return element.Name or ''
+            initial = getattr(self, 'initial_names', {})
+            return initial.get(element.UniqueId, element.Name or '') if initial else (element.Name or '')
         param_name = self.get_selected_original_param_name()
         if param_name:
             return self.get_param_value(element, param_name)
@@ -2097,6 +2103,18 @@ class ReValueDialog(object):
             if self.new_value_filter_active():
                 forms.alert(NEW_VALUE_FILTER_WARNING)
                 return
+            if getattr(self, 'draft_only', False):
+                proposals = dict((item.Element, item.NewName) for item in self.preview_grid.Items)
+                try:
+                    accepted = self.rename_writer(proposals)
+                except Exception as ex:
+                    forms.alert("Could not return filter-name proposals: {}".format(str(ex)))
+                    return
+                if accepted is False:
+                    return
+                self.applied = True
+                self.window.Close()
+                return
             revalue_map = self.get_revalue_map()
             if not revalue_map:
                 forms.alert("No changes to apply.")
@@ -2178,6 +2196,30 @@ def show_filter_names(elements, rename_writer):
         return False
     dialog = ReValueDialog(elements, launch_context='filter_names',
                           rename_writer=rename_writer)
+    dialog.show_dialog()
+    return dialog.applied
+
+
+def show_filter_name_drafts(elements, proposed_names, accept_proposals):
+    """Transform proposed names without writing; return whether proposals were accepted.
+
+    proposed_names is keyed by native UniqueId. The callback receives native
+    FilterElements mapped to proposal text; the caller owns validation/commit.
+    """
+    elements = list(elements)
+    if not callable(accept_proposals):
+        raise TypeError("accept_proposals must be callable.")
+    if any(not isinstance(element, FilterElement) for element in elements):
+        raise TypeError("Expected native Revit FilterElement objects.")
+    if set(proposed_names) != set(element.UniqueId for element in elements):
+        raise ValueError("Proposals must correspond exactly to the supplied filters.")
+    if any(not isinstance(value, basestring) for value in proposed_names.values()):
+        raise TypeError("Filter-name proposals must be text.")
+    if not elements:
+        return False
+    dialog = ReValueDialog(elements, launch_context='filter_names',
+                          rename_writer=accept_proposals, initial_names=proposed_names,
+                          draft_only=True)
     dialog.show_dialog()
     return dialog.applied
 
