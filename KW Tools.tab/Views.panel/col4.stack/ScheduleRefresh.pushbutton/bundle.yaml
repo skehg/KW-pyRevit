@@ -1,0 +1,9 @@
+title: Schedule Refresh
+tooltip: |
+  BETA - Refresh schedules across multiple views.
+  Apply updates to schedule definitions, copy source overrides, and ensure
+  consistency across your project.
+min_revit_version: 2023
+is_beta: true
+engine:
+  clean: true
