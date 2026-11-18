@@ -146,3 +146,4 @@ tooltip:
     os caracteres não imprimíveis dos números das folhas,
     caso um erro na ferramenta faça com que esses caracteres
     permaneçam.
+highlight: new
