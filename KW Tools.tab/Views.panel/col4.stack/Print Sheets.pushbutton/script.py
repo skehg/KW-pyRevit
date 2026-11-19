@@ -7,7 +7,7 @@ __version__ = 1.0
 __beta__ = True
 __doc__ = """Date    = 18.11.2026
 
-"""Print sheets in order from a sheet index.
+Print sheets in order from a sheet index.
 
 Note:
 When using the `Combine into one file` option
