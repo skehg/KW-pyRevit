@@ -382,6 +382,13 @@ def run_integration(uiapp):
         editor.set_case(0, 'upper')
         assert not dialog.btn_use_orig.IsChecked
         assert dialog.txt_pattern.Text == '{orig~upper}'
+        pattern_before_clear = dialog.txt_pattern.Text
+        editor.clear()
+        assert dialog.txt_pattern.Text == ''
+        assert editor.items == []
+        assert not editor.clear_button.IsEnabled
+        dialog.txt_pattern.Text = pattern_before_clear
+        editor.refresh()
         # Selection uses cached display values, without calling the Revit source reader.
         dialog.txt_pattern.Text = '{val1}-{seq:val1:2}-{count}'
         first = dialog.preview_items[0]

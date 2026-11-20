@@ -277,8 +277,11 @@ class TokenEditor(object):
         self.insertion_caret = window.FindName('token_insertion_caret')
         self.status = window.FindName('token_status')
         self.sample_label = window.FindName('token_sample')
+        self.clear_button = window.FindName('btn_clear_tokens')
         self.mode.SelectionChanged += self.mode_changed
         window.FindName('btn_add_token').Click += self.add_menu
+        if self.clear_button:
+            self.clear_button.Click += self.clear
         self.bar.AllowDrop = True
         self.bar.DragOver += self.drag_over
         self.bar.DragLeave += self.drag_leave
@@ -385,6 +388,8 @@ class TokenEditor(object):
         self.status.Text = ('Unmapped/unavailable parameter slot(s): {}. Right-click a parameter chip to edit.'
                             .format(', '.join(missing)) if missing else
                             'Drag to insert/reorder. Double-click to edit. Right-click for options.')
+        if self.clear_button:
+            self.clear_button.IsEnabled = bool(self.items)
         self.render_palette()
         self.render_bar()
 
@@ -566,6 +571,11 @@ class TokenEditor(object):
         items = copy.deepcopy(self.items)
         items.pop(index)
         self.commit(items, min(index, len(items) - 1))
+
+    def clear(self, sender=None, args=None):
+        if not self.items:
+            return
+        self.commit([], -1)
 
     def move(self, index, destination):
         items, selected = insert_item(self.items, None, destination, index)

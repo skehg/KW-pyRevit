@@ -275,8 +275,15 @@
                         <WrapPanel x:Name="token_palette"/>
                     </ScrollViewer>
                     <DockPanel Margin="0,3">
-                        <Button x:Name="btn_add_token" Content="+ Add" DockPanel.Dock="Right"
-                                VerticalAlignment="Top" Margin="3,0" Padding="6,4"/>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Vertical" Margin="3,0"
+                                    VerticalAlignment="Top">
+                            <Button x:Name="btn_add_token" Content="+ Add"
+                                    Margin="0,0,0,3" Padding="6,4"/>
+                            <Button x:Name="btn_clear_tokens" Content="Clear"
+                                    Margin="0" Padding="6,4"
+                                    ToolTip="Clear all tokens from the pattern."
+                                    AutomationProperties.Name="Clear all pattern tokens"/>
+                        </StackPanel>
                         <Border BorderBrush="LightSlateGray" BorderThickness="1" CornerRadius="3">
                             <ScrollViewer x:Name="token_bar_scroll" MinHeight="38" MaxHeight="72"
                                           VerticalScrollBarVisibility="Auto"
