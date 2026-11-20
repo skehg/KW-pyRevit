@@ -43,43 +43,32 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <LinearGradientBrush x:Key="TokenRaisedFill" StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Color="#9BDFFA" Offset="0"/>
-            <GradientStop Color="#38BDF8" Offset="0.45"/>
-            <GradientStop Color="#0EA5E9" Offset="1"/>
-        </LinearGradientBrush>
-        <LinearGradientBrush x:Key="TokenHoverFill" StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Color="#BAEAFE" Offset="0"/>
-            <GradientStop Color="#7DD3FC" Offset="0.45"/>
-            <GradientStop Color="#38BDF8" Offset="1"/>
-        </LinearGradientBrush>
-        <LinearGradientBrush x:Key="TokenPressedFill" StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Color="#0284C7" Offset="0"/>
-            <GradientStop Color="#38BDF8" Offset="1"/>
-        </LinearGradientBrush>
+        <SolidColorBrush x:Key="TokenRaisedFill" Color="#C5C5C5"/>
+        <SolidColorBrush x:Key="TokenHoverFill" Color="#D0D0D0"/>
+        <SolidColorBrush x:Key="TokenPressedFill" Color="#B2B2B2"/>
         <Style x:Key="TokenPillStyle" TargetType="Button">
             <Setter Property="Background" Value="{StaticResource TokenRaisedFill}"/>
-            <Setter Property="Foreground" Value="#082F49"/>
-            <Setter Property="BorderBrush" Value="#0284C7"/>
+            <Setter Property="Foreground" Value="#253746"/>
+            <Setter Property="BorderBrush" Value="#8A8A8A"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="11"/>
-            <Setter Property="MinHeight" Value="22"/>
-            <Setter Property="Height" Value="22"/>
+            <Setter Property="MinHeight" Value="26"/>
+            <Setter Property="Height" Value="26"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Grid x:Name="pill_surface">
-                            <Border x:Name="pill" CornerRadius="11"
+                            <Border x:Name="pill" CornerRadius="5"
                                     Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}">
                                 <Border.Effect>
-                                    <DropShadowEffect Color="#0C4A6E" BlurRadius="3"
-                                                      ShadowDepth="1" Direction="270" Opacity="0.3"/>
+                                    <DropShadowEffect Color="#334155" BlurRadius="2"
+                                                      ShadowDepth="1" Direction="270" Opacity="0.18"/>
                                 </Border.Effect>
                             </Border>
-                            <Border x:Name="pill_highlight" CornerRadius="10" Margin="1"
+                            <Border x:Name="pill_highlight" CornerRadius="4" Margin="1"
                                     BorderThickness="0,1,0,1" IsHitTestVisible="False">
                                 <Border.BorderBrush>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">

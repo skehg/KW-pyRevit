@@ -105,11 +105,15 @@ def run_checks(capture=None):
         for chip in (first_button, editor.palette.Children[0]):
             chip.ApplyTemplate()
             border = chip.Template.FindName('pill', chip)
-            assert border.CornerRadius.TopLeft == 11
-            assert chip.Height == border.CornerRadius.TopLeft * 2
-            assert chip.Background.GradientStops[1].Color.ToString() == '#FF38BDF8'
+            assert border.CornerRadius.TopLeft == 5
+            assert chip.Height == 26
+            assert chip.Background.Color.ToString() == '#FFC5C5C5'
             assert border.Effect.ShadowDepth == 1
             assert chip.Padding.Top == 1 and chip.Padding.Bottom == 1
+            panel = chip.Content
+            assert len(panel.Children) == 2
+            grip = panel.Children[0]
+            assert len(grip.Children) == 6
             chip.Measure(Size(1000, 100))
             assert chip.DesiredSize.Height <= 28
         editor.select(0)
@@ -190,6 +194,23 @@ def run_checks(capture=None):
         editor.drop(None, args)
         assert editor.insertion_caret.Visibility == Visibility.Collapsed
         assert host.txt_pattern.Text == '{val3}{val1}{val2}'
+
+        class OutsideDragArgs(object):
+            Handled = False
+            Effects = getattr(DragDropEffects, 'None')
+            Data = DataObject()
+
+            def GetPosition(self, target):
+                return Point(10000, 10000)
+
+        outside_args = OutsideDragArgs()
+        outside_args.Data.SetData(editor.DRAG_FORMAT, editor.DRAG_FORMAT)
+        editor._drag = (editor.bar.Children[0], Point(0, 0), ('bar', 0, False))
+        editor.outside_drag_over(None, outside_args)
+        assert outside_args.Effects == DragDropEffects.Move
+        editor.outside_drop(None, outside_args)
+        assert host.txt_pattern.Text == '{val1}{val2}'
+        assert len(editor.items) == 2
         editor._drag = None
 
         editor.commit([token('source', start='val{}'.format(i % 3 + 1))

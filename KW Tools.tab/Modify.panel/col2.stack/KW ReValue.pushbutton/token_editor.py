@@ -3,18 +3,19 @@ import copy
 from clr import GetClrType
 
 from System.Windows import (
-    DataObject, DragDrop, DragDropEffects, HorizontalAlignment, Point,
+    DataObject, DragDrop, DragDropEffects, HorizontalAlignment, Point, VerticalAlignment,
     SystemParameters, Thickness, Visibility, Window, WindowStartupLocation,
     SizeToContent,
 )
 from System.Windows.Controls import (
-    Button, Canvas, CheckBox, ComboBox, ContextMenu, MenuItem, Orientation, RadioButton, ScrollViewer,
+    Button, Canvas, CheckBox, ComboBox, ColumnDefinition, ContextMenu, Grid, MenuItem, Orientation,
+    RadioButton, RowDefinition, ScrollViewer,
     ScrollBarVisibility, StackPanel, TextBlock, TextBox,
 )
 from System.Windows.Automation import AutomationProperties
 from System.Windows.Input import Key, MouseButtonState
-from System.Windows.Media import Brushes, Geometry, Stretch
-from System.Windows.Shapes import Path
+from System.Windows.Media import Brushes
+from System.Windows.Shapes import Ellipse
 from token_pattern import (
     CASES, CASE_LABELS, edited, expression, insert_item, label, parameter_slot, parse_pattern,
     serialize_pattern, token,
@@ -250,13 +251,6 @@ class TokenSettings(object):
 
 class TokenEditor(object):
     DRAG_FORMAT = 'KW.ReValue.Token'
-    ICONS = {
-        'source': 'M0,2 L12,2 12,12 0,12 Z M4,2 L4,12 M8,2 L8,12',
-        'parameter': 'M0,3 L12,3 M0,9 L12,9 M4,0 L4,6 M8,6 L8,12',
-        'counter': 'M4,0 L2,12 M10,0 L8,12 M0,4 L12,4 M0,8 L12,8',
-        'text': 'M0,1 L12,1 M6,1 L6,12 M3,12 L9,12',
-        'original': 'M2,0 L9,0 12,3 12,12 2,12 Z M5,5 L9,5 M5,8 L9,8',
-    }
 
     def __init__(self, host, counter_builder):
         self.host = host
@@ -282,6 +276,9 @@ class TokenEditor(object):
         window.FindName('btn_add_token').Click += self.add_menu
         if self.clear_button:
             self.clear_button.Click += self.clear
+        window.AllowDrop = True
+        window.DragOver += self.outside_drag_over
+        window.Drop += self.outside_drop
         self.bar.AllowDrop = True
         self.bar.DragOver += self.drag_over
         self.bar.DragLeave += self.drag_leave
@@ -307,22 +304,34 @@ class TokenEditor(object):
 
     def icon_content(self, button, kind):
         button.Style = self.host.window.FindResource('TokenPillStyle')
-        button.Padding = Thickness(9, 1, 9, 1)
+        button.Padding = Thickness(5, 1, 9, 1)
         panel = StackPanel()
         panel.Orientation = Orientation.Horizontal
-        icon = Path()
-        icon.Data = Geometry.Parse(self.ICONS[kind])
-        icon.Width = 12
-        icon.Height = 12
-        icon.Stretch = Stretch.Uniform
-        icon.Stroke = button.Foreground
-        icon.StrokeThickness = 1.2
-        icon.Margin = Thickness(0, 0, 5, 0)
+        grip = Grid()
+        grip.Width = 10
+        grip.Height = 18
+        grip.Margin = Thickness(0, 0, 6, 0)
+        grip.VerticalAlignment = VerticalAlignment.Center
+        for column in range(2):
+            grip.ColumnDefinitions.Add(ColumnDefinition())
+        for row in range(3):
+            grip.RowDefinitions.Add(RowDefinition())
+        for row in range(3):
+            for column in range(2):
+                dot = Ellipse()
+                dot.Width = 3
+                dot.Height = 3
+                dot.Fill = Brushes.DimGray
+                dot.HorizontalAlignment = HorizontalAlignment.Center
+                dot.VerticalAlignment = VerticalAlignment.Center
+                Grid.SetRow(dot, row)
+                Grid.SetColumn(dot, column)
+                grip.Children.Add(dot)
         text = TextBlock()
         text.Margin = Thickness(0)
         text.Text = button.Content
         AutomationProperties.SetName(button, text.Text)
-        panel.Children.Add(icon)
+        panel.Children.Add(grip)
         panel.Children.Add(text)
         button.Content = panel
 
@@ -692,6 +701,22 @@ class TokenEditor(object):
     def drag_leave(self, sender, args):
         self.clear_insertion()
 
+    def point_in_token_field(self, args):
+        point = args.GetPosition(self.bar_scroll)
+        return (0 <= point.X <= self.bar_scroll.ActualWidth
+                and 0 <= point.Y <= self.bar_scroll.ActualHeight)
+
+    def outside_drag_over(self, sender, args):
+        self.clear_insertion()
+        if (self._drag is not None
+                and self._drag[2][0] == 'bar'
+                and args.Data.GetDataPresent(self.DRAG_FORMAT)
+                and not self.point_in_token_field(args)):
+            args.Effects = DragDropEffects.Move
+        else:
+            args.Effects = getattr(DragDropEffects, 'None')
+        args.Handled = True
+
     def drop(self, sender, args):
         self.clear_insertion()
         if self._drag is not None and args.Data.GetDataPresent(self.DRAG_FORMAT):
@@ -701,4 +726,18 @@ class TokenEditor(object):
                 self.move(value, destination)
             else:
                 self.add(value, configure, destination)
+        args.Handled = True
+
+    def outside_drop(self, sender, args):
+        self.clear_insertion()
+        if (self._drag is not None
+                and self._drag[2][0] == 'bar'
+                and args.Data.GetDataPresent(self.DRAG_FORMAT)
+                and not self.point_in_token_field(args)):
+            index = self._drag[2][1]
+            if 0 <= index < len(self.items):
+                self.remove(index)
+            args.Effects = DragDropEffects.Move
+        else:
+            args.Effects = getattr(DragDropEffects, 'None')
         args.Handled = True

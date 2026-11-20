@@ -140,32 +140,32 @@ $chip.Content = 'Token 1: Door'
 $null = $chip.ApplyTemplate()
 $pill = $chip.Template.FindName('pill', $chip)
 $chip.Measure([System.Windows.Size]::new(300, 100))
-if ($pill.CornerRadius.TopLeft -ne 11 -or
-    $chip.Background.GradientStops[1].Color.ToString() -ne '#FF38BDF8' -or
-    $chip.DesiredSize.Height -gt 24) {
-    throw 'Tokens must use compact sky-blue pill styling.'
+if ($pill.CornerRadius.TopLeft -ne 5 -or
+    $chip.Background.Color.ToString() -ne '#FFC5C5C5' -or
+    $chip.DesiredSize.Height -gt 28) {
+    throw 'Tokens must use compact rectangular grey styling.'
 }
-Write-Output 'PASS: compact sky-blue pill template and height.'
+Write-Output 'PASS: compact rectangular grey chip template and height.'
 foreach ($width in @(60, 140, 280)) {
-    $chip.Arrange([System.Windows.Rect]::new(0, 0, $width, 22))
+    $chip.Arrange([System.Windows.Rect]::new(0, 0, $width, 26))
     $chip.UpdateLayout()
-    if ($pill.ActualHeight -ne 22 -or
-        $pill.CornerRadius.TopLeft * 2 -ne $pill.ActualHeight) {
-        throw 'Pill end radius must equal half its height at every width.'
+    if ($pill.ActualHeight -ne 26 -or
+        $pill.CornerRadius.TopLeft -ne 5) {
+        throw 'Chip corners must remain slightly rounded at every width.'
     }
 }
-Write-Output 'PASS: semicircular pill ends at narrow and wide token widths.'
+Write-Output 'PASS: rectangular chips remain consistent at narrow and wide widths.'
 $highlight = $chip.Template.FindName('pill_highlight', $chip)
-if ($chip.Background -isnot [System.Windows.Media.LinearGradientBrush] -or
+if ($chip.Background -isnot [System.Windows.Media.SolidColorBrush] -or
     $pill.Effect -isnot [System.Windows.Media.Effects.DropShadowEffect] -or
     $pill.Effect.ShadowDepth -gt 1 -or $highlight.IsHitTestVisible) {
-    throw 'Raised tokens require a gradient, restrained shadow and non-interactive highlight.'
+    throw 'Grey chips require a solid fill, restrained shadow and non-interactive highlight.'
 }
 $chip.IsEnabled = $false
 if ($null -ne $pill.Effect) { throw 'Disabled tokens must not cast a raised shadow.' }
 $chip.IsEnabled = $true
 if ($null -eq $pill.Effect) { throw 'Enabled tokens must restore their raised shadow.' }
-Write-Output 'PASS: raised token gradient, highlight, shadow and disabled-state restoration.'
+Write-Output 'PASS: grey chip fill, highlight, shadow and disabled-state restoration.'
 # Existing compact-layout checks cover Advanced Pattern mode.
 $window.FindName('token_editor_panel').Visibility = 'Collapsed'
 $window.Content = $null
