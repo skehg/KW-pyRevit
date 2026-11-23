@@ -15,8 +15,10 @@ class FakeElementType(object):
 
 
 class FakeCollector(object):
-    def __init__(self, document):
+    def __init__(self, document, view_id=None):
         self.document = document
+        self.view_id = view_id
+        self.category_id = None
         self.element_types = False
 
     def WhereElementIsNotElementType(self):
@@ -27,8 +29,25 @@ class FakeCollector(object):
         self.element_types = True
         return self
 
+    def OfCategoryId(self, category_id):
+        self.category_id = int(category_id)
+        return self
+
     def ToElements(self):
+        if self.category_id is not None:
+            source = self.document.types if self.element_types else self.document.instances
+            return [
+                element for element in source
+                if element.Category is not None
+                and element.Category.Id == self.category_id
+            ]
         return self.document.types if self.element_types else self.document.instances
+
+
+class FakeViewSchedule(object):
+    def __init__(self, category_id):
+        self.Id = 500
+        self.Definition = types.SimpleNamespace(CategoryId=category_id)
 
 
 class SelectionModeTests(unittest.TestCase):
@@ -36,6 +55,7 @@ class SelectionModeTests(unittest.TestCase):
         db = types.ModuleType("Autodesk.Revit.DB")
         db.ElementType = FakeElementType
         db.FilteredElementCollector = FakeCollector
+        db.ViewSchedule = FakeViewSchedule
         refs = types.ModuleType("core.element_refs")
         refs.make_element_id = int
         core_types = types.ModuleType("core.types")
@@ -74,6 +94,7 @@ class SelectionModeTests(unittest.TestCase):
         self.uidoc = types.SimpleNamespace(
             Document=self.document,
             Selection=types.SimpleNamespace(GetElementIds=lambda: []),
+            ActiveView=types.SimpleNamespace(Id=500),
         )
 
     def test_entire_model_includes_instances_and_only_their_used_types(self):
@@ -92,6 +113,24 @@ class SelectionModeTests(unittest.TestCase):
         self.assertEqual(
             [item["label"] for item in self.module.category_options(elements)],
             ["Ducts [10]", "Unused Tags [20]"],
+        )
+
+    def test_current_view_schedule_uses_its_category_instead_of_view_id(self):
+        self.uidoc.ActiveView = FakeViewSchedule(10)
+        elements = self.module.resolve_source_elements(self.uidoc, "Current View")
+        self.assertEqual(elements, [self.instance, self.used_type])
+        self.assertEqual(
+            [item["label"] for item in self.module.category_options(elements)],
+            ["Ducts [10]"],
+        )
+
+    def test_multi_category_schedule_fallback_keeps_all_used_category_elements(self):
+        self.uidoc.ActiveView = FakeViewSchedule(-1)
+        elements = self.module.resolve_source_elements(self.uidoc, "Current View")
+        self.assertEqual(elements, [self.instance, self.used_type])
+        self.assertEqual(
+            [item["label"] for item in self.module.category_options(elements)],
+            ["Ducts [10]"],
         )
 
 

@@ -48,6 +48,14 @@ def read_schedule_defaults(uidoc, selection_mode):
 
 
 def schedule_parameters(defaults, usage):
+    return _schedule_parameters(defaults, usage, report_ambiguous=True)
+
+
+def schedule_matches_category(defaults, usage):
+    return bool(_schedule_parameters(defaults, usage, report_ambiguous=False))
+
+
+def _schedule_parameters(defaults, usage, report_ambiguous):
     keys = []
     for field in defaults["fields"]:
         name = field.GetName()
@@ -70,7 +78,7 @@ def schedule_parameters(defaults, usage):
         if len(candidates) == 1:
             if candidates[0] not in keys:
                 keys.append(candidates[0])
-        elif len(candidates) > 1:
+        elif len(candidates) > 1 and report_ambiguous:
             defaults.setdefault("issues", []).append(
                 "Schedule field '{0}' matches multiple parameters; it was not selected.".format(
                     name

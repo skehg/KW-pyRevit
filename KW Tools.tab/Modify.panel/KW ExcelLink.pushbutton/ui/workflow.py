@@ -8,6 +8,7 @@ from core.presets import default_preset, load_preset, preset_label
 from core.schedule_defaults import (
     build_schedule_layout,
     read_schedule_defaults,
+    schedule_matches_category,
     schedule_parameters,
 )
 from core.selection import (
@@ -257,6 +258,17 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
             source_elements = resolve_source_elements(uidoc, selection_mode)
             schedule = read_schedule_defaults(uidoc, selection_mode)
             options = category_options(source_elements)
+            if schedule is not None and options:
+                schedule_options = []
+                for option in options:
+                    category_elements = elements_for_category(
+                        source_elements, option["category_id"]
+                    )
+                    usage = build_parameter_usage_map(doc, category_elements)
+                    if schedule_matches_category(schedule, usage):
+                        schedule_options.append(option)
+                if schedule_options:
+                    options = schedule_options
             if not options:
                 forms.alert("No categorized elements were found for this scope.", title=__title__)
                 continue
@@ -364,14 +376,15 @@ def run_wizard(uidoc, doc, workbook=None, source_elements=None, sheet_index=0):
             else:
                 fields[key] = selected_fields
             if schedule is not None and field_store_key not in schedule_layout_defaulted:
-                if combined or key not in fields:
-                    seeded = schedule_parameters(schedule, usage)
-                    if combined:
+                if combined:
+                    if not combined_fields:
+                        seeded = schedule_parameters(schedule, usage)
                         combined_fields = seeded
                         selected_fields = combined_fields
-                    else:
-                        fields[key] = seeded
-                        selected_fields = fields[key]
+                elif not fields.get(key, []):
+                    seeded = schedule_parameters(schedule, usage)
+                    fields[key] = seeded
+                    selected_fields = fields[key]
                 schedule_layout_defaulted.add(field_store_key)
             dialog = ParameterWizardWindow(
                 category_label, usage, parameter_mode, list(selected_fields or []),

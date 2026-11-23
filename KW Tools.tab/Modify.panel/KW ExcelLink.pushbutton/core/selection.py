@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from Autodesk.Revit.DB import ElementType, FilteredElementCollector
+from Autodesk.Revit.DB import ElementType, FilteredElementCollector, ViewSchedule
 
 from core.element_refs import make_element_id
 from core.types import element_id_value
@@ -33,11 +33,48 @@ def resolve_source_elements(uidoc, selection_mode):
         selected_ids = uidoc.Selection.GetElementIds()
         elements = [doc.GetElement(element_id) for element_id in selected_ids]
     elif selection_mode == "Current View":
-        elements = list(
-            FilteredElementCollector(doc, uidoc.ActiveView.Id)
-            .WhereElementIsNotElementType()
-            .ToElements()
-        )
+        active_view = uidoc.ActiveView
+        if isinstance(active_view, ViewSchedule):
+            category_id = getattr(active_view.Definition, "CategoryId", None)
+            category_id_value = element_id_value(category_id)
+            if category_id_value is not None and category_id_value != -1:
+                instances = list(
+                    FilteredElementCollector(doc)
+                    .OfCategoryId(category_id)
+                    .WhereElementIsNotElementType()
+                    .ToElements()
+                )
+                types = list(
+                    FilteredElementCollector(doc)
+                    .OfCategoryId(category_id)
+                    .WhereElementIsElementType()
+                    .ToElements()
+                )
+                elements = instances + types
+            else:
+                instances = list(
+                    FilteredElementCollector(doc)
+                    .WhereElementIsNotElementType()
+                    .ToElements()
+                )
+                used_type_ids = set()
+                for element in instances:
+                    type_id = element.GetTypeId()
+                    type_id_value = element_id_value(type_id)
+                    if type_id_value is not None and type_id_value >= 0:
+                        used_type_ids.add(type_id_value)
+                types = []
+                for type_id in sorted(used_type_ids):
+                    element_type = doc.GetElement(make_element_id(type_id))
+                    if element_type is not None:
+                        types.append(element_type)
+                elements = instances + types
+        else:
+            elements = list(
+                FilteredElementCollector(doc, active_view.Id)
+                .WhereElementIsNotElementType()
+                .ToElements()
+            )
     elif selection_mode in ("Entire Project File", "Entire Project", "Entire Model"):
         instances = list(
             FilteredElementCollector(doc)

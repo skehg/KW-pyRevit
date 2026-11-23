@@ -428,10 +428,26 @@ def read_import_plan(file_path):
             "gridLayout": meta["gridLayout"], "sheets": [], "issues": [],
         }
         managed_names = set()
+        data_sheets = [
+            (name, part) for name, part in xlsx_sheets
+            if name != META_SHEET_NAME
+        ]
+        unique_renamed_pair = None
+        if len(data_sheets) == 1 and len(meta["sheets"]) == 1:
+            unique_renamed_pair = (
+                data_sheets[0][0],
+                next(iter(meta["sheets"])),
+            )
         for name, part in xlsx_sheets:
             if name == META_SHEET_NAME:
                 continue
             entry = meta["sheets"].get(name)
+            metadata_name = name
+            if entry is None and unique_renamed_pair is not None:
+                actual_name, original_name = unique_renamed_pair
+                if name == actual_name:
+                    entry = meta["sheets"].get(original_name)
+                    metadata_name = original_name
             if entry is None:
                 plan["issues"].append({
                     "sheet": name,
@@ -440,7 +456,10 @@ def read_import_plan(file_path):
                     "message": u"Worksheet is not an ExcelLink data sheet; ignored.",
                 })
                 continue
-            managed_names.add(name)
+            managed_names.add(metadata_name)
+            entry = dict(entry)
+            entry["xlsxName"] = name
+            entry["sheetName"] = name
             rows = reader.rows(part)
             _validate_worksheet_headers(rows, entry["columns"], name)
             ids = {}
@@ -501,8 +520,20 @@ def _match_sheets(workbook, xlsx_sheets, meta):
     matches = []
     unmatched = []
     data_sheets = [(name, part) for name, part in xlsx_sheets if name != META_SHEET_NAME]
+    unique_renamed_pair = None
+    if len(data_sheets) == 1 and len(meta["sheets"]) == 1:
+        unique_renamed_pair = (
+            data_sheets[0][0],
+            next(iter(meta["sheets"])),
+        )
     for name, part in data_sheets:
         entry = meta["sheets"].get(name)
+        metadata_name = name
+        if entry is None and unique_renamed_pair is not None:
+            actual_name, original_name = unique_renamed_pair
+            if name == actual_name:
+                entry = meta["sheets"].get(original_name)
+                metadata_name = original_name
         if entry is None:
             continue
         index = by_key.get(entry["sheetKey"])
@@ -511,7 +542,7 @@ def _match_sheets(workbook, xlsx_sheets, meta):
         else:
             if targets[index].get("gridLayout", meta["gridLayout"]) != meta["gridLayout"]:
                 raise ValueError("Worksheet '{0}' has an incompatible grid layout.".format(name))
-            matches.append((name, part, index))
+            matches.append((name, metadata_name, part, index))
     return matches, unmatched
 
 
@@ -737,13 +768,13 @@ def diff_xlsx(workbook, file_path):
             issues.append({"sheet": name, "row": None, "column": None,
                            "message": u"Worksheet does not match any grid sheet; skipped."})
 
-        for xlsx_name, part, sheet_index in matches:
+        for xlsx_name, metadata_name, part, sheet_index in matches:
             sheet = workbook["sheets"][sheet_index]
             rows = reader.rows(part)
             if not rows:
                 continue
             summary["sheets"] += 1
-            metadata_columns = meta["sheets"][xlsx_name]["columns"]
+            metadata_columns = meta["sheets"][metadata_name]["columns"]
             _validate_worksheet_headers(rows, metadata_columns, xlsx_name)
             mapped, ids, header_issues = _map_headers(
                 rows[1], sheet, metadata_columns

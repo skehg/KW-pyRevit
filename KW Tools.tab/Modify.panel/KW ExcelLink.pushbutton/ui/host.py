@@ -187,28 +187,35 @@ class _WorkbookEventHandler(IExternalEventHandler):
 
     def _import(self, doc, path):
         file_name = os.path.basename(path)
-        plan = read_import_plan(path)
-        layout_replaced = not _layout_matches(plan, self.workbook)
-        if layout_replaced:
-            workbook, source_elements, issues, missing = build_import_workbook(doc, path)
-            report_import_issues(path, issues, missing)
-            if workbook is None:
-                raise RuntimeError(
-                    "None of the rows in {0} match elements in this model.".format(file_name)
-                )
-            updates = workbook.pop("importUpdates")
-            summary = workbook.pop("importSummary")
-            # The window holds the same dict, so replace its contents in place.
-            self.workbook.clear()
-            self.workbook.update(workbook)
-            self.source_elements = source_elements
-            self.source_element_ids = list(workbook.get("_sourceElementIds") or [])
-        else:
-            removed = self._refresh(doc)
-            diff = diff_xlsx(self.workbook, path)
-            updates, summary = diff["updates"], diff["summary"]
-            report_import_issues(path, plan["issues"] + diff["issues"])
-            self.workbook["importFile"] = file_name
+        try:
+            plan = read_import_plan(path)
+            layout_replaced = not _layout_matches(plan, self.workbook)
+            if layout_replaced:
+                workbook, source_elements, issues, missing = build_import_workbook(doc, path)
+                report_import_issues(path, issues, missing)
+                if workbook is None:
+                    raise RuntimeError(
+                        "None of the rows in {0} match elements in this model.".format(file_name)
+                    )
+                updates = workbook.pop("importUpdates")
+                summary = workbook.pop("importSummary")
+                # The window holds the same dict, so replace its contents in place.
+                self.workbook.clear()
+                self.workbook.update(workbook)
+                self.source_elements = source_elements
+                self.source_element_ids = list(workbook.get("_sourceElementIds") or [])
+            else:
+                removed = self._refresh(doc)
+                diff = diff_xlsx(self.workbook, path)
+                updates, summary = diff["updates"], diff["summary"]
+                report_import_issues(path, plan["issues"] + diff["issues"])
+                self.workbook["importFile"] = file_name
+        except ValueError as exc:
+            self.window._post({
+                "type": "error",
+                "message": "Could not import XLSX: {0}".format(exc),
+            })
+            return
         self.window._post({
             "type": "workbook",
             "workbook": self.workbook,

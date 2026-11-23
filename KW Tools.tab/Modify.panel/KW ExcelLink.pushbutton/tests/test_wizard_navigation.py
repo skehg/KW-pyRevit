@@ -15,7 +15,10 @@ class WizardNavigationTests(unittest.TestCase):
             "core.element_refs": ["ReferenceCatalog"],
             "core.parameter_map": ["build_parameter_usage_map"],
             "core.presets": ["default_preset", "load_preset", "preset_label"],
-            "core.schedule_defaults": ["build_schedule_layout", "read_schedule_defaults", "schedule_parameters"],
+            "core.schedule_defaults": [
+                "build_schedule_layout", "read_schedule_defaults",
+                "schedule_matches_category", "schedule_parameters",
+            ],
             "core.selection": ["category_options", "elements_for_category", "resolve_source_elements"],
             "core.types": ["element_id_value"],
             "core.workbook_builder": ["build_import_workbook", "build_preset_workbook", "build_sheet"],
@@ -47,6 +50,7 @@ class WizardNavigationTests(unittest.TestCase):
         f.element_id_value.side_effect = lambda value: value
         f.default_preset.return_value = None
         f.read_schedule_defaults.return_value = None
+        f.schedule_matches_category.return_value = True
         f.build_sheet.side_effect = lambda doc, catalog, label, key, elements, fields, mode, usage, **kwargs: {
             "categoryId": key, "name": label, "parameters": fields, "rows": [],
             "categories": kwargs.get("categories", []),
@@ -182,6 +186,22 @@ class WizardNavigationTests(unittest.TestCase):
         self.assertIsNone(self.flow.run_wizard(uidoc, None))
         self.assertEqual(self.visits[-1], (2, ["Doors [1]", "Walls [2]"]))
 
+    def test_multi_category_schedule_keeps_categories_with_matching_fields(self):
+        uidoc = self.launch_with_selection([1, 2])
+        self.flow.read_schedule_defaults.return_value = {"fields": ["Mark"]}
+        self.flow.build_parameter_usage_map.side_effect = (
+            lambda doc, elements: (
+                {"Mark": {"name": "Mark"}} if elements and elements[0].Id == 1
+                else {"Width": {"name": "Width"}}
+            )
+        )
+        self.flow.schedule_matches_category.side_effect = (
+            lambda defaults, usage: "Mark" in usage
+        )
+        self.actions = [(1, "next", ["Current View"]), (2, "cancel", [])]
+        self.assertIsNone(self.flow.run_wizard(uidoc, None))
+        self.assertEqual(self.visits[-1], (2, ["Doors [1]"]))
+
     def test_back_keeps_explicitly_empty_category_selection(self):
         uidoc = self.launch_with_selection([1])
         self.actions = [
@@ -282,6 +302,22 @@ class WizardNavigationTests(unittest.TestCase):
         self.assertIn(("Combined categories", ["Level", "Mark"], True), self.visits)
         self.assertEqual(workbook["sheets"][0]["layout"], layout)
         self.assertEqual(workbook["gridLayout"], "combined")
+
+    def test_separate_schedule_layout_seeds_parameters_for_category(self):
+        self.flow.read_schedule_defaults.return_value = {"schedule": True}
+        self.flow.schedule_parameters.return_value = ["Door Type", "Mark"]
+        layout = {"filters": {"advanced": {"join": "and", "rules": []}}}
+        self.flow.build_schedule_layout.return_value = (layout, [])
+        self.actions = [
+            (1, "next", ["Current View"]),
+            (2, "next", ["Doors [1]"], "separate"),
+            (3, "next", ["Instances Mode"]),
+            ("Doors [1]", "next", ["Door Type", "Mark"]),
+        ]
+        workbook, _ = self.flow.run_wizard(None, None)
+        self.assertIn(("Doors [1]", ["Door Type", "Mark"], True), self.visits)
+        self.assertEqual(workbook["gridLayout"], "separate")
+        self.assertEqual(workbook["sheets"][0]["parameters"], ["Door Type", "Mark"])
 
     def test_schedule_defaults_do_not_replace_grid_choices(self):
         self.flow.read_schedule_defaults.return_value = {"schedule": True}

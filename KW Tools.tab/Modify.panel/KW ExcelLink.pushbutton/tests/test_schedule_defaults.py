@@ -92,6 +92,22 @@ class ScheduleDefaultsTests(unittest.TestCase):
             defaults, dict.fromkeys(["Mark", "Width", "Level", "Unused", "Count"], {})
         ), ["Mark", "Width", "Level"])
 
+    def test_schedule_category_match_does_not_mutate_ambiguous_defaults(self):
+        defaults = {"fields": [field("Mark", 1)], "issues": []}
+        usage = {
+            "parameter-key-a": {"name": "Mark", "identity": "builtin:-42"},
+            "parameter-key-b": {"name": "Mark", "identity": "shared:other"},
+        }
+        self.assertFalse(self.module.schedule_matches_category(defaults, usage))
+        self.assertEqual(defaults["issues"], [])
+
+    def test_schedule_category_match_accepts_category_parameter(self):
+        defaults = {"fields": [field("Mark", 1)], "issues": []}
+        usage = {
+            "parameter-key": {"name": "Mark", "identity": "builtin:-42"},
+        }
+        self.assertTrue(self.module.schedule_matches_category(defaults, usage))
+
     def test_filters_and_sort_use_real_column_titles_and_reference_names(self):
         layout, issues = self.module.build_schedule_layout(
             self.doc, self.defaults(), self.sheet

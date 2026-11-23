@@ -295,6 +295,34 @@ class XlsxRoundtripTests(unittest.TestCase):
         self.assertEqual(diff["summary"]["changed"], 1)
         self.assertEqual(diff["updates"][0]["value"], 12.5)
 
+    def test_single_data_worksheet_name_can_be_renamed(self):
+        import zipfile
+
+        xlsx_export.write_xlsx(make_workbook(value=12.5), self.path)
+        rewritten = self.path + ".rewrite"
+        with zipfile.ZipFile(self.path, "r") as source:
+            with zipfile.ZipFile(rewritten, "w") as target:
+                for name in source.namelist():
+                    content = source.read(name)
+                    if name == "xl/workbook.xml":
+                        content = content.replace(
+                            b'name="Combined"',
+                            b'name="Sheet1"',
+                        )
+                    target.writestr(name, content)
+        os.remove(self.path)
+        os.rename(rewritten, self.path)
+
+        plan = xlsx_import.read_import_plan(self.path)
+        self.assertEqual(len(plan["sheets"]), 1)
+        self.assertEqual(plan["sheets"][0]["sheetName"], "Sheet1")
+        self.assertEqual(plan["sheets"][0]["sheetKey"],
+                         "combined:category:doors|category:walls")
+
+        diff = xlsx_import.diff_xlsx(make_workbook(value=10.0), self.path)
+        self.assertEqual(diff["summary"]["changed"], 1)
+        self.assertEqual(diff["updates"][0]["value"], 12.5)
+
     def test_separate_layout_roundtrips_single_category_identity(self):
         xlsx_export.write_xlsx(make_workbook(layout="separate"), self.path)
         plan = xlsx_import.read_import_plan(self.path)
