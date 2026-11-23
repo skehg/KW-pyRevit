@@ -155,6 +155,8 @@ class _XlsxReader(object):
         return rows
 
     def _cell_value(self, cell):
+        # Formula cells carry the formula in <f> and their last displayed result
+        # in <v>. Import the displayed result and never evaluate/import the formula.
         cell_type = cell.get("t") or "n"
         value_nodes = _children(cell, "v")
         raw = value_nodes[0].text if value_nodes else None
@@ -425,15 +427,20 @@ def read_import_plan(file_path):
             "parameterMode": meta["parameterMode"],
             "gridLayout": meta["gridLayout"], "sheets": [], "issues": [],
         }
+        managed_names = set()
         for name, part in xlsx_sheets:
             if name == META_SHEET_NAME:
                 continue
             entry = meta["sheets"].get(name)
             if entry is None:
-                raise ValueError(
-                    "Worksheet '{0}' is not described by the authoritative ExcelLink metadata."
-                    .format(name)
-                )
+                plan["issues"].append({
+                    "sheet": name,
+                    "row": None,
+                    "column": None,
+                    "message": u"Worksheet is not an ExcelLink data sheet; ignored.",
+                })
+                continue
+            managed_names.add(name)
             rows = reader.rows(part)
             _validate_worksheet_headers(rows, entry["columns"], name)
             ids = {}
@@ -468,6 +475,12 @@ def read_import_plan(file_path):
             )
             plan_entry.update({"uniqueIds": unique_ids, "elementIds": element_ids})
             plan["sheets"].append(plan_entry)
+        missing_names = set(meta["sheets"]) - managed_names
+        if missing_names:
+            raise ValueError(
+                "Worksheet '{0}' described by the authoritative ExcelLink metadata is missing."
+                .format(sorted(missing_names)[0])
+            )
         return plan
     finally:
         reader.close()
@@ -491,7 +504,7 @@ def _match_sheets(workbook, xlsx_sheets, meta):
     for name, part in data_sheets:
         entry = meta["sheets"].get(name)
         if entry is None:
-            raise ValueError("Worksheet '{0}' has no authoritative metadata.".format(name))
+            continue
         index = by_key.get(entry["sheetKey"])
         if index is None:
             unmatched.append(name)

@@ -1,6 +1,7 @@
 """Round-trip ExcelLink's two-row XLSX schema without Revit dependencies."""
 
 import os
+import re
 import sys
 import unittest
 
@@ -229,6 +230,70 @@ class XlsxRoundtripTests(unittest.TestCase):
         self.assertEqual(change["parameterIdentity"], PARAMETER_USAGE["identity"])
         self.assertEqual(change["specTypeId"], PARAMETER_USAGE["specTypeId"])
         self.assertEqual(change["parameterGuid"], "width-guid")
+
+    def test_formula_cell_imports_cached_displayed_value(self):
+        import zipfile
+
+        xlsx_export.write_xlsx(make_workbook(value=12.5), self.path)
+        rewritten = self.path + ".rewrite"
+        with zipfile.ZipFile(self.path, "r") as source:
+            with zipfile.ZipFile(rewritten, "w") as target:
+                for name in source.namelist():
+                    content = source.read(name)
+                    if name == "xl/worksheets/sheet1.xml":
+                        xml = content.decode("utf-8")
+                        xml, count = re.subn(
+                            r'<c r="D3"([^>]*)><v>12\.5</v></c>',
+                            r'<c r="D3"\1><f>1+2</f><v>12.5</v></c>',
+                            xml,
+                            count=1,
+                        )
+                        self.assertEqual(count, 1)
+                        content = xml.encode("utf-8")
+                    target.writestr(name, content)
+        os.remove(self.path)
+        os.rename(rewritten, self.path)
+
+        current = make_workbook(value=10.0)
+        diff = xlsx_import.diff_xlsx(current, self.path)
+        self.assertEqual(len(diff["updates"]), 1)
+        self.assertEqual(diff["updates"][0]["value"], 12.5)
+
+    def test_additional_worksheet_is_ignored_with_import_note(self):
+        import zipfile
+
+        xlsx_export.write_xlsx(make_workbook(value=12.5), self.path)
+        rewritten = self.path + ".rewrite"
+        with zipfile.ZipFile(self.path, "r") as source:
+            with zipfile.ZipFile(rewritten, "w") as target:
+                for name in source.namelist():
+                    content = source.read(name)
+                    if name == "xl/workbook.xml":
+                        content = content.replace(
+                            b"</sheets>",
+                            b'<sheet name="Sheet1" sheetId="99" r:id="rId99"/></sheets>',
+                        )
+                    elif name == "xl/_rels/workbook.xml.rels":
+                        content = content.replace(
+                            b"</Relationships>",
+                            b'<Relationship Id="rId99" '
+                            b'Type="http://schemas.openxmlformats.org/officeDocument/'
+                            b'2006/relationships/worksheet" '
+                            b'Target="worksheets/sheet1.xml"/></Relationships>',
+                        )
+                    target.writestr(name, content)
+        os.remove(self.path)
+        os.rename(rewritten, self.path)
+
+        plan = xlsx_import.read_import_plan(self.path)
+        self.assertEqual(len(plan["sheets"]), 1)
+        self.assertEqual(len(plan["issues"]), 1)
+        self.assertEqual(plan["issues"][0]["sheet"], "Sheet1")
+        self.assertIn("ignored", plan["issues"][0]["message"])
+
+        diff = xlsx_import.diff_xlsx(make_workbook(value=10.0), self.path)
+        self.assertEqual(diff["summary"]["changed"], 1)
+        self.assertEqual(diff["updates"][0]["value"], 12.5)
 
     def test_separate_layout_roundtrips_single_category_identity(self):
         xlsx_export.write_xlsx(make_workbook(layout="separate"), self.path)

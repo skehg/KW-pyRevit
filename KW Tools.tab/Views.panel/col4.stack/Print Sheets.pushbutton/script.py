@@ -1348,7 +1348,6 @@ class PrintSheetsWindow(forms.WPFWindow):
 
         self.issuereason_tb.Text = state_value.get("issue_reason", "")
         self._browse_folder = state_value.get("browse_folder", "")
-        self.browsefolder_tb.Text = self._browse_folder
 
     def _restore_grid_state(self, state, restore_search=True):
         if restore_search:
@@ -2802,21 +2801,24 @@ class PrintSheetsWindow(forms.WPFWindow):
             return
         if self.custom_output_path:
             self.issuereason_dp.Visibility = Visibility.Visible
-            self.outputpath_preview_tb.Visibility = Visibility.Visible
         else:
             self.issuereason_dp.Visibility = Visibility.Collapsed
-            self.outputpath_preview_tb.Visibility = Visibility.Collapsed
         self._update_browse_visibility()
         self.outputpath_changed(sender, args)
 
     def _update_browse_visibility(self):
         if not hasattr(self, "browsefolder_dp"):
             return
-        if self.issue_template_uses_browse:
+        if self.custom_output_path:
             self.browsefolder_dp.Visibility = Visibility.Visible
         else:
             self.browsefolder_dp.Visibility = Visibility.Collapsed
-        self.browsefolder_tb.Text = self._browse_folder
+        if self.issue_template_uses_browse:
+            self.browsefolder_label.Visibility = Visibility.Visible
+            self.browsefolder_btn.Visibility = Visibility.Visible
+        else:
+            self.browsefolder_label.Visibility = Visibility.Collapsed
+            self.browsefolder_btn.Visibility = Visibility.Collapsed
 
     def browsefolder_clicked(self, sender, args):
         selected_folder = forms.pick_folder(
@@ -2825,7 +2827,6 @@ class PrintSheetsWindow(forms.WPFWindow):
         )
         if selected_folder:
             self._browse_folder = selected_folder
-            self.browsefolder_tb.Text = selected_folder
             self.outputpath_changed(sender, args)
 
     def outputpath_changed(self, sender, args):
@@ -2996,7 +2997,6 @@ class PrintSheetsWindow(forms.WPFWindow):
                 if not selected_folder:
                     return
                 self._browse_folder = selected_folder
-                self.browsefolder_tb.Text = selected_folder
                 self.outputpath_changed(sender, args)
 
             selected_only = False

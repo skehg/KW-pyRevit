@@ -186,30 +186,31 @@
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Left">
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                            <TextBlock Text="{DynamicResource ExportFormat}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <ComboBox x:Name="exportformat_cb" Width="120" SelectedIndex="0" SelectionChanged="exportformat_changed">
-                                <ComboBoxItem Tag="PDF" Content="{DynamicResource OnlyPDF}"/>
-                                <ComboBoxItem Tag="DWG" Content="{DynamicResource OnlyDWG}"/>
-                                <ComboBoxItem Tag="BOTH" Content="{DynamicResource BothPDFDWG}"/>
-                            </ComboBox>
-                            <CheckBox x:Name="combine_cb" Margin="15,0,0,0" IsChecked="False" IsEnabled="True" Checked="options_changed" Unchecked="options_changed" Content="{DynamicResource CombineIntoOnePDF}" Visibility="Visible"/>
-                            </StackPanel>
-                            <DockPanel Margin="0,5,0,0" Height="24">
-                                <TextBlock Text="{DynamicResource OutputPath}" VerticalAlignment="Center" Width="80"/>
-                                <RadioButton x:Name="outputroute_default_rb" GroupName="OutputRoute" Content="{DynamicResource DefaultPath}" IsChecked="True" Margin="10,0,10,0" VerticalAlignment="Center" Checked="outputroute_changed"/>
+                                <TextBlock Text="{DynamicResource ExportFormat}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox x:Name="exportformat_cb" Width="120" SelectedIndex="0" SelectionChanged="exportformat_changed">
+                                    <ComboBoxItem Tag="PDF" Content="{DynamicResource OnlyPDF}"/>
+                                    <ComboBoxItem Tag="DWG" Content="{DynamicResource OnlyDWG}"/>
+                                    <ComboBoxItem Tag="BOTH" Content="{DynamicResource BothPDFDWG}"/>
+                                </ComboBox>
+                                <RadioButton x:Name="outputroute_default_rb" GroupName="OutputRoute" Content="{DynamicResource DefaultPath}" IsChecked="True" Margin="15,0,10,0" VerticalAlignment="Center" Checked="outputroute_changed"/>
                                 <RadioButton x:Name="outputroute_custom_rb" GroupName="OutputRoute" Content="{DynamicResource IssuePath}" VerticalAlignment="Center" Checked="outputroute_changed"/>
                                 <CheckBox x:Name="openoutput_cb" Margin="15,0,0,0" IsChecked="True" IsEnabled="True" Checked="openoutput_changed" Unchecked="openoutput_changed" Content="{DynamicResource OpenOutputFolder}"/>
-                            </DockPanel>
+                                <CheckBox x:Name="combine_cb" Margin="15,0,0,0" IsChecked="False" IsEnabled="True" Checked="options_changed" Unchecked="options_changed" Content="{DynamicResource CombineIntoOnePDF}" Visibility="Visible"/>
+                            </StackPanel>
                             <DockPanel x:Name="issuereason_dp" Margin="0,5,0,0" Height="24" Visibility="Collapsed">
                                 <TextBlock Text="{DynamicResource IssueReason}" VerticalAlignment="Center" Width="80"/>
                                 <TextBox x:Name="issuereason_tb" Margin="10,0,0,0" VerticalContentAlignment="Center" TextChanged="outputpath_changed"/>
                             </DockPanel>
-                            <DockPanel x:Name="browsefolder_dp" Margin="0,5,0,0" Height="24" Visibility="Collapsed">
-                                <TextBlock Text="{DynamicResource TargetFolder}" VerticalAlignment="Center" Width="80"/>
-                                <TextBlock x:Name="browsefolder_tb" Margin="10,0,10,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                <Button Content="{DynamicResource Browse}" Width="70" Height="24" Click="browsefolder_clicked"/>
-                            </DockPanel>
-                            <TextBlock x:Name="outputpath_preview_tb" Margin="90,4,0,4" TextWrapping="Wrap" Foreground="{DynamicResource pyRevitAccentBrush}" Visibility="Collapsed"/>
+                            <Grid x:Name="browsefolder_dp" Margin="0,5,0,0" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="70"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="browsefolder_label" Grid.Column="0" Text="{DynamicResource TargetFolder}" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="outputpath_preview_tb" Grid.Column="1" Margin="10,0,10,0" MinHeight="24" VerticalAlignment="Center" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource pyRevitAccentBrush}"/>
+                                <Button x:Name="browsefolder_btn" Grid.Column="2" Content="{DynamicResource Browse}" Width="70" Height="24" HorizontalAlignment="Right" Click="browsefolder_clicked"/>
+                            </Grid>
                             <DockPanel x:Name="namingformat_dp" Margin="0,5,0,0" Height="24" >
                                 <TextBlock Text="{DynamicResource NamingFormat}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                                 <Button Content="{DynamicResource EditFormats}" DockPanel.Dock="Right" Width="100" BorderThickness="0,1,1,1" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" Click="edit_formats"/>
@@ -232,14 +233,18 @@
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
                             </DockPanel>
-                            <DockPanel Margin="0,5,0,0" Height="24" >
-                                <TextBlock Text="{DynamicResource Printer}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <ComboBox x:Name="printers_cb" SelectionChanged="printers_changed"/>
-                            </DockPanel>
-                            <DockPanel Margin="0,5,0,0" Height="24" >
-                                <TextBlock Text="{DynamicResource PageSettings}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <ComboBox x:Name="printsettings_cb" SelectionChanged="printsettings_changed" ItemTemplate="{StaticResource printSettingsItem}" />
-                            </DockPanel>
+                            <Grid Margin="0,5,0,0" Height="24">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="60"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{DynamicResource Printer}" VerticalAlignment="Center"/>
+                                <ComboBox Grid.Column="1" x:Name="printers_cb" Margin="0,0,10,0" SelectionChanged="printers_changed"/>
+                                <TextBlock Grid.Column="2" Text="{DynamicResource PageSettings}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox Grid.Column="3" x:Name="printsettings_cb" SelectionChanged="printsettings_changed" ItemTemplate="{StaticResource printSettingsItem}" />
+                            </Grid>
                         </StackPanel>
                     </DockPanel>
                 </GroupBox>
