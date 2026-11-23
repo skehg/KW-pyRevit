@@ -1076,8 +1076,8 @@ import {cellColumn, typeLabel} from "./cell_metadata.js";
   }
 
   var FILTER_HELP = "Filter: text = contains · =x equals · = empty · != not empty · " +
-    "!x excludes · >5 >=5 <5 <=5 · 2..8 between · ^start · end$ · * ? wildcards · " +
-    "/regex/ · a|b either";
+    "!x excludes · >5 >=5 <5 <=5 · 2..8 between · ^start · !^not-start · " +
+    "end$ · end$! not-end · * ? wildcards · /regex/ · a|b either";
 
   function headerFilterFunc(headerValue, rowValue) {
     var predicate = F.compileExpression(headerValue);

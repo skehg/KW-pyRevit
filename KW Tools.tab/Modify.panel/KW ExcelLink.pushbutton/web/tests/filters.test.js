@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {OPERATORS, rowPasses, SHOW_OPTIONS, testValue} from "../filters.js";
+import {
+  OPERATORS,
+  expressionFor,
+  parseTerm,
+  rowPasses,
+  SHOW_OPTIONS,
+  testValue
+} from "../filters.js";
 
 const context = {
   visibleColumns: () => [],
@@ -30,4 +37,21 @@ test("negative prefix and suffix operators are available and match case-insensit
   assert.equal(testValue("notStartsWith", "Room 101", "door"), true);
   assert.equal(testValue("notEndsWith", "Room 101", "101"), false);
   assert.equal(testValue("notEndsWith", "Room 101", "102"), true);
+  assert.equal(testValue("notStartsWith", "Door 101", ""), true);
+  assert.equal(testValue("notEndsWith", "Room 101", ""), true);
+});
+
+test("negative prefix and suffix builder conditions round-trip without wildcard conversion", () => {
+  assert.deepEqual(parseTerm(expressionFor("notStartsWith", "*")), {
+    op: "notStartsWith",
+    value: "*"
+  });
+  assert.deepEqual(parseTerm(expressionFor("notEndsWith", "*")), {
+    op: "notEndsWith",
+    value: "*"
+  });
+  assert.equal(testValue("notStartsWith", "*Name", "*"), false);
+  assert.equal(testValue("notStartsWith", "Name", "*"), true);
+  assert.equal(testValue("notEndsWith", "Name*", "*"), false);
+  assert.equal(testValue("notEndsWith", "Name", "*"), true);
 });

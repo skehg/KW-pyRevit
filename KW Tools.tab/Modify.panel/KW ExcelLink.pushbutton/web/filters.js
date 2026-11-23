@@ -172,10 +172,12 @@ export function testValue(op, cell, operand, operand2) {
     case "equals": return equalValues(cell, operand);
     case "notEquals": return !equalValues(cell, operand);
     case "startsWith": return text(cell).indexOf(operand.toLowerCase()) === 0;
-    case "notStartsWith": return !testValue("startsWith", cell, operand);
+    case "notStartsWith":
+      return !operand || !testValue("startsWith", cell, operand);
     case "endsWith":
       return text(cell).slice(-operand.length) === operand.toLowerCase();
-    case "notEndsWith": return !testValue("endsWith", cell, operand);
+    case "notEndsWith":
+      return !operand || !testValue("endsWith", cell, operand);
     case "gt": return operand === "" || (!isBlank(cell) && compare(cell, operand) > 0);
     case "gte": return operand === "" || (!isBlank(cell) && compare(cell, operand) >= 0);
     case "lt": return operand === "" || (!isBlank(cell) && compare(cell, operand) < 0);
@@ -204,7 +206,8 @@ export function testValue(op, cell, operand, operand2) {
 // Header filter syntax (Excel-like, case-insensitive):
 //   text contains · =x equals · = empty · != not empty · !=x / <>x not equal ·
 //   !x does not contain · >x >=x <x <=x · a..b between · ^x starts · x$ ends ·
-//   * ? wildcards · /regex/ · a|b either · 'text literal contains.
+//   !^x does not start · x$! does not end · * ? wildcards · /regex/ ·
+//   a|b either · 'text literal contains.
 export function parseTerm(term) {
   var trimmed = term.trim();
   var match;
@@ -215,6 +218,8 @@ export function parseTerm(term) {
     var ops = { ">=": "gte", "<=": "lte", "<>": "notEquals", "!=": "notEquals", ">": "gt", "<": "lt", "=": "equals" };
     return { op: ops[match[1]], value: match[2] };
   }
+  if (trimmed.indexOf("!^") === 0) { return { op: "notStartsWith", value: trimmed.slice(2) }; }
+  if (trimmed.length > 2 && trimmed.slice(-2) === "$!") { return { op: "notEndsWith", value: trimmed.slice(0, -2) }; }
   if (trimmed.charAt(0) === "!") { return { op: "notContains", value: trimmed.slice(1).trim() }; }
   if ((match = /^(.*?)\s*\.\.\s*(.*)$/.exec(trimmed)) && (match[1] || match[2])) {
     return { op: "between", value: match[1], value2: match[2] };
@@ -274,7 +279,9 @@ export function expressionFor(op, value, value2) {
     case "lte": return "<=" + value;
     case "between": return value + ".." + value2;
     case "startsWith": return "^" + value;
+    case "notStartsWith": return "!^" + value;
     case "endsWith": return value + "$";
+    case "notEndsWith": return value + "$!";
     case "notContains": return "!" + value;
     case "wildcard": return value;
     case "regex": return "/" + value.replace(/\//g, "\\/") + "/";
