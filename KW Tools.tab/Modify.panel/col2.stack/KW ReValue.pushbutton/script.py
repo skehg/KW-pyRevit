@@ -710,11 +710,22 @@ def _safe_set_element_name(element, new_name):
 def _transactional_set_instance_name(element, new_name):
     """Set an instance name using a transaction-friendly path.
 
-    Views and other instance-like elements are first tried through writable
-    parameters when available, then fall back to the standard name setter.
+    Views and other instance-like elements are first tried through the direct
+    element Name property. This avoids plan-view parameter writes that can
+    trigger Revit's corresponding-level rename behavior.
     """
     if element is None:
         return False
+
+    try:
+        if isinstance(element, View):
+            element.Name = new_name
+            return True
+        if isinstance(element, Level):
+            element.Name = new_name
+            return True
+    except Exception:
+        pass
 
     candidate_bips = [
         getattr(BuiltInParameter, 'VIEW_NAME', None),

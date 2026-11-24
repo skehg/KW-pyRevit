@@ -43,6 +43,7 @@ All sliding switches show both options on opposite sides of the track, with the 
 10. Optionally type into the Current Value and New Value header filters, then click Apply Re-Value. Only rows remaining in the filtered preview are eligible to be changed, including rows below the scroll area. The New Value filter is for finding rows only: Apply is disabled while it contains text.
 11. After the result message, the dialog stays open, reloads current values from the model, and returns to the foreground ready for another action. Focus also returns after validation or error messages. Find and Replace are cleared, and Final rows are unfrozen so the next preview is recalculated. Pattern, mode, parameter choices, counter settings, case options and filters are preserved. Filters are re-evaluated against the updated values, so changed rows may no longer be visible.
 12. Repeat as needed, then click **Close**. Closing does not apply pending changes or undo earlier applies.
+13. In Instance mode, renaming plan views changes only the view names. Associated levels keep their existing names.
 
 ## Filter Manager: Rename Filters
 
