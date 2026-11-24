@@ -16,19 +16,19 @@ from System.Windows.Automation import AutomationProperties
 from System.Windows.Input import Key, MouseButtonState
 from System.Windows.Media import Brushes
 from System.Windows.Shapes import Ellipse
-from token_pattern import (
-    CASES, CASE_LABELS, edited, expression, insert_item, label, parameter_slot, parse_pattern,
-    serialize_pattern, token,
-    position_controls, position_expression,
+from rule_model import (
+    CASES, CASE_LABELS, deep_copy_composition, edit_operation,
+    insert_operation, operation, position_controls,
+    position_value, describe_operation, serialize_composition,
+    validate_composition,
 )
 
 
 class TokenSettings(object):
-    """Draft-only settings; shared mappings are returned, never changed in place."""
+    """Draft-only settings; parameter names are stored on the operation itself."""
     def __init__(self, editor, item):
         self.editor = editor
         self.item = copy.deepcopy(item)
-        self.mappings = list(editor.mappings())
         self.result = None
         self.fields = {}
         self.window = Window()
@@ -53,17 +53,19 @@ class TokenSettings(object):
             self.text('Literal text (spaces are preserved)', 'text', item.get('text', ''))
         elif kind == 'source':
             self.note('Count from Start or End. Position 1 from End is the last token.')
-            self.position_row('Start position', 'start', item.get('start', 'val1'))
+            self.position_row('Start position', 'start',
+                              item.get('start', {'direction': 'start', 'index': 1}))
             include_range = CheckBox()
             include_range.Content = 'Include a range'
             include_range.Margin = Thickness(0, 5, 0, 5)
             include_range.IsChecked = bool(item.get('end'))
             self.fields['range'] = include_range
             panel.Children.Add(include_range)
-            self.position_row('End position', 'end', item.get('end') or 'end', True)
+            self.position_row('End position', 'end',
+                              item.get('end') or {'direction': 'end', 'index': 1}, True)
             self.combo('Join separator (ranges; enter custom text exactly, without wrapping quotes)', 'join',
                        ['', 'hyphen', 'space', 'underscore', '/', '.'],
-                       item.get('join', ''), editable=True)
+                       item.get('separator', ''), editable=True)
             self.position_hint = self.note('')
             include_range.Checked += self.positions_changed
             include_range.Unchecked += self.positions_changed
@@ -73,31 +75,27 @@ class TokenSettings(object):
                     direction.Checked += self.positions_changed
             self.positions_changed(None, None)
         elif kind == 'parameter':
-            self.note('Five shared slots. Reassigning a slot changes EVERY chip using it.\n'
-                      'Existing mappings are reused; otherwise an empty slot is selected.')
+            self.note('Choose the Revit parameter read directly by this chip.')
             self.combo('Parameter', 'parameter', [''] + list(editor.host.available_params),
-                       self.mappings[item['slot'] - 1] if item.get('slot') else '')
-            options = ['{}: {}'.format(i + 1, name or '(empty)')
-                       for i, name in enumerate(self.mappings)]
-            self.combo('Shared slot (choose explicitly if all five are occupied)',
-                       'slot', options,
-                       options[item['slot'] - 1] if item.get('slot') else None)
-            self.fields['parameter'].SelectionChanged += self.parameter_changed
+                       item.get('parameter', ''))
         elif kind == 'counter':
-            self.note('Start and increment are SHARED by every Counter chip.\n'
-                      'Repeated Counter chips use the same value within each row.')
-            self.text('Start', 'counter_start', editor.host.txt_counter_start.Text)
+            self.note('Repeated Counter chips use the same row value.\n'
+                      'Configure Start and Increment directly on this chip.')
+            self.text('Start', 'counter_start', item.get('start', 'A'))
             self.text('Increment (nonnegative integer)', 'counter_increment',
-                      editor.host.txt_counter_increment.Text)
+                      str(item.get('increment', 1)))
         if kind != 'text':
             self.combo('Text case (this chip)', 'case', [CASE_LABELS[case] for case in CASES],
                        CASE_LABELS[item.get('case', 'Unchanged')])
         if kind in ('source', 'parameter'):
-            self.note('Progression supports a single position counted from Start or a parameter slot, not ranges.\n'
+            self.note('Progression supports a single position counted from Start or a parameter name, not ranges.\n'
                       'Increment: each row independently. Sequence: first unfiltered row plus row position.')
+            progression = item.get('progression')
             self.combo('Progression', 'operation', ['None', 'Increment', 'Sequence'],
-                       {'inc': 'Increment', 'seq': 'Sequence'}.get(item.get('operation'), 'None'))
-            self.text('Step (signed integer, e.g. 2 or -1)', 'step', item.get('step', '1'))
+                       {'inc': 'Increment', 'seq': 'Sequence'}.get(
+                           progression['kind'] if progression else '', 'None'))
+            self.text('Step (signed integer, e.g. 2 or -1)', 'step',
+                      str(progression['step'] if progression else 1))
         self.error = self.note('')
         self.error.Foreground = Brushes.Firebrick
         actions = StackPanel()
@@ -141,14 +139,9 @@ class TokenSettings(object):
         self.panel.Children.Add(field)
         self.fields[name] = field
 
-    def parameter_changed(self, sender, args):
-        slot = parameter_slot(self.mappings, self.fields['parameter'].SelectedItem)
-        self.fields['slot'].SelectedIndex = slot - 1 if slot else -1
-
     def accept(self, sender, args):
         candidate = copy.deepcopy(self.item)
         candidate.pop('raw', None)
-        mappings = list(self.mappings)
         counter = None
         try:
             for name in ('text', 'step'):
@@ -157,30 +150,31 @@ class TokenSettings(object):
                     candidate[name] = value if name == 'text' else value.strip()
             if candidate['kind'] == 'source':
                 candidate['start'] = self.read_position('start')
-                candidate['end'] = self.read_position('end') if self.fields['range'].IsChecked else ''
+                candidate['end'] = (self.read_position('end')
+                                    if self.fields['range'].IsChecked else None)
             if 'case' in self.fields:
                 case_index = self.fields['case'].SelectedIndex
                 if case_index < 0:
                     raise ValueError('Choose a text case.')
                 candidate['case'] = CASES[case_index]
             if 'join' in self.fields:
-                candidate['join'] = self.fields['join'].Text
+                candidate['separator'] = self.fields['join'].Text
             if candidate['kind'] == 'source' and not self.fields['range'].IsChecked:
-                candidate['join'] = ''
-                candidate['join_quoted'] = False
+                candidate['separator'] = ''
             if 'operation' in self.fields:
-                candidate['operation'] = {
+                operation_name = {
                     'None': '', 'Increment': 'inc', 'Sequence': 'seq',
                 }[self.fields['operation'].SelectedItem]
+                candidate['progression'] = (
+                    {'kind': operation_name, 'step': int(candidate['step'])}
+                    if operation_name else None)
             if candidate['kind'] == 'parameter':
-                slot = self.fields['slot'].SelectedIndex + 1
                 name = self.fields['parameter'].SelectedItem
-                if not slot or not name:
-                    raise ValueError('Choose an available parameter and a shared slot.')
+                if not name:
+                    raise ValueError('Choose an available parameter.')
                 if name not in self.editor.host.available_params:
                     raise ValueError('This parameter is unavailable in the current mode.')
-                candidate['slot'] = slot
-                mappings[slot - 1] = name
+                candidate['parameter'] = str(name).strip()
             if candidate['kind'] == 'text' and not candidate['text']:
                 raise ValueError('Enter literal text, including at least one character or space.')
             if candidate['kind'] == 'counter':
@@ -189,12 +183,13 @@ class TokenSettings(object):
                 unused, error = self.editor.counter_builder(start, increment)
                 if error:
                     raise ValueError(error)
-                counter = (start, increment)
-            expression(candidate)
+                candidate['start'] = start.strip()
+                candidate['increment'] = int(increment.strip())
+            validate_composition({'version': 1, 'operations': [candidate]})
         except ValueError as ex:
             self.error.Text = str(ex)
             return
-        self.result = candidate, mappings, counter
+        self.result = candidate, None, counter
         self.window.DialogResult = True
 
     def position_row(self, title, name, spec, is_end=False):
@@ -229,7 +224,7 @@ class TokenSettings(object):
     def read_position(self, name):
         direction = next(button.Content for button in self.fields[name + '_directions']
                          if button.IsChecked)
-        return position_expression(direction, self.fields[name].Text, name == 'end')
+        return position_value(direction, self.fields[name].Text, name == 'end')
 
     def positions_changed(self, sender, args):
         ranged = bool(self.fields['range'].IsChecked)
@@ -238,9 +233,20 @@ class TokenSettings(object):
         try:
             start = self.read_position('start')
             end = self.read_position('end') if ranged else ''
-            self.position_hint.Text = 'Selection: {' + start + (':' + end if end else '') + '}'
-            if end.startswith('+'):
-                self.position_hint.Text += '  (start plus {} following token(s))'.format(int(end[1:]))
+            start_direction = start['direction']
+            start_number = start.get('index')
+            if end:
+                end_direction = end['direction']
+                if end_direction == 'following':
+                    self.position_hint.Text = 'Selection: {} {} plus {} following'.format(
+                        start_direction.title(), start_number, end['count'])
+                else:
+                    self.position_hint.Text = 'Selection: {} {} to {} {}'.format(
+                        start_direction.title(), start_number,
+                        end_direction.title(), end.get('index', 1))
+            else:
+                self.position_hint.Text = 'Selection: {} {}'.format(
+                    start_direction.title(), start_number)
         except ValueError as ex:
             self.position_hint.Text = str(ex)
 
@@ -255,7 +261,7 @@ class TokenEditor(object):
     def __init__(self, host, counter_builder):
         self.host = host
         self.counter_builder = counter_builder
-        self.items = []
+        self.items = deep_copy_composition(host.composition)['operations']
         self.selected = -1
         self.samples = []
         self.source_text = ''
@@ -263,7 +269,6 @@ class TokenEditor(object):
         self._syncing = False
         self._drag = None
         window = host.window
-        self.mode = window.FindName('combo_editor_mode')
         self.panel = window.FindName('token_editor_panel')
         self.palette = window.FindName('token_palette')
         self.bar = window.FindName('token_bar')
@@ -272,7 +277,6 @@ class TokenEditor(object):
         self.status = window.FindName('token_status')
         self.sample_label = window.FindName('token_sample')
         self.clear_button = window.FindName('btn_clear_tokens')
-        self.mode.SelectionChanged += self.mode_changed
         window.FindName('btn_add_token').Click += self.add_menu
         if self.clear_button:
             self.clear_button.Click += self.clear
@@ -284,15 +288,6 @@ class TokenEditor(object):
         self.bar.DragLeave += self.drag_leave
         self.bar.Drop += self.drop
         self.refresh()
-        try:
-            parse_pattern(host.txt_pattern.Text)
-            self.mode.SelectedIndex = 0
-        except ValueError:
-            self.mode.SelectedIndex = 1
-        self.mode_changed(None, None)
-
-    def mappings(self):
-        return [self.host._selected_combo_text(combo) for combo in self.host.param_combos]
 
     def button(self, text, callback):
         button = Button()
@@ -335,35 +330,17 @@ class TokenEditor(object):
         panel.Children.Add(text)
         button.Content = panel
 
-    def mode_changed(self, sender, args):
-        if self._syncing:
-            return
-        if self.mode.SelectedIndex == 0:
-            try:
-                parse_pattern(self.host.txt_pattern.Text)
-            except ValueError as ex:
-                self.status.Text = str(ex)
-                self.mode.SelectedIndex = 1
-                return
-        visual = self.mode.SelectedIndex == 0
-        self.panel.Visibility = Visibility.Visible if visual else Visibility.Collapsed
-        self.host.window.MinHeight = 660 if visual else 500
-        self.host.txt_pattern.IsReadOnly = visual
-        self.host.txt_pattern.ToolTip = (
-            'Generated pattern. Choose Advanced Pattern to edit syntax directly.' if visual
-            else 'Existing pattern syntax; unsupported expressions are preserved.')
-
     def refresh(self):
-        pattern = self.host.txt_pattern.Text
-        mappings = self.mappings()
+        composition = deep_copy_composition(self.host.composition)
         sample = self.host.get_token_sample_item()
         self.source_text = sample.CurrentName if sample is not None else ''
         self.samples = self.host.get_tokenizer_func()(self.source_text)
-        signature = pattern, tuple(mappings), self.source_text, tuple(self.samples)
+        signature = (serialize_composition(composition),
+                     self.source_text, tuple(self.samples))
         if signature == self._signature:
             return
         sample_only = self._signature is not None and signature[:2] == self._signature[:2]
-        previous_count = len(self._signature[3]) if self._signature is not None else -1
+        previous_count = len(self._signature[2]) if self._signature is not None else -1
         self._signature = signature
         self.sample_label.Text = 'Sample (selection / first visible row): ' + (
             self.source_text if sample is not None else '(no visible rows)')
@@ -378,25 +355,28 @@ class TokenEditor(object):
             else:
                 self.render_palette()
             for index, item in enumerate(self.items):
-                self.update_chip_label(self.bar.Children[index], label(item, self.samples, mappings))
+                self.update_chip_label(
+                    self.bar.Children[index],
+                    describe_operation(item, self.samples))
             return
         try:
-            if serialize_pattern(self.items) != pattern:
-                self.items = parse_pattern(pattern)
+            validate_composition(composition)
+            if repr(composition['operations']) != repr(self.items):
+                self.items = deep_copy_composition(composition['operations'])
         except ValueError as ex:
             self.items = []
             self.status.Text = str(ex)
             self.bar.Children.Clear()
-            self.mode.SelectedIndex = 1
-            self.mode_changed(None, None)
             return
         self.selected = min(self.selected, len(self.items) - 1)
-        used_slots = set(item['slot'] for item in self.items if item['kind'] == 'parameter')
-        missing = [str(slot) for slot in sorted(used_slots)
-                   if not mappings[slot - 1] or mappings[slot - 1] not in self.host.available_params]
-        self.status.Text = ('Unmapped/unavailable parameter slot(s): {}. Right-click a parameter chip to edit.'
-                            .format(', '.join(missing)) if missing else
-                            'Drag to insert/reorder. Double-click to edit. Right-click for options.')
+        missing = sorted(set(
+            item['parameter'] for item in self.items
+            if item['kind'] == 'parameter'
+            and item.get('parameter') not in self.host.available_params))
+        self.status.Text = (
+            'Unavailable parameter chip(s): {}. Right-click a parameter chip to edit.'
+            .format(', '.join(missing)) if missing else
+            'Drag to insert/reorder. Double-click to edit. Right-click for options.')
         if self.clear_button:
             self.clear_button.IsEnabled = bool(self.items)
         self.render_palette()
@@ -408,18 +388,22 @@ class TokenEditor(object):
 
     def render_palette(self):
         self.palette.Children.Clear()
-        entries = [('Original', token('original'))]
-        entries += [('{}: {}'.format(i + 1, sample), token('source', start='val{}'.format(i + 1)))
+        entries = [('Original', operation('original'))]
+        entries += [('{}: {}'.format(i + 1, sample),
+                     operation('source', start={'direction': 'start', 'index': i + 1}))
                     for i, sample in enumerate(self.samples)]
         entries += [
-            ('Last', token('source', start='end')),
-            ('Range...', token('source', start='val1', end='end')),
-            ('Parameter...', token('parameter')),
-            ('Counter', token('counter')),
-            ('Space', token('text', text=' ')),
-            ('Hyphen', token('text', text='-')),
-            ('Underscore', token('text', text='_')),
-            ('Text...', token('text', text='')),
+            ('Last', operation('source', start={'direction': 'end', 'index': 1})),
+            ('Range...', operation('source',
+                                   start={'direction': 'start', 'index': 1},
+                                   end={'direction': 'end', 'index': 1},
+                                   separator='')),
+            ('Parameter...', operation('parameter', parameter='')),
+            ('Counter', operation('counter')),
+            ('Space', operation('text', text=' ')),
+            ('Hyphen', operation('text', text='-')),
+            ('Underscore', operation('text', text='_')),
+            ('Text...', operation('text', text='')),
         ]
         for title, item in entries:
             configure = title in ('Range...', 'Parameter...', 'Text...')
@@ -437,13 +421,12 @@ class TokenEditor(object):
     def render_bar(self, focus=False):
         self.clear_insertion()
         self.bar.Children.Clear()
-        mappings = self.mappings()
         for index, item in enumerate(self.items):
-            button = self.button(label(item, self.samples, mappings),
+            button = self.button(describe_operation(item, self.samples),
                                  lambda sender, args, i=index: self.select(i))
             self.icon_content(button, item['kind'])
             button.Tag = index
-            button.ToolTip = serialize_pattern([item])
+            button.ToolTip = describe_operation(item, self.samples)
             if item['kind'] == 'text':
                 button.ToolTip += '\n{} character(s); spaces are preserved.'.format(len(item['text']))
             button.BorderBrush = Brushes.MidnightBlue if index == self.selected else Brushes.SteelBlue
@@ -495,7 +478,8 @@ class TokenEditor(object):
                 entry.IsChecked = item.get('case', 'Unchanged') == case
         if item['kind'] in ('source', 'parameter'):
             eligible = (item['kind'] == 'parameter' or
-                        (item['start'].startswith('val') and not item.get('end') and not item.get('join')))
+                        (item['start'].get('direction') == 'start'
+                         and item.get('end') is None))
             progress = self.menu_item(menu, 'Progression', enabled=eligible)
             for title, operation in [('None', ''), ('Increment Each Value...', 'inc'),
                                      ('Sequence from First Row...', 'seq')]:
@@ -505,14 +489,14 @@ class TokenEditor(object):
             self.menu_item(menu, 'Token Selection...', lambda sender, args: self.edit(index))
             if item.get('end'):
                 joins = self.menu_item(menu, 'Join Separator')
-                for title in ('hyphen', 'space', 'underscore'):
+                for title, separator in (('hyphen', '-'), ('space', ' '), ('underscore', '_')):
                     self.menu_item(joins, title,
-                        lambda sender, args, value=title: self.set_join(index, value))
+                        lambda sender, args, value=separator: self.set_join(index, value))
                 self.menu_item(joins, 'Custom...', lambda sender, args: self.edit(index))
         if item['kind'] == 'parameter':
             self.menu_item(menu, 'Choose Parameter...', lambda sender, args: self.edit(index))
         if item['kind'] == 'counter':
-            self.menu_item(menu, 'Counter Settings (shared)...', lambda sender, args: self.edit(index))
+            self.menu_item(menu, 'Counter Settings...', lambda sender, args: self.edit(index))
         self.menu_item(menu, 'Duplicate', lambda sender, args: self.duplicate(index))
         self.menu_item(menu, 'Move Left', lambda sender, args: self.move(index, index - 1), index > 0)
         self.menu_item(menu, 'Move Right', lambda sender, args: self.move(index, index + 2),
@@ -522,25 +506,30 @@ class TokenEditor(object):
 
     def set_case(self, index, case):
         items = copy.deepcopy(self.items)
-        items[index] = edited(items[index], case=case)
+        items[index] = edit_operation(items[index], case=case)
         self.commit(items, index)
 
     def set_join(self, index, join):
         items = copy.deepcopy(self.items)
-        items[index] = edited(items[index], join=join, join_quoted=False)
+        items[index] = edit_operation(items[index], separator=join)
         self.commit(items, index)
 
     def add_menu(self, sender, args):
         menu = ContextMenu()
-        for title, item in [('Original', token('original')),
-                            ('Source Token...', token('source', start='val1')),
-                            ('Range...', token('source', start='val1', end='end')),
-                            ('Parameter...', token('parameter')),
-                            ('Counter...', token('counter')),
-                            ('Space', token('text', text=' ')),
-                            ('Hyphen', token('text', text='-')),
-                            ('Underscore', token('text', text='_')),
-                            ('Text...', token('text', text=''))]:
+        for title, item in [
+                ('Original', operation('original')),
+                ('Source Token...', operation('source',
+                                              start={'direction': 'start', 'index': 1})),
+                ('Range...', operation('source',
+                                       start={'direction': 'start', 'index': 1},
+                                       end={'direction': 'end', 'index': 1},
+                                       separator='')),
+                ('Parameter...', operation('parameter', parameter='')),
+                ('Counter...', operation('counter')),
+                ('Space', operation('text', text=' ')),
+                ('Hyphen', operation('text', text='-')),
+                ('Underscore', operation('text', text='_')),
+                ('Text...', operation('text', text=''))]:
             self.menu_item(menu, title,
                 lambda sender, args, value=item, config=title.endswith('...'): self.add(value, config))
         menu.PlacementTarget = sender
@@ -549,31 +538,36 @@ class TokenEditor(object):
     def add(self, item, configure=False, destination=None):
         if not self.host.commit_preview_edits():
             return
-        mappings, counter = None, None
         if configure:
             result = TokenSettings(self, item).show()
             if result is None:
                 return
-            item, mappings, counter = result
+            item, unused_result, unused_counter = result
         if destination is None:
             destination = self.selected + 1 if self.selected >= 0 else len(self.items)
-        items, index = insert_item(self.items, item, destination)
-        self.commit(items, index, mappings, counter)
+        items, index = insert_operation(self.items, item, destination)
+        self.commit(items, index)
 
     def edit(self, index, **values):
         if not self.host.commit_preview_edits():
             return
         item = copy.deepcopy(self.items[index])
-        item.update(values)
+        if 'operation' in values:
+            operation_name = values['operation']
+            item['progression'] = (
+                {'kind': operation_name, 'step': item.get('progression', {}).get('step', 1)}
+                if operation_name else None)
+        else:
+            item.update(values)
         result = TokenSettings(self, item).show()
         if result is not None:
-            item, mappings, counter = result
+            item, unused_result, unused_counter = result
             items = copy.deepcopy(self.items)
             items[index] = item
-            self.commit(items, index, mappings, counter)
+            self.commit(items, index)
 
     def duplicate(self, index):
-        items, selected = insert_item(self.items, self.items[index], index + 1)
+        items, selected = insert_operation(self.items, self.items[index], index + 1)
         self.commit(items, selected)
 
     def remove(self, index):
@@ -587,24 +581,21 @@ class TokenEditor(object):
         self.commit([], -1)
 
     def move(self, index, destination):
-        items, selected = insert_item(self.items, None, destination, index)
+        items, selected = insert_operation(self.items, None, destination, index)
         self.commit(items, selected)
 
-    def commit(self, items, selected, mappings=None, counter=None):
+    def commit(self, items, selected):
         if not self.host.commit_preview_edits():
             return
-        pattern = serialize_pattern(items)
         suspended = self.host._suspend_events
         self.host._suspend_events = True
         try:
-            if mappings is not None:
-                for combo, name in zip(self.host.param_combos, mappings):
-                    combo.SelectedItem = name
-            if counter is not None:
-                self.host.txt_counter_start.Text, self.host.txt_counter_increment.Text = counter
             self.selected = selected
             self.items = copy.deepcopy(items)
-            self.host.txt_pattern.Text = pattern
+            self.host.composition = {
+                'version': 1,
+                'operations': copy.deepcopy(items),
+            }
         finally:
             self.host._suspend_events = suspended
         self._signature = None

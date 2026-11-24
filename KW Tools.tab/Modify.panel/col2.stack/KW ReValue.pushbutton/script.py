@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """"KW ReValue"
-Re-value types/instances using advanced tokenization and pattern mapping.
+Re-value types/instances using structured token composition rules.
 Decompose names into tokens, apply parameter re-valuation, reconstruct with flexible syntax.
 """
 
@@ -39,7 +39,11 @@ from pyrevit.compat import get_elementid_value_func
 from filter_expression import (
     count_rules, evaluate_expression, serialize_expression, validate_expression,
 )
-from range_separator import decode_separator, split_case
+from rule_model import (
+    CASES, CASE_LABELS, default_composition, deserialize_composition,
+    deep_copy_composition, original_composition, serialize_composition,
+    validate_composition,
+)
 
 
 class ListSortDirection(object):
@@ -60,15 +64,8 @@ _SESSION_SETTING_DEFAULTS = {
     'mode': 'type',
     'delimiters': r'-_/,\|',
     'orig_param': '',
-    'param1': '',
-    'param2': '',
-    'param3': '',
-    'param4': '',
-    'param5': '',
-    'pattern': '{val1}',
+    'composition': serialize_composition(default_composition()),
     'final_case': 'None',
-    'counter_start': 'A',
-    'counter_increment': '1',
     'find_text': '',
     'replace_text': '',
     'match_whole_word': 'False',
@@ -116,6 +113,13 @@ def load_session_settings():
                 settings[name] = str(saved)
         except Exception:
             pass
+    if 'composition' in settings:
+        try:
+            settings['composition'] = serialize_composition(
+                deserialize_composition(settings['composition']))
+        except Exception as ex:
+            settings['composition'] = serialize_composition(default_composition())
+            settings['composition_error'] = 'Malformed structured composition reset to default: {}'.format(ex)
     return settings
 
 
@@ -167,161 +171,9 @@ def build_tokenizer(delimiters):
 # Default tokenizer
 tokenize = build_tokenizer(DEFAULT_DELIMITERS)
 
-VAL_EXPR_REGEX = re.compile(r'\{([^{}]+)\}')
 NUMERIC_REGEX = re.compile(r'^\d+$')
 ALPHA_REGEX = re.compile(r'^[A-Za-z]+$')
 MIXED_SUFFIX_NUM_REGEX = re.compile(r'^(.*?)(\d+)$')
-
-def _parse_val_expression(expr):
-    """Parse the inside of {...}.
-    
-    Supported start specs:
-      valN      - 1-based absolute index
-      end       - last token
-      end-N     - Nth token from the end (end-1 = 2nd to last, end-2 = 3rd to last)
-    
-    Supported forms (start[:end][|delim]):
-      valN
-      end
-      end-N
-      valN:M
-      valN:+K
-      valN:end
-      valN:end-K
-      end-N:end
-      end-N:end-K
-      end-N:+K
-      valN:M|delim
-      valN:end|delim
-      end-N:end|delim
-      end-N:end-K|delim
-    
-    Delimiter can be:
-      - Named: space, hyphen, underscore
-      - Literal: -, _, /, etc.; quoted JSON strings preserve spaces and escapes.
-    
-    Returns:
-      (start_idx, end_spec, delimiter_string_or_None)
-      start_idx is an int (1-based) or a string 'end'/'end-N'
-    """
-    # Split off optional delimiter part: "core|delim"
-    if '|' in expr:
-        core, delim_part = expr.split('|', 1)
-        delimiter = decode_separator(delim_part)
-    else:
-        core = expr
-        delimiter = None
-
-    core = core.strip()
-
-    def _parse_start(s):
-        """Parse a start spec string into int (1-based) or string 'end'/'end-N'."""
-        if s.startswith('val'):
-            try:
-                return int(s[3:])
-            except ValueError:
-                return None
-        elif s == 'end':
-            return 'end'
-        elif s.startswith('end-'):
-            try:
-                int(s[4:])  # validate numeric suffix
-                return s
-            except ValueError:
-                return None
-        return None
-
-    if ':' not in core:
-        start_idx = _parse_start(core)
-        if start_idx is None:
-            return None, None, delimiter
-        return start_idx, None, delimiter
-
-    start_str, end_str = core.split(':', 1)
-    start_str = start_str.strip()
-    end_str = end_str.strip()
-
-    start_idx = _parse_start(start_str)
-    if start_idx is None:
-        return None, None, delimiter
-
-    if end_str == 'end':
-        end_spec = 'end'
-    elif end_str.startswith('end-'):
-        # Handle "end-N" syntax (all except last N tokens)
-        try:
-            k = int(end_str[4:])
-            end_spec = 'end-%d' % k
-        except ValueError:
-            return None, None, delimiter
-    elif end_str.startswith('+'):
-        try:
-            k = int(end_str[1:])
-        except ValueError:
-            return None, None, delimiter
-        end_spec = '+%d' % k
-    else:
-        try:
-            end_idx = int(end_str)
-        except ValueError:
-            return None, None, delimiter
-        end_spec = end_idx
-
-    return start_idx, end_spec, delimiter
-
-
-def _resolve_window(tokens, start_idx, end_spec):
-    """Resolve a token window. start_idx may be int (1-based) or string 'end'/'end-N'."""
-    n = len(tokens)
-    if n == 0:
-        return []
-
-    # Resolve start_pos from start_idx
-    if isinstance(start_idx, basestring):
-        if start_idx == 'end':
-            start_pos = n - 1
-        elif start_idx.startswith('end-'):
-            try:
-                k = int(start_idx[4:])
-            except ValueError:
-                return []
-            start_pos = n - 1 - k
-            if start_pos < 0:
-                start_pos = 0
-        else:
-            return []
-    else:
-        if start_idx < 1:
-            start_idx = 1
-        if start_idx > n:
-            return []
-        start_pos = start_idx - 1
-
-    if end_spec is None:
-        end_pos = start_pos
-    elif end_spec == 'end':
-        end_pos = n - 1
-    elif isinstance(end_spec, basestring) and end_spec.startswith('end-'):
-        try:
-            k = int(end_spec[4:])
-        except ValueError:
-            return []
-        end_pos = max(start_pos, n - 1 - k)
-    elif isinstance(end_spec, int):
-        end_pos = min(end_spec - 1, n - 1)
-    elif isinstance(end_spec, basestring) and end_spec.startswith('+'):
-        try:
-            k = int(end_spec[1:])
-        except ValueError:
-            return []
-        end_pos = min(start_pos + k, n - 1)
-    else:
-        return []
-
-    if end_pos < start_pos:
-        return []
-
-    return tokens[start_pos:end_pos + 1]
 
 
 def _alpha_to_int(text):
@@ -383,38 +235,6 @@ def _increment_value(value, increment):
     return original, 'source value is not numeric, alphabetic, or prefix-plus-number'
 
 
-def _parse_progression_expression(expression):
-    """Parse inc/seq expressions that reference one valN or paramN value."""
-    parts = expression.split(':')
-    if len(parts) != 3:
-        return None
-
-    operation = parts[0].strip().lower()
-    source_ref = parts[1].strip().lower()
-    if operation not in ['inc', 'seq']:
-        return None
-    if not PROGRESSION_SOURCE_REGEX.match(source_ref):
-        return None
-
-    try:
-        increment = int(parts[2].strip())
-    except Exception:
-        return None
-
-    return operation, source_ref, increment
-
-
-CASE_MODIFIERS = ('upper', 'lower', 'title', 'sentence')
-
-
-def _split_case_modifier(expression):
-    """Split a recognized ~case suffix from a pattern placeholder."""
-    core, modifier = split_case(expression)
-    if modifier in CASE_MODIFIERS:
-        return core, modifier
-    return expression, None
-
-
 def apply_case_conversion(value, case_name):
     """Convert text to the requested case, leaving it unchanged for None."""
     if value is None:
@@ -451,17 +271,31 @@ def _resolve_progression_source(source_ref, tokens, param_dict):
     return param_dict.get(source_ref, '')
 
 
-def _sequence_source_refs(pattern):
-    """Return distinct source references used by sequence expressions."""
+def _sequence_source_refs(composition):
+    """Return source references used by sequence operations."""
     source_refs = []
-    for match in VAL_EXPR_REGEX.finditer(pattern or ''):
-        if not re.match(r'^\s*seq\s*:', match.group(1), re.IGNORECASE):
+    validate_composition(composition)
+    for item in composition['operations']:
+        progression = item.get('progression')
+        if not progression or progression['kind'] != 'seq':
             continue
-        expression, unused_case = _split_case_modifier(match.group(1).strip())
-        parsed = _parse_progression_expression(expression)
-        if parsed and parsed[0] == 'seq' and parsed[1] not in source_refs:
-            source_refs.append(parsed[1])
+        if item['kind'] == 'source':
+            start = item['start']
+            if start['direction'] != 'start':
+                continue
+            ref = 'val{}'.format(start['index'])
+        elif item['kind'] == 'parameter':
+            ref = item['parameter']
+        else:
+            continue
+        if ref not in source_refs:
+            source_refs.append(ref)
     return source_refs
+
+
+def _composition_uses_counter(composition):
+    validate_composition(composition)
+    return any(item['kind'] == 'counter' for item in composition['operations'])
 
 
 def build_counter_generator(start_text, increment_text):
@@ -470,7 +304,7 @@ def build_counter_generator(start_text, increment_text):
     increment_text = '' if increment_text is None else str(increment_text).strip()
 
     if not start_text:
-        return None, 'Start value is required when using {count} or {param6}.'
+        return None, 'Counter Start value is required when the composition uses Counter.'
 
     if not increment_text:
         increment_text = '1'
@@ -522,76 +356,121 @@ def build_counter_generator(start_text, increment_text):
     return None, 'Unsupported start format. Use numeric, alphabetic, or prefix+numeric (e.g. RM01).'
 
 
-def apply_pattern(input_text, pattern, param_dict, tokenizer_func=None,
-                  sequence_seeds=None, row_index=0, warnings=None):
-    """Apply pattern to input_text using tokenization and parameter substitution.
-    
-    First applies tokenization for {valN}, then parameter substitution for {paramN}.
-    """
+def _resolve_source_window(tokens, start, end=None):
+    """Resolve a structured Start/End/Following source range."""
+    if not tokens:
+        return []
+    direction = start.get('direction')
+    if direction == 'start':
+        start_pos = start['index'] - 1
+        if start_pos < 0 or start_pos >= len(tokens):
+            return []
+    elif direction == 'end':
+        start_pos = len(tokens) - start['index']
+        if start_pos < 0:
+            start_pos = 0
+    else:
+        raise ValueError('Invalid source start direction.')
+
+    if end is None:
+        end_pos = start_pos
+    else:
+        end_direction = end.get('direction')
+        if end_direction == 'start':
+            end_pos = end['index'] - 1
+        elif end_direction == 'end':
+            end_pos = len(tokens) - end['index']
+        elif end_direction == 'following':
+            end_pos = start_pos + end['count']
+        else:
+            raise ValueError('Invalid source end direction.')
+
+    if end_pos < start_pos:
+        return []
+    end_pos = min(end_pos, len(tokens) - 1)
+    return tokens[start_pos:end_pos + 1]
+
+
+def evaluate_composition(input_text, composition, parameter_values,
+                         tokenizer_func=None, sequence_seeds=None,
+                         row_index=0, warnings=None):
+    """Evaluate an ordered structured composition into one output string."""
+    validate_composition(composition)
     if tokenizer_func is None:
         tokenizer_func = tokenize
-    
     tokens = tokenizer_func(input_text)
     sequence_seeds = sequence_seeds or {}
     if warnings is None:
         warnings = []
-    
-    def replace_match(m):
-        inner = m.group(1).strip()
-        expression, case_modifier = _split_case_modifier(inner)
 
-        progression = _parse_progression_expression(expression)
-        if progression:
-            operation, source_ref, increment = progression
-            source_value = _resolve_progression_source(
-                source_ref, tokens, param_dict)
+    param_dict = {}
+    if isinstance(parameter_values, dict):
+        param_dict.update(parameter_values)
 
-            if operation == 'inc':
-                result, error = _increment_value(source_value, increment)
-            else:
-                seed_value = sequence_seeds.get(source_ref, '')
-                if not seed_value:
-                    error = 'sequence seed is blank'
-                    result = source_value
+    param_dict['orig'] = '' if input_text is None else str(input_text)
+    parts = []
+    for item in composition['operations']:
+        kind = item['kind']
+        case = item.get('case', 'Unchanged')
+        if kind == 'text':
+            result = item.get('text', '')
+        elif kind == 'source':
+            window = _resolve_source_window(tokens, item['start'], item.get('end'))
+            result = item.get('separator', '').join(window)
+            progression = item.get('progression')
+            if progression:
+                ref = 'val{}'.format(item['start']['index'])
+                source_value = _resolve_progression_source(ref, tokens, param_dict)
+                if progression['kind'] == 'inc':
+                    result, error = _increment_value(source_value, progression['step'])
                 else:
-                    result, error = _increment_value(
-                        seed_value, row_index * increment)
-                    if error:
+                    seed_value = sequence_seeds.get(ref, '')
+                    if not seed_value:
+                        error = 'sequence seed is blank'
                         result = source_value
-
+                    else:
+                        result, error = _increment_value(
+                            seed_value, row_index * progression['step'])
+                        if error:
+                            result = source_value
+                if error:
+                    warnings.append('{}: {}'.format(ref, error))
+        elif kind == 'parameter':
+            ref = item['parameter']
+            result = param_dict.get(ref, '')
+            progression = item.get('progression')
+            if progression:
+                source_value = _resolve_progression_source(ref, tokens, param_dict)
+                if progression['kind'] == 'inc':
+                    result, error = _increment_value(source_value, progression['step'])
+                else:
+                    seed_value = sequence_seeds.get(ref, '')
+                    if not seed_value:
+                        error = 'sequence seed is blank'
+                        result = source_value
+                    else:
+                        result, error = _increment_value(
+                            seed_value, row_index * progression['step'])
+                        if error:
+                            result = source_value
+                if error:
+                    warnings.append('{}: {}'.format(ref, error))
+        elif kind == 'original':
+            result = param_dict['orig']
+        elif kind == 'counter':
+            start = item.get('start', 'A')
+            increment = item.get('increment', 1)
+            generator, error = build_counter_generator(
+                start, str(increment))
             if error:
-                warnings.append('{}: {}'.format(inner, error))
-            return apply_case_conversion(result, case_modifier)
-
-        if expression.lower() == 'orig':
-            return apply_case_conversion(param_dict.get('orig', ''), case_modifier)
-
-        if expression.lower() == 'count':
-            return apply_case_conversion(param_dict.get('count', ''), case_modifier)
-        
-        # Try parameter substitution first ({paramN})
-        if expression.lower().startswith('param'):
-            try:
-                param_num = int(expression[5:])
-                key = 'param{}'.format(param_num)
-                if key in param_dict:
-                    return apply_case_conversion(param_dict[key], case_modifier)
-                return apply_case_conversion('', case_modifier)
-            except ValueError:
-                pass
-        
-        # Try token extraction ({valN}, {valN:M}, etc)
-        start_idx, end_spec, delim = _parse_val_expression(expression)
-
-        if start_idx is None:
-            return m.group(0)
-
-        window_tokens = _resolve_window(tokens, start_idx, end_spec)
-        joiner = delim if delim is not None else '-'
-        return apply_case_conversion(joiner.join(window_tokens), case_modifier)
-
-    result = VAL_EXPR_REGEX.sub(replace_match, pattern)
-    return result
+                warnings.append('Counter: {}'.format(error))
+                result = param_dict.get('counter', '')
+            else:
+                result = generator(row_index)
+        else:
+            raise ValueError('Unknown operation kind: {}'.format(kind))
+        parts.append(apply_case_conversion(result, case))
+    return ''.join(parts)
 
 
 # ============================================================================
@@ -1088,35 +967,26 @@ class PreviewItem(object):
     def HasChanges(self):
         return self.NewName != self.CurrentName
     
-    def format_value(self, pattern, param_values, tokenizer_func, counter_value='', original_value='', find_text='', replace_text='', sequence_seeds=None, row_index=0, match_whole_word=False, match_case=True, final_case='None'):
-        """Format new name using tokenization and parameter substitution"""
+    def format_value(self, composition, param_values, tokenizer_func, counter_value='', original_value='', find_text='', replace_text='', sequence_seeds=None, row_index=0, match_whole_word=False, match_case=True, final_case='None'):
+        """Format new name using a structured token composition."""
         if self.final:
             return
         
         self.tooltip = ''
         try:
-            if not pattern:
+            if not composition:
                 self.NewName = ''
-                self.tooltip = 'Pattern Required'
+                self.tooltip = 'Composition Required'
                 return
-            
-            pattern = pattern.strip()
-            
-            # Build parameter dict for substitution
+            validate_composition(composition)
             param_dict = {}
-            for i, val in enumerate(param_values, 1):
-                param_dict['param{}'.format(i)] = val if val else ''
-
+            if isinstance(param_values, dict):
+                param_dict.update(param_values)
             param_dict['orig'] = '' if original_value is None else str(original_value)
-
-            # Counter aliases: {param6} and {count}
-            param_dict['param6'] = '' if counter_value is None else str(counter_value)
-            param_dict['count'] = '' if counter_value is None else str(counter_value)
-            
-            # Use the tokenization + parameter substitution pattern application
+            param_dict['counter'] = '' if counter_value is None else str(counter_value)
             warnings = []
-            new_name = apply_pattern(
-                self.CurrentName, pattern, param_dict, tokenizer_func,
+            new_name = evaluate_composition(
+                self.CurrentName, composition, param_dict, tokenizer_func,
                 sequence_seeds, row_index, warnings)
 
             if find_text:
@@ -1164,7 +1034,9 @@ class ReValueDialog(object):
         self.available_params = []
         self.param_values_map = {}
         self._suspend_events = False
-        self._pattern_before_original = None
+        self._composition_before_original = None
+        self.composition = default_composition()
+        self.composition_error = ''
         self.sort_mode = SORT_NONE
         self.sort_param = ''
         self.sort_descending = False
@@ -1172,11 +1044,9 @@ class ReValueDialog(object):
         # Get controls - mode toggle
         self.btn_mode = self.window.FindName('btn_mode')
         
-        # Get controls - delimiters
-        self.txt_delimiters = self.window.FindName('txt_delimiters')
-        
         # Get controls - original parameter dropdown
         self.combo_orig_param = self.window.FindName('combo_orig_param')
+        self.txt_delimiters = self.window.FindName('txt_delimiters')
 
         # Get controls - row sorting
         self.combo_sort_by = self.window.FindName('combo_sort_by')
@@ -1187,32 +1057,16 @@ class ReValueDialog(object):
         self.current_sort_hint = self.window.FindName('current_sort_hint')
         self.current_header_sort_hint = self.window.FindName('current_header_sort_hint')
         
-        # Get controls - parameters (5 combos)
-        self.param_combos = [
-            self.window.FindName('combo_param1'),
-            self.window.FindName('combo_param2'),
-            self.window.FindName('combo_param3'),
-            self.window.FindName('combo_param4'),
-            self.window.FindName('combo_param5')
-        ]
         
-        # Get controls - pattern
-        self.txt_pattern = self.window.FindName('txt_pattern')
+        # Get controls - composition
         self.btn_use_orig = self.window.FindName('btn_use_orig')
         self.combo_final_case = self.window.FindName('combo_final_case')
-
-        # Get controls - optional counter
-        self.txt_counter_start = self.window.FindName('txt_counter_start')
-        self.txt_counter_increment = self.window.FindName('txt_counter_increment')
 
         # Get controls - final value find/replace
         self.txt_find = self.window.FindName('txt_find')
         self.txt_replace = self.window.FindName('txt_replace')
         self.chk_match_whole_word = self.window.FindName('chk_match_whole_word')
         self.chk_match_case = self.window.FindName('chk_match_case')
-        
-        # Get controls - tokenization display
-        self.txt_tokenization = self.window.FindName('txt_tokenization')
         
         # Get controls - grid and buttons
         self.preview_grid = self.window.FindName('preview_grid')
@@ -1237,20 +1091,13 @@ class ReValueDialog(object):
         
         # Wire up events
         self.btn_mode.Click += self.OnModeChanged
-        if self.txt_delimiters:
-            self.txt_delimiters.TextChanged += self.OnSettingsChanged
         if self.combo_orig_param:
             self.combo_orig_param.SelectionChanged += self.OnSettingsChanged
+        if self.txt_delimiters:
+            self.txt_delimiters.TextChanged += self.OnSettingsChanged
         if self.combo_final_case:
             self.combo_final_case.SelectionChanged += self.OnSettingsChanged
         
-        for combo in self.param_combos:
-            combo.SelectionChanged += self.OnSettingsChanged
-
-        if self.txt_counter_start:
-            self.txt_counter_start.TextChanged += self.OnSettingsChanged
-        if self.txt_counter_increment:
-            self.txt_counter_increment.TextChanged += self.OnSettingsChanged
         if self.txt_find:
             self.txt_find.TextChanged += self.OnSettingsChanged
         if self.txt_replace:
@@ -1259,7 +1106,6 @@ class ReValueDialog(object):
             checkbox.Checked += self.OnSettingsChanged
             checkbox.Unchecked += self.OnSettingsChanged
         
-        self.txt_pattern.TextChanged += self.OnSettingsChanged
         self.btn_use_orig.Click += self.OnUseOriginal
         self.preview_grid.SelectedCellsChanged += self.OnGridSelectionChanged
         self.preview_grid.Sorting += self.OnGridSorting
@@ -1286,11 +1132,9 @@ class ReValueDialog(object):
             self.btn_mode.IsEnabled = False
             self.btn_mode.Parent.Visibility = WpfVisibility.Collapsed
             self.combo_orig_param.IsEnabled = False
-            for combo in self.param_combos:
-                combo.IsEnabled = False
             self.btn_edit_filters.IsEnabled = False
             self.btn_clear_filters.IsEnabled = False
-            self.more_settings.Header = 'More Settings - Delimiters & Counter'
+            self.more_settings.Header = 'More Settings - Parameter Filters'
         
         # Initialize data
         self.initialize_data()
@@ -1302,20 +1146,25 @@ class ReValueDialog(object):
         self._suspend_events = True
         if self.is_filter_name_context:
             session_settings = dict(_SESSION_SETTING_DEFAULTS)
-            session_settings['pattern'] = '{orig}'
+            session_settings['composition'] = serialize_composition(original_composition())
         else:
             session_settings = load_session_settings()
+        self.composition_error = session_settings.get('composition_error', '')
+        try:
+            self.composition = deserialize_composition(session_settings.get(
+                'composition', serialize_composition(default_composition())))
+        except ValueError as ex:
+            self.composition = default_composition()
+            self.composition_error = str(ex)
 
         # Set mode
         self.is_instance_mode = (self.is_filter_name_context or
                                 str(session_settings.get('mode', 'type')).lower() == 'instance')
         self.btn_mode.IsChecked = self.is_instance_mode
-        
-        # Set delimiters
+
         if self.txt_delimiters:
             saved_delims = session_settings.get('delimiters', DEFAULT_DELIMITERS)
             self.txt_delimiters.Text = saved_delims if saved_delims else DEFAULT_DELIMITERS
-
         # Set counter inputs
         if self.combo_final_case:
             final_case = session_settings.get('final_case', 'None')
@@ -1325,10 +1174,6 @@ class ReValueDialog(object):
             except ValueError:
                 self.combo_final_case.SelectedIndex = 0
 
-        if self.txt_counter_start:
-            self.txt_counter_start.Text = session_settings.get('counter_start', 'A') or 'A'
-        if self.txt_counter_increment:
-            self.txt_counter_increment.Text = session_settings.get('counter_increment', '1') or '1'
         if self.txt_find:
             self.txt_find.Text = session_settings.get('find_text', '') or ''
         if self.txt_replace:
@@ -1345,20 +1190,6 @@ class ReValueDialog(object):
         
         self.populate_source_parameters(session_settings.get('orig_param', ''))
         self.populate_sort_options(session_settings)
-        
-        # Populate parameter combo boxes (5 slots)
-        for i, combo in enumerate(self.param_combos):
-            if combo:
-                combo.Items.Add('')
-                for param_name in self.available_params:
-                    combo.Items.Add(param_name)
-
-                param_key = 'param{}'.format(i + 1)
-                prev_selection = session_settings.get(param_key, '')
-                if prev_selection and prev_selection in self.available_params:
-                    combo.SelectedItem = prev_selection
-                else:
-                    combo.SelectedIndex = 0
         
         # Create preview items
         for elem in self.elements:
@@ -1401,9 +1232,6 @@ class ReValueDialog(object):
         self.preview_view = CollectionViewSource.GetDefaultView(self.preview_items)
         self.preview_view.Filter = Predicate[object](self.matches_preview_filters)
         
-        # Set pattern
-        self.txt_pattern.Text = session_settings.get('pattern', '{val1}') or '{val1}'
-        
         self._suspend_events = False
 
         # Store normalized values into current-session settings.
@@ -1413,7 +1241,6 @@ class ReValueDialog(object):
         self.update_preview()
 
         # Update tokenization display for first item
-        self.update_tokenization_display()
 
     def populate_source_parameters(self, previous_selection):
         """Keep the system default distinct from real, possibly bracketed names."""
@@ -1620,35 +1447,29 @@ class ReValueDialog(object):
             return ''
         return str(combo.SelectedItem).strip()
 
-    def _pattern_uses_counter(self):
-        """Return True when pattern contains {count} or {param6}."""
-        pattern = self.txt_pattern.Text if self.txt_pattern else ''
-        if not pattern:
-            return False
-        return re.search(
-            r'\{\s*(count|param6)(?:\s*~\s*(?:upper|lower|title|sentence))?\s*\}',
-            pattern, re.IGNORECASE) is not None
+    def _composition_uses_counter(self):
+        return _composition_uses_counter(self.composition)
 
     def persist_settings(self):
         """Persist current UI settings for this Revit session only."""
         if getattr(self, 'is_filter_name_context', False):
+            return
+        try:
+            validate_composition(self.composition)
+            serialized_composition = serialize_composition(self.composition)
+            self.composition_error = ''
+        except ValueError as ex:
+            self.composition_error = str(ex)
             return
         mode = 'instance' if self.is_instance_mode else 'type'
         save_session_setting('mode', mode)
         save_session_setting('delimiters', self.get_delimiters())
         save_session_setting('orig_param', self.get_selected_original_param_name())
 
-        for i, combo in enumerate(self.param_combos):
-            save_session_setting('param{}'.format(i + 1), self._selected_combo_text(combo))
-
-        pattern = self.txt_pattern.Text if self.txt_pattern else ''
-        save_session_setting('pattern', pattern)
+        save_session_setting(
+            'composition',
+            serialized_composition)
         save_session_setting('final_case', self._selected_final_case())
-
-        start_text = self.txt_counter_start.Text if self.txt_counter_start else 'A'
-        increment_text = self.txt_counter_increment.Text if self.txt_counter_increment else '1'
-        save_session_setting('counter_start', start_text)
-        save_session_setting('counter_increment', increment_text)
 
         find_text = self.txt_find.Text if self.txt_find else ''
         replace_text = self.txt_replace.Text if self.txt_replace else ''
@@ -1660,16 +1481,14 @@ class ReValueDialog(object):
         save_session_setting('sort_param', self.sort_param)
         save_session_setting('sort_descending', self.sort_descending)
     
-    def get_delimiters(self):
-        """Get current delimiters from UI"""
-        if self.txt_delimiters:
-            return self.txt_delimiters.Text or DEFAULT_DELIMITERS
-        return DEFAULT_DELIMITERS
-    
     def get_tokenizer_func(self):
-        """Get tokenizer function with current delimiters"""
-        delimiters = self.get_delimiters()
-        return build_tokenizer(delimiters)
+        """Get the source-tokenizer function for the current delimiter field."""
+        delimiters = self.txt_delimiters.Text if getattr(self, 'txt_delimiters', None) else ''
+        return build_tokenizer(delimiters if delimiters else DEFAULT_DELIMITERS)
+
+    def get_delimiters(self):
+        delimiters = self.txt_delimiters.Text if getattr(self, 'txt_delimiters', None) else ''
+        return delimiters if delimiters else DEFAULT_DELIMITERS
 
     def _selected_final_case(self):
         """Return the selected final-case option."""
@@ -1745,23 +1564,15 @@ class ReValueDialog(object):
         return ""
     
     def get_selected_param_values(self, element):
-        """Get values for all 5 selected parameters"""
+        """Get values for parameter names referenced by the composition."""
         if getattr(self, 'is_filter_name_context', False):
-            return [''] * 5
-        values = []
-        for combo in self.param_combos:
-            if combo:
-                selected = combo.SelectedItem
-                if selected:
-                    param_name = str(selected).strip()
-                    if param_name:
-                        values.append(self.get_param_value(element, param_name))
-                    else:
-                        values.append("")
-                else:
-                    values.append("")
-            else:
-                values.append("")
+            return {}
+        values = {}
+        for item in self.composition['operations']:
+            if item['kind'] == 'parameter':
+                name = item.get('parameter', '').strip()
+                if name and name not in values:
+                    values[name] = self.get_param_value(element, name)
         return values
     
     def get_original_source_text(self, element):
@@ -1807,34 +1618,50 @@ class ReValueDialog(object):
         return grid.Items[0]
 
     def update_tokenization_display(self):
-        """Refresh only token samples; never recalculate preview values."""
-        if self._suspend_events:
+        """Refresh the visible source-token preview without recalculating preview values."""
+        if getattr(self, '_suspend_events', False):
             return
         editor = getattr(self, 'token_editor', None)
         if editor is not None:
             editor.refresh()
-        if self.txt_tokenization:
-            item = self.get_token_sample_item()
-            tokens = self.get_tokenizer_func()(item.CurrentName) if item is not None else []
-            token_display = ', '.join('[{0}] {1}'.format(i + 1, value)
-                                      for i, value in enumerate(tokens))
-            self.txt_tokenization.Text = 'Tokens: ' + (token_display or '(none)')
+        field = self.window.FindName('tokenized_sample')
+        if not field:
+            return
+        item = self.get_token_sample_item()
+        if item is None:
+            field.Text = 'Tokens: (no visible rows)'
+            return
+        source = item.CurrentName if item.CurrentName is not None else ''
+        tokens = self.get_tokenizer_func()(source)
+        field.Text = 'Tokens: ' + (' '.join(
+            '[{0}] {1}'.format(index + 1, token)
+            for index, token in enumerate(tokens)) if tokens else '(none)')
 
     def get_counter_generator(self):
-        """Build counter generator only when pattern asks for a counter token."""
-        if not self._pattern_uses_counter():
+        """Compatibility hook; Counter values are generated per chip."""
+        if not self._composition_uses_counter():
             return None, None
-
-        start_text = self.txt_counter_start.Text if self.txt_counter_start else ''
-        increment_text = self.txt_counter_increment.Text if self.txt_counter_increment else '1'
-        return build_counter_generator(start_text, increment_text)
+        counter_item = next(
+            item for item in self.composition['operations']
+            if item['kind'] == 'counter')
+        return build_counter_generator(
+            counter_item.get('start', 'A'),
+            str(counter_item.get('increment', 1)))
     
     def update_preview(self):
         """Sort, then number only rows passing the Current Value and parameter filters,
         in display order. The New Value filter is excluded so it can never renumber."""
-        pattern = self.txt_pattern.Text
+        composition = self.composition
         tokenizer_func = self.get_tokenizer_func()
         counter_gen, counter_error = self.get_counter_generator()
+
+        if getattr(self, 'composition_error', ''):
+            for item in self.preview_items:
+                item.NewName = ''
+                item.tooltip = 'Composition Error: {}'.format(self.composition_error)
+            self.refresh_preview_filters(recompute_matches=False)
+            self.update_tokenization_display()
+            return
 
         for item in self.preview_items:
             # CurrentName column always reflects the selected tokenization source.
@@ -1848,7 +1675,6 @@ class ReValueDialog(object):
                 item.tooltip = 'Counter Error: {}'.format(counter_error)
 
             self.refresh_preview_filters(recompute_matches=False)
-            self.update_tokenization_display()
             return
 
         numbered_rows = [item for item in self.preview_items
@@ -1859,11 +1685,9 @@ class ReValueDialog(object):
         sequence_seeds = {}
         if row_contexts:
             first_source, first_values = row_contexts[0]
-            first_param_dict = {}
-            for param_index, value in enumerate(first_values, 1):
-                first_param_dict['param{}'.format(param_index)] = value if value else ''
+            first_param_dict = dict(first_values)
             first_tokens = tokenizer_func(first_source)
-            for source_ref in _sequence_source_refs(pattern):
+            for source_ref in _sequence_source_refs(composition):
                 sequence_seeds[source_ref] = _resolve_progression_source(
                     source_ref, first_tokens, first_param_dict)
 
@@ -1873,7 +1697,7 @@ class ReValueDialog(object):
             original_source, param_values = row_contexts[idx]
             counter_value = counter_gen(idx) if counter_gen else ''
             item.format_value(
-                pattern,
+                composition,
                 param_values,
                 tokenizer_func,
                 counter_value,
@@ -1888,7 +1712,6 @@ class ReValueDialog(object):
             )
         
         self.refresh_preview_filters(recompute_matches=False)
-        self.update_tokenization_display()
     
     def OnModeChanged(self, sender, args):
         """Called when instance/type mode changes"""
@@ -1908,20 +1731,6 @@ class ReValueDialog(object):
 
         self.populate_source_parameters(session_settings.get('orig_param', ''))
         self.populate_sort_options(session_settings)
-        
-        # Clear and rebuild parameter combos
-        for i, combo in enumerate(self.param_combos):
-            combo.Items.Clear()
-            combo.Items.Add('')
-            for param_name in self.available_params:
-                combo.Items.Add(param_name)
-
-            param_key = 'param{}'.format(i + 1)
-            prev_selection = session_settings.get(param_key, '')
-            if prev_selection and prev_selection in self.available_params:
-                combo.SelectedItem = prev_selection
-            else:
-                combo.SelectedIndex = 0
         
         # Rebuild preview items
         self.preview_items.Clear()
@@ -1962,14 +1771,16 @@ class ReValueDialog(object):
         self.update_preview()
     
     def OnSettingsChanged(self, sender, args):
-        """Called when patterns or parameters change"""
+        """Called when composition-affecting settings change."""
         if self._suspend_events:
             return
-        if self.btn_use_orig.IsChecked and self.txt_pattern.Text != '{orig}':
+        if self.btn_use_orig.IsChecked and (
+                self.composition != original_composition()):
             self.btn_use_orig.IsChecked = False
-            self._pattern_before_original = None
+            self._composition_before_original = None
         self.persist_settings()
         self.update_preview()
+        self.update_tokenization_display()
     
     def OnGridSelectionChanged(self, sender, args):
         """Called when grid selection changes"""
@@ -2048,7 +1859,6 @@ class ReValueDialog(object):
             status += (' {} row(s) excluded: blank/non-numeric or unsupported display '
                        'format (use decimal project units).').format(invalid_values)
         self.txt_filter_status.Text = status
-        self.update_tokenization_display()
 
     def commit_preview_edits(self):
         if not self.preview_grid.CommitEdit(DataGridEditingUnit.Cell, True):
@@ -2164,14 +1974,16 @@ class ReValueDialog(object):
                 self.window.Focus()
 
     def OnUseOriginal(self, sender, args):
-        """Temporarily use the source value, or restore the previous pattern."""
+        """Temporarily use an Original operation, or restore the saved composition."""
         if self.btn_use_orig.IsChecked:
-            self._pattern_before_original = self.txt_pattern.Text
-            self.txt_pattern.Text = '{orig}'
-        elif self._pattern_before_original is not None:
-            pattern = self._pattern_before_original
-            self._pattern_before_original = None
-            self.txt_pattern.Text = pattern
+            self._composition_before_original = deep_copy_composition(self.composition)
+            self.composition = original_composition()
+        elif self._composition_before_original is not None:
+            self.composition = deserialize_composition(
+                serialize_composition(self._composition_before_original))
+            self._composition_before_original = None
+        self.persist_settings()
+        self.update_preview()
 
     def OnClose(self, sender, args):
         """Close without applying pending changes."""
@@ -2380,7 +2192,7 @@ def revalue_elements(revalue_map, is_instance_mode, target_param_name=''):
 def _resolve_target_param_name(selected_source_name):
     """Normalize source selection into explicit write target.
 
-    Empty/placeholder values route to rename mode (empty target parameter).
+    Empty values route to rename mode (empty target parameter).
     """
     if selected_source_name is None:
         return ''

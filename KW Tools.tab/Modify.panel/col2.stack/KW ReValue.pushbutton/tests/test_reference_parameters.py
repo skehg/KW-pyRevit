@@ -130,13 +130,17 @@ class ReferenceParameterTests(unittest.TestCase):
             self.assertEqual('First Floor', self.dialog.get_param_value(element, 'Reference'))
 
     def test_tokens_and_filter_expressions_use_same_level_names(self):
-        self.dialog.param_combos = [
-            types.SimpleNamespace(SelectedItem='Base Constraint'),
-            types.SimpleNamespace(SelectedItem='Top Constraint'),
-            types.SimpleNamespace(SelectedItem=''),
-        ]
+        self.dialog.composition = {'version': 1, 'operations': [
+            {'kind': 'parameter', 'parameter': 'Base Constraint',
+             'case': 'Unchanged', 'progression': None},
+            {'kind': 'parameter', 'parameter': 'Top Constraint',
+             'case': 'Unchanged', 'progression': None},
+        ]}
         values = self.namespace['get_selected_param_values'](self.dialog, self.wall)
-        self.assertEqual(['Ground Floor', 'First Floor', ''], values)
+        self.assertEqual({
+            'Base Constraint': 'Ground Floor',
+            'Top Constraint': 'First Floor',
+        }, values)
         expression = parse_expression(
             'AND([Base Constraint] = "Ground Floor", '
             '[Top Constraint] = "First Floor")')

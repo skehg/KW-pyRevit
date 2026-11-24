@@ -102,9 +102,20 @@ for ($i = 0; $i -lt $caseLabels.Count; $i++) {
         throw 'Final Case options must demonstrate the case without changing their internal values.'
     }
 }
-if ($window.FindName('combo_editor_mode').SelectedIndex -ne 0 -or
-    $window.FindName('token_editor_panel').Visibility -ne 'Visible') {
-    throw 'The token interface must be the default.'
+if ($null -ne $window.FindName('combo_editor_mode') -or
+    $null -ne $window.FindName('txt_pattern')) {
+    throw 'Advanced Pattern controls must not exist.'
+}
+if ($window.FindName('token_editor_panel').Visibility -ne 'Visible') {
+    throw 'The token-rule interface must be the default.'
+}
+$delimiterField = $window.FindName('txt_delimiters')
+$tokenPreview = $window.FindName('tokenized_sample')
+if ($null -eq $delimiterField -or $delimiterField.ActualWidth -le 0) {
+    throw 'Delimiters must remain visible and editable in the toolbar.'
+}
+if ($null -eq $tokenPreview) {
+    throw 'The source token preview must remain visible.'
 }
 Write-Output 'PASS: token interface is the default.'
 $caret = $window.FindName('token_insertion_caret')
@@ -166,9 +177,9 @@ if ($null -ne $pill.Effect) { throw 'Disabled tokens must not cast a raised shad
 $chip.IsEnabled = $true
 if ($null -eq $pill.Effect) { throw 'Enabled tokens must restore their raised shadow.' }
 Write-Output 'PASS: grey chip fill, highlight, shadow and disabled-state restoration.'
-# Existing compact-layout checks cover Advanced Pattern mode.
-$window.FindName('token_editor_panel').Visibility = 'Collapsed'
-$window.Content = $null
+# The token-rule composition remains the only main editor.
+$window.FindName('token_editor_panel').Visibility = 'Visible'
+$window.Content = $window.Content
 $preview = $window.FindName('preview_grid')
 $more = $window.FindName('more_settings')
 $settingsRow = $window.FindName('settings_row')
@@ -190,10 +201,10 @@ $close = $window.FindName('btn_close')
 if ($close.Content -ne 'Close') { throw 'The main dialog exit button must say Close.' }
 $useOrig = $window.FindName('btn_use_orig')
 if ($useOrig -isnot [System.Windows.Controls.Primitives.ToggleButton]) {
-    throw 'The original-pattern shortcut must be a toggle.'
+    throw 'The Original Source shortcut must be a toggle.'
 }
-if ($useOrig.IsChecked) { throw 'The original-pattern toggle must start off.' }
-if ($useOrig.Content -ne 'Pattern') { throw 'The switch must show Pattern when off.' }
+if ($useOrig.IsChecked) { throw 'The Rules/Source toggle must start off.' }
+if ($useOrig.Content -ne 'Rules') { throw 'The switch must show Rules when off.' }
 $null = $useOrig.ApplyTemplate()
 $track = $useOrig.Template.FindName('switch_track', $useOrig)
 $thumb = $useOrig.Template.FindName('switch_thumb', $useOrig)
@@ -202,15 +213,15 @@ if ($thumb.HorizontalAlignment -ne 'Left' -or $track.Background.Color.ToString()
     throw 'The off switch must have a grey track and left-aligned thumb.'
 }
 $useOrig.IsChecked = $true
-Assert-SwitchLabels $useOrig 'Pattern' 'Source'
+Assert-SwitchLabels $useOrig 'Rules' 'Source'
 if ($thumb.HorizontalAlignment -ne 'Right' -or $track.Background.Color.ToString() -ne '#FF287D46') {
     throw 'The on switch must have a green track and right-aligned thumb.'
 }
-if ($useOrig.ToolTip -notlike 'Using Source*') { throw 'The on tooltip must describe the current Source state.' }
+if ($useOrig.ToolTip -notlike 'Using Original Source*') { throw 'The on tooltip must describe the current Source state.' }
 $useOrig.IsChecked = $false
-if ($useOrig.Content -ne 'Pattern') { throw 'The switch must return to showing Pattern when off.' }
+if ($useOrig.Content -ne 'Rules') { throw 'The switch must return to showing Rules when off.' }
 if ($thumb.HorizontalAlignment -ne 'Left') { throw 'The thumb must return to the left when off.' }
-if ($useOrig.ToolTip -notlike 'Using your pattern*') { throw 'The off tooltip must describe the current Pattern state.' }
+if ($useOrig.ToolTip -notlike 'Using ordered token rules*') { throw 'The off tooltip must describe the current Rules state.' }
 $switchPeer = [System.Windows.Automation.Peers.UIElementAutomationPeer]::CreatePeerForElement($useOrig)
 $toggleProvider = $switchPeer.GetPattern([System.Windows.Automation.Peers.PatternInterface]::Toggle)
 $toggleProvider.Toggle()
@@ -311,7 +322,7 @@ foreach ($size in @(@(1010, 880), @(720, 430), @(1440, 880), @(1920, 880))) {
     Measure-Layout $size[0] $size[1]
     foreach ($checked in @($true, $false)) {
         foreach ($spec in @(@('btn_mode', 'Type', 'Instance'),
-                @('btn_sort_direction', 'Asc', 'Desc'), @('btn_use_orig', 'Pattern', 'Source'))) {
+                @('btn_sort_direction', 'Asc', 'Desc'), @('btn_use_orig', 'Rules', 'Source'))) {
             $switch = $window.FindName($spec[0])
             $switch.IsChecked = $checked
             Measure-Layout $size[0] $size[1]
@@ -371,10 +382,9 @@ foreach ($size in @(@(1010, 880), @(720, 430), @(1440, 880), @(1920, 880))) {
         throw 'Divider should be hidden when More Settings is collapsed.'
     }
     Assert-Footer
-    $pattern = $window.FindName('txt_pattern')
-    if ($pattern.ActualWidth -lt 100 -or
-        $useOrig.ActualWidth + $useOrig.Margin.Left + $useOrig.Margin.Right + 0.1 -lt $useOrig.DesiredSize.Width) {
-        throw 'Pattern and the original-pattern shortcut must remain usable.'
+    if ($useOrig.ActualWidth + $useOrig.Margin.Left + $useOrig.Margin.Right + 0.1 -lt
+        $useOrig.DesiredSize.Width) {
+        throw 'Rules and the Original Source shortcut must remain usable.'
     }
     Write-Output ("PASS: collapsed {0}x{1}, preview height {2:N0} ({3:P0})." -f
         $size[0], $size[1], $preview.ActualHeight,
@@ -391,8 +401,6 @@ $sortColumn.Visibility = 'Collapsed'
 Write-Output ('PASS: Sort column fits at 720 (Current {0:N0}, New {1:N0}).' -f
     $currentWidth, $newWidth)
 
-$window.FindName('txt_pattern').Text = '{orig}-{count}'
-$window.FindName('txt_counter_start').Text = 'A'
 $window.FindName('txt_find').Text = 'Door'
 $filterSummary.Text = '3 rules - Custom grouping'
 $more.IsExpanded = $true
@@ -426,8 +434,6 @@ $settingsRow.Height = [System.Windows.GridLength]::Auto
 $previewRow.Height = [System.Windows.GridLength]::new(3, [System.Windows.GridUnitType]::Star)
 Measure-Layout 1010 880
 foreach ($entry in @(
-    @('txt_pattern', '{orig}-{count}'),
-    @('txt_counter_start', 'A'),
     @('txt_find', 'Door'),
     @('txt_filter_summary', '3 rules - Custom grouping')
 )) {
