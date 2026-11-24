@@ -22,6 +22,7 @@ CASE_LABELS = {
     'sentence': 'Sentence case',
 }
 OPERATION_KINDS = ('source', 'parameter', 'original', 'counter', 'text')
+DEFAULT_PARAMETER_DELIMITERS = r'-_/,\|'
 
 
 def operation(kind, **values):
@@ -30,12 +31,19 @@ def operation(kind, **values):
     if kind == 'text':
         item.setdefault('text', '')
     if kind == 'source':
-        item.setdefault('start', {'direction': 'start', 'index': 1})
-        item.setdefault('end', None)
+        item.setdefault('selections', [
+            selection('single', position={'direction': 'start', 'index': 1}),
+        ])
         item.setdefault('separator', '')
         item.setdefault('progression', None)
     elif kind == 'parameter':
         item.setdefault('parameter', '')
+        item.setdefault('tokenize', False)
+        item.setdefault('delimiters', DEFAULT_PARAMETER_DELIMITERS)
+        item.setdefault('selections', [
+            selection('single', position={'direction': 'start', 'index': 1}),
+        ])
+        item.setdefault('separator', '')
         item.setdefault('progression', None)
     elif kind == 'counter':
         item.setdefault('start', 'A')
@@ -46,12 +54,25 @@ def operation(kind, **values):
     return item
 
 
+def selection(kind, **values):
+    if kind == 'range':
+        return {
+            'kind': 'range',
+            'start': values.get('start', {'direction': 'start', 'index': 1}),
+            'end': values.get('end', {'direction': 'end', 'index': 1}),
+        }
+    if kind == 'single':
+        return {
+            'kind': 'single',
+            'position': values.get('position', {'direction': 'start', 'index': 1}),
+        }
+    raise ValueError('Selection kind must be range or single.')
+
+
 def default_composition():
     return {
         'version': 1,
-        'operations': [
-            operation('source', start={'direction': 'start', 'index': 1})
-        ],
+        'operations': [operation('source')],
     }
 
 
@@ -114,6 +135,23 @@ def _validate_progression(progression, label):
         raise ValueError('{} progression step must be an integer.'.format(label))
 
 
+def _validate_selections(selections, label):
+    if not isinstance(selections, list) or not selections:
+        raise ValueError('{} must be a non-empty list.'.format(label))
+    for selection_index, selection in enumerate(selections):
+        selection_label = '{} selection {}'.format(label, selection_index + 1)
+        if not isinstance(selection, dict):
+            raise ValueError('{} must be a dictionary.'.format(selection_label))
+        selection_kind = selection.get('kind')
+        if selection_kind == 'range':
+            _validate_position(selection.get('start'), selection_label + ' start')
+            _validate_position(selection.get('end'), selection_label + ' end')
+        elif selection_kind == 'single':
+            _validate_position(selection.get('position'), selection_label + ' position')
+        else:
+            raise ValueError('{} has an invalid kind.'.format(selection_label))
+
+
 def validate_composition(composition):
     if not isinstance(composition, dict):
         raise ValueError('Composition must be a dictionary.')
@@ -142,29 +180,50 @@ def validate_composition(composition):
             if item.get('progression') is not None:
                 raise ValueError('{} Text operations do not support progression.'.format(label))
         elif kind == 'source':
-            _validate_position(item.get('start'), label + ' start')
-            end = item.get('end')
-            if end is not None:
-                _validate_position(end, label + ' end')
+            if 'start' in item or 'end' in item:
+                raise ValueError('{} uses the unsupported legacy source shape.'.format(label))
             separator = item.get('separator', '')
             if not isinstance(separator, string_types):
                 raise ValueError('{} separator must be a string.'.format(label))
             progression = item.get('progression')
             _validate_progression(progression, label)
+            selections = item.get('selections')
+            _validate_selections(selections, label + ' selections')
             if progression is not None:
-                start = item.get('start')
-                if item.get('end') is not None:
+                if len(selections) != 1 or selections[0].get('kind') != 'single':
                     raise ValueError('{} progression requires a single source position.'.format(label))
+                start = selections[0].get('position')
                 if start.get('direction') != 'start':
                     raise ValueError('{} progression requires an absolute Start position.'.format(label))
-            if item.get('end') is None and item.get('separator', ''):
-                raise ValueError('{} separator is only valid for a source range.'.format(label))
         elif kind == 'parameter':
             parameter = item.get('parameter')
             if not isinstance(parameter, string_types) or not parameter.strip():
                 raise ValueError('{} parameter name is required.'.format(label))
+            tokenize = item.get('tokenize', False)
+            if not isinstance(tokenize, bool):
+                raise ValueError('{} tokenize setting must be true or false.'.format(label))
+            progression = item.get('progression')
+            _validate_progression(progression, label)
+            if tokenize:
+                delimiters = item.get('delimiters')
+                separator = item.get('separator', '')
+                if not isinstance(delimiters, string_types) or not delimiters:
+                    raise ValueError('{} token delimiters are required.'.format(label))
+                if not isinstance(separator, string_types):
+                    raise ValueError('{} separator must be a string.'.format(label))
+                selections = item.get('selections')
+                _validate_selections(selections, label + ' selections')
+                if progression is not None:
+                    if len(selections) != 1 or selections[0].get('kind') != 'single':
+                        raise ValueError(
+                            '{} progression requires a single parameter token.'.format(label))
+                    position = selections[0].get('position')
+                    if position.get('direction') != 'start':
+                        raise ValueError(
+                            '{} progression requires an absolute Start position.'.format(label))
+        elif kind == 'original':
             _validate_progression(item.get('progression'), label)
-        elif kind in ('original', 'counter'):
+        elif kind == 'counter':
             if item.get('progression') is not None:
                 raise ValueError('{} does not support progression.'.format(label))
         if kind == 'counter':
@@ -249,30 +308,44 @@ def describe_operation(item, samples=()):
     elif kind == 'parameter':
         name = item.get('parameter', '')
         text = 'Parameter: {}'.format(name or '(unselected)')
+        if item.get('tokenize'):
+            parts = []
+            for selection in item.get('selections', []):
+                if selection['kind'] == 'range':
+                    start_direction, start_number = position_controls(selection['start'])
+                    end_direction, end_number = position_controls(selection['end'])
+                    if end_direction == 'Following':
+                        parts.append('{} {} + {} following'.format(
+                            start_direction, start_number, end_number))
+                    else:
+                        parts.append('{} {} to {} {}'.format(
+                            start_direction, start_number,
+                            end_direction, end_number))
+                else:
+                    direction, number = position_controls(selection['position'])
+                    parts.append('{} {}'.format(direction, number))
+            if parts:
+                text += ' [' + ' + '.join(parts) + ']'
     elif kind == 'source':
-        start = item['start']
-        end = item.get('end')
-        direction, number = position_controls(start)
-        if direction == 'Start':
-            index = number
-            text = 'Start {}'
-            text = text.format(index)
-            try:
-                sample_index = int(index) - 1
-                sample = samples[sample_index] if 0 <= sample_index < len(samples) else '(missing in sample)'
-                text += ': ' + sample
-            except Exception:
-                pass
-        else:
-            text = 'End {}'.format(number)
-        if end is not None:
-            end_direction, end_number = position_controls(end)
-            if end_direction == 'Following':
-                text += ' + {} following'.format(end_number)
+        parts = []
+        for selection in item['selections']:
+            if selection['kind'] == 'range':
+                start_direction, start_number = position_controls(selection['start'])
+                end_direction, end_number = position_controls(selection['end'])
+                if end_direction == 'Following':
+                    part = '{} {} + {} following'.format(
+                        start_direction, start_number, end_number)
+                else:
+                    part = '{} {} to {} {}'.format(
+                        start_direction, start_number,
+                        end_direction, end_number)
             else:
-                text += ' to {} {}'.format(end_direction, end_number)
-            separator = item.get('separator', '')
-            text += ' | ' + repr(separator)
+                position_direction, position_number = position_controls(selection['position'])
+                part = '{} {}'.format(position_direction, position_number)
+            parts.append(part)
+        text = 'Selections: ' + ' + '.join(parts)
+        if len(item['selections']) > 1:
+            text += ' | ' + repr(item.get('separator', ''))
     else:
         text = 'Unknown'
     progression = item.get('progression')

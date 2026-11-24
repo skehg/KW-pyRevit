@@ -257,7 +257,7 @@ def apply_case_conversion(value, case_name):
     return text
 
 
-def _resolve_progression_source(source_ref, tokens, param_dict):
+def _resolve_progression_source(source_ref, tokens, param_dict, composition=None):
     """Get one token or selected parameter value for an inc/seq operation."""
     if source_ref.startswith('val'):
         try:
@@ -268,25 +268,46 @@ def _resolve_progression_source(source_ref, tokens, param_dict):
             pass
         return ''
 
+    if source_ref.startswith('ptoken') and composition is not None:
+        try:
+            operation_index = int(source_ref[6:])
+            item = composition['operations'][operation_index]
+            if item.get('kind') == 'parameter' and item.get('tokenize'):
+                return _resolve_tokenized_parameter(
+                    item, param_dict.get(item.get('parameter'), ''))
+        except Exception:
+            pass
+        return ''
+
     return param_dict.get(source_ref, '')
+
+
+def _operation_progression_ref(operation_index, item):
+    if item['kind'] == 'source':
+        selections = item['selections']
+        if len(selections) == 1 and selections[0].get('kind') == 'single':
+            position = selections[0].get('position', {})
+            if position.get('direction') == 'start':
+                return 'val{}'.format(position['index'])
+    elif item['kind'] == 'parameter':
+        if item.get('tokenize'):
+            return 'ptoken{}'.format(operation_index)
+        return item['parameter']
+    elif item['kind'] == 'original':
+        return 'orig'
+    return ''
 
 
 def _sequence_source_refs(composition):
     """Return source references used by sequence operations."""
     source_refs = []
     validate_composition(composition)
-    for item in composition['operations']:
+    for operation_index, item in enumerate(composition['operations']):
         progression = item.get('progression')
         if not progression or progression['kind'] != 'seq':
             continue
-        if item['kind'] == 'source':
-            start = item['start']
-            if start['direction'] != 'start':
-                continue
-            ref = 'val{}'.format(start['index'])
-        elif item['kind'] == 'parameter':
-            ref = item['parameter']
-        else:
+        ref = _operation_progression_ref(operation_index, item)
+        if not ref:
             continue
         if ref not in source_refs:
             source_refs.append(ref)
@@ -294,6 +315,8 @@ def _sequence_source_refs(composition):
 
 
 def _composition_uses_counter(composition):
+    if isinstance(composition, dict) and composition.get('operations') == []:
+        return False
     validate_composition(composition)
     return any(item['kind'] == 'counter' for item in composition['operations'])
 
@@ -391,6 +414,31 @@ def _resolve_source_window(tokens, start, end=None):
     return tokens[start_pos:end_pos + 1]
 
 
+def _resolve_source_selection(tokens, selection):
+    if selection.get('kind') == 'range':
+        return _resolve_source_window(
+            tokens, selection['start'], selection['end'])
+    if selection.get('kind') == 'single':
+        position = selection['position']
+        return _resolve_source_window(tokens, position, None)
+    raise ValueError('Invalid source selection kind.')
+
+
+def _resolve_selected_tokens(tokens, selections, separator):
+    resolved_parts = []
+    for selection in selections:
+        window = _resolve_source_selection(tokens, selection)
+        resolved_parts.append(separator.join(window))
+    return separator.join(part for part in resolved_parts if part)
+
+
+def _resolve_tokenized_parameter(item, value):
+    tokenizer = build_tokenizer(item['delimiters'])
+    tokens = tokenizer('' if value is None else str(value))
+    return _resolve_selected_tokens(
+        tokens, item['selections'], item.get('separator', ''))
+
+
 def evaluate_composition(input_text, composition, parameter_values,
                          tokenizer_func=None, sequence_seeds=None,
                          row_index=0, warnings=None):
@@ -409,17 +457,19 @@ def evaluate_composition(input_text, composition, parameter_values,
 
     param_dict['orig'] = '' if input_text is None else str(input_text)
     parts = []
-    for item in composition['operations']:
+    for operation_index, item in enumerate(composition['operations']):
         kind = item['kind']
         case = item.get('case', 'Unchanged')
         if kind == 'text':
             result = item.get('text', '')
         elif kind == 'source':
-            window = _resolve_source_window(tokens, item['start'], item.get('end'))
-            result = item.get('separator', '').join(window)
+            selections = item['selections']
+            result = _resolve_selected_tokens(
+                tokens, selections, item.get('separator', ''))
             progression = item.get('progression')
             if progression:
-                ref = 'val{}'.format(item['start']['index'])
+                start = selections[0]['position']
+                ref = 'val{}'.format(start['index'])
                 source_value = _resolve_progression_source(ref, tokens, param_dict)
                 if progression['kind'] == 'inc':
                     result, error = _increment_value(source_value, progression['step'])
@@ -438,9 +488,13 @@ def evaluate_composition(input_text, composition, parameter_values,
         elif kind == 'parameter':
             ref = item['parameter']
             result = param_dict.get(ref, '')
+            if item.get('tokenize'):
+                result = _resolve_tokenized_parameter(item, result)
             progression = item.get('progression')
             if progression:
-                source_value = _resolve_progression_source(ref, tokens, param_dict)
+                ref = _operation_progression_ref(operation_index, item)
+                source_value = _resolve_progression_source(
+                    ref, tokens, param_dict, composition)
                 if progression['kind'] == 'inc':
                     result, error = _increment_value(source_value, progression['step'])
                 else:
@@ -457,6 +511,24 @@ def evaluate_composition(input_text, composition, parameter_values,
                     warnings.append('{}: {}'.format(ref, error))
         elif kind == 'original':
             result = param_dict['orig']
+            progression = item.get('progression')
+            if progression:
+                ref = 'orig'
+                source_value = _resolve_progression_source(ref, tokens, param_dict)
+                if progression['kind'] == 'inc':
+                    result, error = _increment_value(source_value, progression['step'])
+                else:
+                    seed_value = sequence_seeds.get(ref, '')
+                    if not seed_value:
+                        error = 'sequence seed is blank'
+                        result = source_value
+                    else:
+                        result, error = _increment_value(
+                            seed_value, row_index * progression['step'])
+                        if error:
+                            result = source_value
+                if error:
+                    warnings.append('{}: {}'.format(ref, error))
         elif kind == 'counter':
             start = item.get('start', 'A')
             increment = item.get('increment', 1)
@@ -1075,9 +1147,6 @@ class ReValueDialog(object):
         self.btn_help = self.window.FindName('btn_help')
         self.btn_apply = self.window.FindName('btn_apply')
         self.btn_close = self.window.FindName('btn_close')
-        self.more_settings = self.window.FindName('more_settings')
-        self.settings_row = self.window.FindName('settings_row')
-        self.preview_row = self.window.FindName('preview_row')
         self.btn_edit_filters = self.window.FindName('btn_edit_filters')
         self.btn_clear_filters = self.window.FindName('btn_clear_filters')
         self.txt_filter_summary = self.window.FindName('txt_filter_summary')
@@ -1114,8 +1183,6 @@ class ReValueDialog(object):
         self.btn_clear_sort.Click += self.OnClearSort
         self.txt_filter_current.TextChanged += self.OnPreviewFilterChanged
         self.txt_filter_new.TextChanged += self.OnPreviewFilterChanged
-        self.more_settings.Expanded += self.OnMoreSettingsChanged
-        self.more_settings.Collapsed += self.OnMoreSettingsChanged
         self.btn_edit_filters.Click += self.OnEditFilters
         self.btn_clear_filters.Click += self.OnClearFilters
 
@@ -1134,7 +1201,6 @@ class ReValueDialog(object):
             self.combo_orig_param.IsEnabled = False
             self.btn_edit_filters.IsEnabled = False
             self.btn_clear_filters.IsEnabled = False
-            self.more_settings.Header = 'More Settings - Parameter Filters'
         
         # Initialize data
         self.initialize_data()
@@ -1653,7 +1719,6 @@ class ReValueDialog(object):
         in display order. The New Value filter is excluded so it can never renumber."""
         composition = self.composition
         tokenizer_func = self.get_tokenizer_func()
-        counter_gen, counter_error = self.get_counter_generator()
 
         if getattr(self, 'composition_error', ''):
             for item in self.preview_items:
@@ -1663,6 +1728,7 @@ class ReValueDialog(object):
             self.update_tokenization_display()
             return
 
+        counter_gen, counter_error = self.get_counter_generator()
         for item in self.preview_items:
             # CurrentName column always reflects the selected tokenization source.
             item.CurrentName = self.get_original_source_text(item.Element)
@@ -1689,7 +1755,7 @@ class ReValueDialog(object):
             first_tokens = tokenizer_func(first_source)
             for source_ref in _sequence_source_refs(composition):
                 sequence_seeds[source_ref] = _resolve_progression_source(
-                    source_ref, first_tokens, first_param_dict)
+                    source_ref, first_tokens, first_param_dict, composition)
 
         find_text = self.txt_find.Text if self.txt_find else ''
         replace_text = self.txt_replace.Text if self.txt_replace else ''
@@ -1847,10 +1913,14 @@ class ReValueDialog(object):
         self.txt_filter_summary.ToolTip = serialize_expression(self.parameter_filter)
         self.btn_clear_filters.IsEnabled = self.parameter_filter is not None
         self.btn_apply.IsEnabled = not (
-            self._parameter_filter_error or self.new_value_filter_active())
+            self._parameter_filter_error
+            or self.new_value_filter_active()
+            or bool(getattr(self, 'composition_error', '')))
         self.btn_apply.ToolTip = (
-            self.btn_apply.FindResource('NewValueFilterToolTip')
-            if self.new_value_filter_active() else None)
+            getattr(self, 'composition_error', '')
+            if getattr(self, 'composition_error', '')
+            else (self.btn_apply.FindResource('NewValueFilterToolTip')
+                  if self.new_value_filter_active() else None))
         status = '{} of {} rows displayed.'.format(
             self.preview_grid.Items.Count, len(self.preview_items))
         if self._parameter_filter_error:
@@ -1897,13 +1967,6 @@ class ReValueDialog(object):
             self.refresh_preview_filters(recompute_matches=False)
         else:
             self.update_preview()
-
-    def OnMoreSettingsChanged(self, sender, args):
-        """Reclaim space when collapsed, including after dragging the divider."""
-        self.settings_row.Height = (
-            GridLength(2, GridUnitType.Star)
-            if self.more_settings.IsExpanded else GridLength.Auto)
-        self.preview_row.Height = GridLength(3, GridUnitType.Star)
 
     def OnHelp(self, sender, args):
         """Lazy-load help viewer only when Help is clicked."""
@@ -1979,8 +2042,7 @@ class ReValueDialog(object):
             self._composition_before_original = deep_copy_composition(self.composition)
             self.composition = original_composition()
         elif self._composition_before_original is not None:
-            self.composition = deserialize_composition(
-                serialize_composition(self._composition_before_original))
+            self.composition = deep_copy_composition(self._composition_before_original)
             self._composition_before_original = None
         self.persist_settings()
         self.update_preview()

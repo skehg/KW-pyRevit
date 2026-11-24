@@ -3,23 +3,24 @@ import copy
 from clr import GetClrType
 
 from System.Windows import (
-    DataObject, DragDrop, DragDropEffects, HorizontalAlignment, Point, VerticalAlignment,
+    CornerRadius, DataObject, DragDrop, DragDropEffects, FontWeights,
+    HorizontalAlignment, Point, VerticalAlignment,
     SystemParameters, Thickness, Visibility, Window, WindowStartupLocation,
     SizeToContent,
 )
 from System.Windows.Controls import (
-    Button, Canvas, CheckBox, ComboBox, ColumnDefinition, ContextMenu, Grid, MenuItem, Orientation,
+    Border, Button, Canvas, CheckBox, ComboBox, ColumnDefinition, ContextMenu, Grid, MenuItem, Orientation,
     RadioButton, RowDefinition, ScrollViewer,
     ScrollBarVisibility, StackPanel, TextBlock, TextBox,
 )
 from System.Windows.Automation import AutomationProperties
-from System.Windows.Input import Key, MouseButtonState
+from System.Windows.Input import Key, Keyboard, ModifierKeys, MouseButtonState
 from System.Windows.Media import Brushes
 from System.Windows.Shapes import Ellipse
 from rule_model import (
     CASES, CASE_LABELS, deep_copy_composition, edit_operation,
     insert_operation, operation, position_controls,
-    position_value, describe_operation, serialize_composition,
+    position_value, describe_operation,
     validate_composition,
 )
 
@@ -52,32 +53,25 @@ class TokenSettings(object):
         if kind == 'text':
             self.text('Literal text (spaces are preserved)', 'text', item.get('text', ''))
         elif kind == 'source':
-            self.note('Count from Start or End. Position 1 from End is the last token.')
-            self.position_row('Start position', 'start',
-                              item.get('start', {'direction': 'start', 'index': 1}))
-            include_range = CheckBox()
-            include_range.Content = 'Include a range'
-            include_range.Margin = Thickness(0, 5, 0, 5)
-            include_range.IsChecked = bool(item.get('end'))
-            self.fields['range'] = include_range
-            panel.Children.Add(include_range)
-            self.position_row('End position', 'end',
-                              item.get('end') or {'direction': 'end', 'index': 1}, True)
-            self.combo('Join separator (ranges; enter custom text exactly, without wrapping quotes)', 'join',
-                       ['', 'hyphen', 'space', 'underscore', '/', '.'],
-                       item.get('separator', ''), editable=True)
-            self.position_hint = self.note('')
-            include_range.Checked += self.positions_changed
-            include_range.Unchecked += self.positions_changed
-            for name in ('start', 'end'):
-                self.fields[name].TextChanged += self.positions_changed
-                for direction in self.fields[name + '_directions']:
-                    direction.Checked += self.positions_changed
-            self.positions_changed(None, None)
+            self.selection_editor(panel, item)
         elif kind == 'parameter':
             self.note('Choose the Revit parameter read directly by this chip.')
             self.combo('Parameter', 'parameter', [''] + list(editor.host.available_params),
                        item.get('parameter', ''))
+            tokenize = CheckBox()
+            tokenize.Content = 'Tokenise parameter value'
+            tokenize.IsChecked = bool(item.get('tokenize', False))
+            tokenize.Margin = Thickness(0, 3, 0, 6)
+            self.fields['tokenize'] = tokenize
+            panel.Children.Add(tokenize)
+            token_panel = StackPanel()
+            token_panel.Visibility = (
+                Visibility.Visible if tokenize.IsChecked else Visibility.Collapsed)
+            self.fields['token_panel'] = token_panel
+            panel.Children.Add(token_panel)
+            self.selection_editor(token_panel, item, include_delimiters=True)
+            tokenize.Checked += self.parameter_tokenize_changed
+            tokenize.Unchecked += self.parameter_tokenize_changed
         elif kind == 'counter':
             self.note('Repeated Counter chips use the same row value.\n'
                       'Configure Start and Increment directly on this chip.')
@@ -87,15 +81,42 @@ class TokenSettings(object):
         if kind != 'text':
             self.combo('Text case (this chip)', 'case', [CASE_LABELS[case] for case in CASES],
                        CASE_LABELS[item.get('case', 'Unchanged')])
-        if kind in ('source', 'parameter'):
-            self.note('Progression supports a single position counted from Start or a parameter name, not ranges.\n'
-                      'Increment: each row independently. Sequence: first unfiltered row plus row position.')
+        if kind in ('source', 'parameter', 'original'):
+            if kind == 'original':
+                self.note('Progression uses the complete original value.')
+            elif kind == 'parameter' and item.get('tokenize'):
+                self.note('Progression supports a single parameter token counted from Start.')
+            else:
+                self.note('Progression supports a single Start position or a parameter name, not ranges.')
             progression = item.get('progression')
-            self.combo('Progression', 'operation', ['None', 'Increment', 'Sequence'],
-                       {'inc': 'Increment', 'seq': 'Sequence'}.get(
-                           progression['kind'] if progression else '', 'None'))
-            self.text('Step (signed integer, e.g. 2 or -1)', 'step',
-                      str(progression['step'] if progression else 1))
+            operation_label = TextBlock()
+            operation_label.Text = 'Progression'
+            operation_label.Margin = Thickness(0, 0, 8, 0)
+            operation_label.VerticalAlignment = VerticalAlignment.Center
+            operation = ComboBox()
+            operation.Width = 128
+            for label in ('None', 'Increment', 'Sequence'):
+                operation.Items.Add(label)
+            operation.SelectedItem = {'inc': 'Increment', 'seq': 'Sequence'}.get(
+                progression['kind'] if progression else '', 'None')
+            operation.Margin = Thickness(0, 0, 12, 0)
+            step_label = TextBlock()
+            step_label.Text = 'Step'
+            step_label.Margin = Thickness(0, 0, 8, 0)
+            step_label.VerticalAlignment = VerticalAlignment.Center
+            step = TextBox()
+            step.Text = str(progression['step'] if progression else 1)
+            step.Width = 62
+            step.ToolTip = 'Signed integer, for example 2 or -1'
+            compact_row = StackPanel()
+            compact_row.Orientation = Orientation.Horizontal
+            compact_row.Children.Add(operation_label)
+            compact_row.Children.Add(operation)
+            compact_row.Children.Add(step_label)
+            compact_row.Children.Add(step)
+            panel.Children.Add(compact_row)
+            self.fields['operation'] = operation
+            self.fields['step'] = step
         self.error = self.note('')
         self.error.Foreground = Brushes.Firebrick
         actions = StackPanel()
@@ -109,13 +130,13 @@ class TokenSettings(object):
         actions.Children.Add(cancel)
         panel.Children.Add(actions)
 
-    def note(self, text):
+    def note(self, text, parent=None):
         block = TextBlock()
         block.Text = text
         from System.Windows import TextWrapping
         block.TextWrapping = TextWrapping.Wrap
         block.Margin = Thickness(0, 3, 0, 6)
-        self.panel.Children.Add(block)
+        (parent or self.panel).Children.Add(block)
         return block
 
     def text(self, title, name, value):
@@ -139,6 +160,198 @@ class TokenSettings(object):
         self.panel.Children.Add(field)
         self.fields[name] = field
 
+    def selection_editor(self, parent, item, include_delimiters=False):
+        self.note('Selections combine ranges and individual positions.', parent)
+        if include_delimiters:
+            self.note('Delimiters', parent)
+            delimiters = TextBox()
+            delimiters.Text = item.get('delimiters', r'-_/,\|')
+            delimiters.Margin = Thickness(0, 0, 0, 6)
+            delimiters.ToolTip = 'Characters used to split the parameter value into tokens.'
+            self.fields['delimiters'] = delimiters
+            parent.Children.Add(delimiters)
+        self.fields['selections'] = copy.deepcopy(item.get('selections', [
+            {'kind': 'single',
+             'position': {'direction': 'start', 'index': 1}},
+        ]))
+        self.selection_host = StackPanel()
+        parent.Children.Add(self.selection_host)
+        self.selection_containers = []
+        self.position_hint = self.note('', parent)
+        self.render_selections()
+        add_row = StackPanel()
+        add_row.Orientation = Orientation.Horizontal
+        add_button = self.editor.button(
+            '+ Add selection', lambda sender, args: self.add_selection())
+        add_row.Children.Add(add_button)
+        join_hint = TextBlock()
+        join_hint.Text = 'Join with'
+        join_hint.Margin = Thickness(8, 5, 6, 0)
+        join_hint.VerticalAlignment = VerticalAlignment.Center
+        add_row.Children.Add(join_hint)
+        join_combo = ComboBox()
+        join_combo.IsEditable = True
+        join_combo.Width = 88
+        join_options = ('', '-', ' ', '_', '/', '.')
+        for option in join_options:
+            join_combo.Items.Add(option)
+        separator = item.get('separator', '')
+        if separator not in join_options:
+            join_combo.Items.Add(separator)
+        join_combo.SelectedItem = separator
+        join_combo.SelectionChanged += self.positions_changed
+        add_row.Children.Add(join_combo)
+        self.fields['join'] = join_combo
+        parent.Children.Add(add_row)
+        self.positions_changed(None, None)
+
+    def parameter_tokenize_changed(self, sender, args):
+        panel = self.fields.get('token_panel')
+        if panel is not None:
+            panel.Visibility = (
+                Visibility.Visible if bool(sender.IsChecked)
+                else Visibility.Collapsed)
+
+    def compact_position_row(self, title, name, spec, is_end=False):
+        row = StackPanel()
+        row.Orientation = Orientation.Horizontal
+        direction, number = position_controls(spec)
+        label = TextBlock()
+        label.Text = title
+        label.Margin = Thickness(0, 0, 6, 0)
+        row.Children.Add(label)
+        count_from = ComboBox()
+        count_from.Width = 82
+        count_from.Margin = Thickness(0, 0, 6, 0)
+        options = ('Start', 'End', 'Following') if is_end else ('Start', 'End')
+        for option in options:
+            count_from.Items.Add(option)
+        count_from.SelectedItem = direction
+        count_from.SelectionChanged += self.positions_changed
+        row.Children.Add(count_from)
+        field = TextBox()
+        field.Text = number
+        field.Width = 62
+        field.TextChanged += self.positions_changed
+        row.Children.Add(field)
+        return row, {'direction': count_from, 'number': field}
+
+    def read_compact_position(self, name, fields, is_end=False):
+        direction = str(fields['direction'].SelectedItem)
+        return position_value(direction, fields['number'].Text, is_end)
+
+    def render_selections(self):
+        self._rendering_selections = True
+        self.selection_host.Children.Clear()
+        self.selection_containers = []
+        for index, selection in enumerate(self.fields['selections']):
+            card = Border()
+            card.BorderBrush = Brushes.LightSlateGray
+            card.BorderThickness = Thickness(1)
+            card.CornerRadius = self.corner_radius()
+            card.Margin = Thickness(0, 3, 0, 3)
+            card.Padding = Thickness(8)
+            card_stack = StackPanel()
+            header = StackPanel()
+            header.Orientation = Orientation.Horizontal
+            number = TextBlock()
+            number.Text = '{:02d}'.format(index + 1)
+            number.Width = 34
+            number.FontWeight = FontWeights.Bold
+            number.Foreground = Brushes.DimGray
+            header.Children.Add(number)
+            kind = ComboBox()
+            kind.Width = 120
+            kind.Items.Add('Range')
+            kind.Items.Add('Single position')
+            kind.SelectedItem = ('Range' if selection['kind'] == 'range'
+                                 else 'Single position')
+            kind.SelectionChanged += lambda sender, args, i=index: self.selection_kind_changed(i, sender.SelectedItem)
+            header.Children.Add(kind)
+            up = self.editor.button('\u2191', lambda sender, args, i=index: self.move_selection(i, i - 1))
+            up.Width = 30
+            up.IsEnabled = index > 0
+            header.Children.Add(up)
+            down = self.editor.button('\u2193', lambda sender, args, i=index: self.move_selection(i, i + 1))
+            down.Width = 30
+            down.IsEnabled = index < len(self.fields['selections']) - 1
+            header.Children.Add(down)
+            remove = self.editor.button('\u00d7', lambda sender, args, i=index: self.remove_selection(i))
+            remove.Width = 30
+            remove.IsEnabled = len(self.fields['selections']) > 1
+            header.Children.Add(remove)
+            card_stack.Children.Add(header)
+            body = StackPanel()
+            body.Margin = Thickness(34, 6, 0, 0)
+            container = {'kind': kind}
+            if selection['kind'] == 'range':
+                start_row, start_fields = self.compact_position_row(
+                    'FROM', 'start', selection['start'], False)
+                end_row, end_fields = self.compact_position_row(
+                    'TO', 'end', selection['end'], True)
+                body.Children.Add(start_row)
+                end_row.Margin = Thickness(0, 6, 0, 0)
+                body.Children.Add(end_row)
+                container['start'] = start_fields
+                container['end'] = end_fields
+            else:
+                position_row, position_fields = self.compact_position_row(
+                    'COUNT FROM', 'position', selection['position'], False)
+                body.Children.Add(position_row)
+                container['position'] = position_fields
+            card_stack.Children.Add(body)
+            card.Child = card_stack
+            self.selection_host.Children.Add(card)
+            self.selection_containers.append(container)
+        self._rendering_selections = False
+        self.positions_changed(None, None)
+
+    def corner_radius(self):
+        from System.Windows import CornerRadius
+        return CornerRadius(4)
+
+    def add_selection(self):
+        selections = copy.deepcopy(self.fields['selections'])
+        selections.append({'kind': 'single',
+                           'position': {'direction': 'start', 'index': 1}})
+        self.fields['selections'] = selections
+        self.render_selections()
+
+    def remove_selection(self, index):
+        selections = copy.deepcopy(self.fields['selections'])
+        if 0 <= index < len(selections) and len(selections) > 1:
+            selections.pop(index)
+            self.fields['selections'] = selections
+            self.render_selections()
+
+    def move_selection(self, index, destination):
+        selections = copy.deepcopy(self.fields['selections'])
+        if not (0 <= destination < len(selections)):
+            return
+        selection = selections.pop(index)
+        selections.insert(destination, selection)
+        self.fields['selections'] = selections
+        self.render_selections()
+
+    def selection_kind_changed(self, index, selected):
+        if getattr(self, '_rendering_selections', False):
+            return
+        kind = 'range' if str(selected) == 'Range' else 'single'
+        selections = copy.deepcopy(self.fields['selections'])
+        if kind == 'range':
+            selections[index] = {
+                'kind': 'range',
+                'start': {'direction': 'start', 'index': 1},
+                'end': {'direction': 'end', 'index': 1},
+            }
+        else:
+            selections[index] = {
+                'kind': 'single',
+                'position': {'direction': 'start', 'index': 1},
+            }
+        self.fields['selections'] = selections
+        self.render_selections()
+
     def accept(self, sender, args):
         candidate = copy.deepcopy(self.item)
         candidate.pop('raw', None)
@@ -148,19 +361,41 @@ class TokenSettings(object):
                 if name in self.fields:
                     value = self.fields[name].Text
                     candidate[name] = value if name == 'text' else value.strip()
-            if candidate['kind'] == 'source':
-                candidate['start'] = self.read_position('start')
-                candidate['end'] = (self.read_position('end')
-                                    if self.fields['range'].IsChecked else None)
+            tokenized_parameter = (
+                candidate['kind'] == 'parameter'
+                and bool(self.fields.get('tokenize').IsChecked)
+                if 'tokenize' in self.fields else False)
+            if candidate['kind'] == 'source' or tokenized_parameter:
+                selections = []
+                for container in self.selection_containers:
+                    if str(container['kind'].SelectedItem) == 'Range':
+                        selections.append({
+                            'kind': 'range',
+                            'start': self.read_compact_position(
+                                'start', container['start'], False),
+                            'end': self.read_compact_position(
+                                'end', container['end'], True),
+                        })
+                    else:
+                        selections.append({
+                            'kind': 'single',
+                            'position': self.read_compact_position(
+                                'position', container['position'], False),
+                        })
+                candidate['selections'] = selections
+                if candidate['kind'] == 'source':
+                    candidate.pop('start', None)
+                    candidate.pop('end', None)
             if 'case' in self.fields:
                 case_index = self.fields['case'].SelectedIndex
                 if case_index < 0:
                     raise ValueError('Choose a text case.')
                 candidate['case'] = CASES[case_index]
             if 'join' in self.fields:
-                candidate['separator'] = self.fields['join'].Text
-            if candidate['kind'] == 'source' and not self.fields['range'].IsChecked:
-                candidate['separator'] = ''
+                join_field = self.fields['join']
+                candidate['separator'] = (join_field.Text
+                                          if hasattr(join_field, 'Text')
+                                          else '')
             if 'operation' in self.fields:
                 operation_name = {
                     'None': '', 'Increment': 'inc', 'Sequence': 'seq',
@@ -175,6 +410,12 @@ class TokenSettings(object):
                 if name not in self.editor.host.available_params:
                     raise ValueError('This parameter is unavailable in the current mode.')
                 candidate['parameter'] = str(name).strip()
+                candidate['tokenize'] = tokenized_parameter
+                if 'delimiters' in self.fields:
+                    delimiters = self.fields['delimiters'].Text
+                    if tokenized_parameter and not delimiters:
+                        raise ValueError('Enter at least one parameter token delimiter.')
+                    candidate['delimiters'] = delimiters
             if candidate['kind'] == 'text' and not candidate['text']:
                 raise ValueError('Enter literal text, including at least one character or space.')
             if candidate['kind'] == 'counter':
@@ -192,61 +433,34 @@ class TokenSettings(object):
         self.result = candidate, None, counter
         self.window.DialogResult = True
 
-    def position_row(self, title, name, spec, is_end=False):
-        self.note(title)
-        row = StackPanel()
-        row.Orientation = Orientation.Horizontal
-        direction, number = position_controls(spec)
-        buttons = []
-        for value in (('Start', 'End', 'Following') if is_end else ('Start', 'End')):
-            button = RadioButton()
-            button.Content = value
-            button.GroupName = name + '_direction'
-            button.Style = self.editor.host.window.FindResource('TokenDirectionStyle')
-            button.IsChecked = value == direction
-            button.ToolTip = ('Additional tokens after the start (0 allowed).' if value == 'Following'
-                              else 'Count from the {}: 1 is the {} token.'.format(
-                                  value.lower(), 'first' if value == 'Start' else 'last'))
-            AutomationProperties.SetName(button, title + ': ' + value)
-            row.Children.Add(button)
-            buttons.append(button)
-        field = TextBox()
-        field.Text = number
-        field.Width = 62
-        field.Margin = Thickness(8, 0, 0, 0)
-        AutomationProperties.SetName(field, title + ' number')
-        row.Children.Add(field)
-        self.fields[name] = field
-        self.fields[name + '_directions'] = buttons
-        self.fields[name + '_row'] = row
-        self.panel.Children.Add(row)
-
-    def read_position(self, name):
-        direction = next(button.Content for button in self.fields[name + '_directions']
-                         if button.IsChecked)
-        return position_value(direction, self.fields[name].Text, name == 'end')
-
     def positions_changed(self, sender, args):
-        ranged = bool(self.fields['range'].IsChecked)
-        self.fields['end_row'].IsEnabled = ranged
-        self.fields['join'].IsEnabled = ranged
+        if not hasattr(self, 'selection_containers'):
+            return
+        descriptions = []
         try:
-            start = self.read_position('start')
-            end = self.read_position('end') if ranged else ''
-            start_direction = start['direction']
-            start_number = start.get('index')
-            if end:
-                end_direction = end['direction']
-                if end_direction == 'following':
-                    self.position_hint.Text = 'Selection: {} {} plus {} following'.format(
-                        start_direction.title(), start_number, end['count'])
+            for container in self.selection_containers:
+                if str(container['kind'].SelectedItem) == 'Range':
+                    start = self.read_compact_position(
+                        'start', container['start'], False)
+                    end = self.read_compact_position(
+                        'end', container['end'], True)
+                    start_direction = start['direction']
+                    start_number = start.get('index')
+                    end_direction = end['direction']
+                    if end_direction == 'following':
+                        descriptions.append('{} {} + {} following'.format(
+                            start_direction.title(), start_number, end['count']))
+                    else:
+                        descriptions.append('{} {} to {} {}'.format(
+                            start_direction.title(), start_number,
+                            end_direction.title(), end.get('index', 1)))
                 else:
-                    self.position_hint.Text = 'Selection: {} {} to {} {}'.format(
-                        start_direction.title(), start_number,
-                        end_direction.title(), end.get('index', 1))
-            else:
-                self.position_hint.Text = 'Selection: {} {}'.format(
-                    start_direction.title(), start_number)
+                    position = self.read_compact_position(
+                        'position', container['position'], False)
+                    descriptions.append('{} {}'.format(
+                        position['direction'].title(),
+                        position.get('index', 1)))
+            self.position_hint.Text = 'Selection: ' + ' | '.join(descriptions)
         except ValueError as ex:
             self.position_hint.Text = str(ex)
 
@@ -335,8 +549,7 @@ class TokenEditor(object):
         sample = self.host.get_token_sample_item()
         self.source_text = sample.CurrentName if sample is not None else ''
         self.samples = self.host.get_tokenizer_func()(self.source_text)
-        signature = (serialize_composition(composition),
-                     self.source_text, tuple(self.samples))
+        signature = (repr(composition), self.source_text, tuple(self.samples))
         if signature == self._signature:
             return
         sample_only = self._signature is not None and signature[:2] == self._signature[:2]
@@ -367,6 +580,8 @@ class TokenEditor(object):
             self.items = []
             self.status.Text = str(ex)
             self.bar.Children.Clear()
+            if self.clear_button:
+                self.clear_button.IsEnabled = False
             return
         self.selected = min(self.selected, len(self.items) - 1)
         missing = sorted(set(
@@ -376,7 +591,8 @@ class TokenEditor(object):
         self.status.Text = (
             'Unavailable parameter chip(s): {}. Right-click a parameter chip to edit.'
             .format(', '.join(missing)) if missing else
-            'Drag to insert/reorder. Double-click to edit. Right-click for options.')
+            'Drag to insert/reorder. Hold Ctrl while dragging a composition chip to copy it. '
+            'Double-click to edit. Right-click for options.')
         if self.clear_button:
             self.clear_button.IsEnabled = bool(self.items)
         self.render_palette()
@@ -389,15 +605,24 @@ class TokenEditor(object):
     def render_palette(self):
         self.palette.Children.Clear()
         entries = [('Original', operation('original'))]
+        if not self.samples or not str(self.samples[0]).strip():
+            entries.append(('Token', operation('source')))
         entries += [('{}: {}'.format(i + 1, sample),
-                     operation('source', start={'direction': 'start', 'index': i + 1}))
+                     operation('source', selections=[
+                         {'kind': 'single',
+                          'position': {'direction': 'start', 'index': i + 1}},
+                     ]))
                     for i, sample in enumerate(self.samples)]
         entries += [
-            ('Last', operation('source', start={'direction': 'end', 'index': 1})),
-            ('Range...', operation('source',
-                                   start={'direction': 'start', 'index': 1},
-                                   end={'direction': 'end', 'index': 1},
-                                   separator='')),
+            ('Last', operation('source', selections=[
+                {'kind': 'single',
+                 'position': {'direction': 'end', 'index': 1}},
+            ])),
+            ('Range...', operation('source', selections=[
+                {'kind': 'range',
+                 'start': {'direction': 'start', 'index': 1},
+                 'end': {'direction': 'end', 'index': 1}},
+            ], separator='')),
             ('Parameter...', operation('parameter', parameter='')),
             ('Counter', operation('counter')),
             ('Space', operation('text', text=' ')),
@@ -406,7 +631,7 @@ class TokenEditor(object):
             ('Text...', operation('text', text='')),
         ]
         for title, item in entries:
-            configure = title in ('Range...', 'Parameter...', 'Text...')
+            configure = title in ('Token', 'Range...', 'Parameter...', 'Text...')
             self.palette.Children.Add(self.palette_button(title, item, configure))
 
     def palette_button(self, title, item, configure):
@@ -427,6 +652,7 @@ class TokenEditor(object):
             self.icon_content(button, item['kind'])
             button.Tag = index
             button.ToolTip = describe_operation(item, self.samples)
+            button.ToolTip += '\nHold Ctrl while dragging to copy this chip.'
             if item['kind'] == 'text':
                 button.ToolTip += '\n{} character(s); spaces are preserved.'.format(len(item['text']))
             button.BorderBrush = Brushes.MidnightBlue if index == self.selected else Brushes.SteelBlue
@@ -476,10 +702,18 @@ class TokenEditor(object):
                     lambda sender, args, value=case: self.set_case(index, value))
                 entry.IsCheckable = True
                 entry.IsChecked = item.get('case', 'Unchanged') == case
-        if item['kind'] in ('source', 'parameter'):
-            eligible = (item['kind'] == 'parameter' or
-                        (item['start'].get('direction') == 'start'
-                         and item.get('end') is None))
+        if item['kind'] in ('source', 'parameter', 'original'):
+            eligible = item['kind'] in ('parameter', 'original')
+            if item['kind'] == 'source':
+                selections = item['selections']
+                eligible = (len(selections) == 1
+                            and selections[0].get('kind') == 'single'
+                            and selections[0].get('position', {}).get('direction') == 'start')
+            elif item['kind'] == 'parameter' and item.get('tokenize'):
+                selections = item['selections']
+                eligible = (len(selections) == 1
+                            and selections[0].get('kind') == 'single'
+                            and selections[0].get('position', {}).get('direction') == 'start')
             progress = self.menu_item(menu, 'Progression', enabled=eligible)
             for title, operation in [('None', ''), ('Increment Each Value...', 'inc'),
                                      ('Sequence from First Row...', 'seq')]:
@@ -487,7 +721,12 @@ class TokenEditor(object):
                     lambda sender, args, op=operation: self.edit(index, operation=op))
         if item['kind'] == 'source':
             self.menu_item(menu, 'Token Selection...', lambda sender, args: self.edit(index))
-            if item.get('end'):
+            selections = item['selections']
+            has_range_or_multiple = (
+                len(selections) > 1
+                or any(selection.get('kind') == 'range'
+                       for selection in selections))
+            if has_range_or_multiple:
                 joins = self.menu_item(menu, 'Join Separator')
                 for title, separator in (('hyphen', '-'), ('space', ' '), ('underscore', '_')):
                     self.menu_item(joins, title,
@@ -518,12 +757,12 @@ class TokenEditor(object):
         menu = ContextMenu()
         for title, item in [
                 ('Original', operation('original')),
-                ('Source Token...', operation('source',
-                                              start={'direction': 'start', 'index': 1})),
-                ('Range...', operation('source',
-                                       start={'direction': 'start', 'index': 1},
-                                       end={'direction': 'end', 'index': 1},
-                                       separator='')),
+                ('Token...', operation('source')),
+                ('Range...', operation('source', selections=[
+                    {'kind': 'range',
+                     'start': {'direction': 'start', 'index': 1},
+                     'end': {'direction': 'end', 'index': 1}},
+                ], separator='')),
                 ('Parameter...', operation('parameter', parameter='')),
                 ('Counter...', operation('counter')),
                 ('Space', operation('text', text=' ')),
@@ -603,6 +842,9 @@ class TokenEditor(object):
         self.refresh()
         self.render_bar(True)
 
+    def ctrl_copy_requested(self):
+        return bool(Keyboard.Modifiers & ModifierKeys.Control)
+
     def wire_drag(self, button, payload):
         def down(sender, args):
             if args.ChangedButton.ToString() == 'Left':
@@ -621,7 +863,13 @@ class TokenEditor(object):
             data_object = DataObject()
             data_object.SetData(self.DRAG_FORMAT, self.DRAG_FORMAT)
             try:
-                effect = DragDropEffects.Move if data[0] == 'bar' else DragDropEffects.Copy
+                allowed_effects = (DragDropEffects.Move | DragDropEffects.Copy
+                                   if data[0] == 'bar' else DragDropEffects.Copy)
+                effect = (DragDropEffects.Copy
+                          if data[0] == 'palette' or self.ctrl_copy_requested()
+                          else DragDropEffects.Move)
+                if data[0] == 'bar':
+                    effect = allowed_effects
                 DragDrop.DoDragDrop(button, data_object, effect)
             finally:
                 self._drag = None
@@ -678,8 +926,11 @@ class TokenEditor(object):
         if self._drag is None or not args.Data.GetDataPresent(self.DRAG_FORMAT):
             args.Effects = getattr(DragDropEffects, 'None')
         else:
-            args.Effects = (DragDropEffects.Move if self._drag[2][0] == 'bar'
-                            else DragDropEffects.Copy)
+            kind = self._drag[2][0]
+            args.Effects = (DragDropEffects.Copy
+                            if kind == 'palette'
+                            or (kind == 'bar' and self.ctrl_copy_requested())
+                            else DragDropEffects.Move)
             point = args.GetPosition(self.bar_scroll)
             if point.Y < 15:
                 self.bar_scroll.LineUp()
@@ -702,7 +953,8 @@ class TokenEditor(object):
         if (self._drag is not None
                 and self._drag[2][0] == 'bar'
                 and args.Data.GetDataPresent(self.DRAG_FORMAT)
-                and not self.point_in_token_field(args)):
+                and not self.point_in_token_field(args)
+                and not self.ctrl_copy_requested()):
             args.Effects = DragDropEffects.Move
         else:
             args.Effects = getattr(DragDropEffects, 'None')
@@ -714,7 +966,15 @@ class TokenEditor(object):
             kind, value, configure = self._drag[2]
             destination = self.drop_position(args.GetPosition(self.bar))
             if kind == 'bar':
-                self.move(value, destination)
+                if self.ctrl_copy_requested():
+                    if 0 <= value < len(self.items):
+                        items, selected = insert_operation(
+                            self.items,
+                            copy.deepcopy(self.items[value]),
+                            destination)
+                        self.commit(items, selected)
+                else:
+                    self.move(value, destination)
             else:
                 self.add(value, configure, destination)
         args.Handled = True
@@ -724,7 +984,8 @@ class TokenEditor(object):
         if (self._drag is not None
                 and self._drag[2][0] == 'bar'
                 and args.Data.GetDataPresent(self.DRAG_FORMAT)
-                and not self.point_in_token_field(args)):
+                and not self.point_in_token_field(args)
+                and not self.ctrl_copy_requested()):
             index = self._drag[2][1]
             if 0 <= index < len(self.items):
                 self.remove(index)

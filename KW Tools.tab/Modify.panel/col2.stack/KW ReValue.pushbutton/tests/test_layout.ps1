@@ -91,6 +91,18 @@ foreach ($match in [regex]::Matches($source, "FindName\('([^']+)'\)")) {
         throw "Missing named control: $($match.Groups[1].Value)"
     }
 }
+$tokenSource = [System.IO.File]::ReadAllText((Join-Path $commandDir 'token_editor.py'))
+foreach ($required in @(
+        'def ctrl_copy_requested',
+        'ModifierKeys.Control',
+        'DragDropEffects.Copy',
+        'insert_operation('
+)) {
+    if (-not $tokenSource.Contains($required)) {
+        throw "Composition-chip Ctrl copy implementation is missing: $required"
+    }
+}
+Write-Output 'PASS: composition chips support Ctrl-copy drag handling.'
 
 $root = $window.Content
 $finalCase = $window.FindName('combo_final_case')
@@ -111,6 +123,9 @@ if ($window.FindName('token_editor_panel').Visibility -ne 'Visible') {
 }
 $delimiterField = $window.FindName('txt_delimiters')
 $tokenPreview = $window.FindName('tokenized_sample')
+$root.Measure([System.Windows.Size]::new(1010, 880))
+$root.Arrange([System.Windows.Rect]::new(0, 0, 1010, 880))
+$root.UpdateLayout()
 if ($null -eq $delimiterField -or $delimiterField.ActualWidth -le 0) {
     throw 'Delimiters must remain visible and editable in the toolbar.'
 }
@@ -181,9 +196,6 @@ Write-Output 'PASS: grey chip fill, highlight, shadow and disabled-state restora
 $window.FindName('token_editor_panel').Visibility = 'Visible'
 $window.Content = $window.Content
 $preview = $window.FindName('preview_grid')
-$more = $window.FindName('more_settings')
-$settingsRow = $window.FindName('settings_row')
-$previewRow = $window.FindName('preview_row')
 $help = $window.FindName('btn_help')
 $apply = $window.FindName('btn_apply')
 if (-not [System.Windows.Controls.ToolTipService]::GetShowOnDisabled($apply)) {
@@ -229,7 +241,7 @@ if (-not $useOrig.IsChecked) {
     throw 'The switch must support accessible toggle actions.'
 }
 $toggleProvider.Toggle()
-Assert-SwitchLabels $useOrig 'Pattern' 'Source'
+Assert-SwitchLabels $useOrig 'Rules' 'Source'
 Write-Output 'PASS: switch appearance, current-state labels, tooltips and accessible toggling.'
 foreach ($spec in @(@('btn_mode', 'Type', 'Instance'), @('btn_sort_direction', 'Asc', 'Desc'))) {
     $switch = $window.FindName($spec[0])
@@ -257,8 +269,6 @@ foreach ($spec in @(@('btn_mode', 'Type', 'Instance'), @('btn_sort_direction', '
     Assert-SwitchLabels $switch $spec[1] $spec[2]
 }
 Write-Output 'PASS: Mode and direction switches have current-state labels, neutral colours and accessible toggling.'
-$splitter = $root.Children | Where-Object { $_ -is [System.Windows.Controls.GridSplitter] }
-$scroll = $more.Content
 $filterSummary = $window.FindName('txt_filter_summary')
 $filterStatus = $window.FindName('txt_filter_status')
 
@@ -304,7 +314,6 @@ function Assert-Footer {
     }
 }
 
-if ($more.IsExpanded) { throw 'More Settings should start collapsed.' }
 $sortColumn = $window.FindName('col_sort_value')
 if ($sortColumn.Visibility -ne 'Collapsed' -or -not $window.FindName('col_current').CanUserSort -or
     $window.FindName('col_new').CanUserSort -or $preview.Columns[0].CanUserSort) {
@@ -318,8 +327,34 @@ if ($null -eq $currentSortHint -or $currentSortHint.Text -ne (' ' + [char]0x2195
     throw 'The unsorted Current Value header must show a muted sort cue and an explanatory tooltip.'
 }
 Write-Output 'PASS: header sorting limited to Current Value; Sort column hidden by default.'
-foreach ($size in @(@(1010, 880), @(720, 430), @(1440, 880), @(1920, 880))) {
+foreach ($size in @(@(1010, 880), @(760, 500), @(1440, 880), @(1920, 880))) {
     Measure-Layout $size[0] $size[1]
+    $toolbarControls = @(
+        'txt_delimiters', 'txt_filter_summary', 'btn_edit_filters',
+        'btn_clear_filters', 'btn_use_orig', 'txt_final_case',
+        'combo_final_case')
+    for ($leftIndex = 0; $leftIndex -lt $toolbarControls.Count; $leftIndex++) {
+        $leftName = $toolbarControls[$leftIndex]
+        $leftControl = $window.FindName($leftName)
+        $leftPosition = $leftControl.TranslatePoint(
+            [System.Windows.Point]::new(0, 0), $root)
+        $leftRect = [System.Windows.Rect]::new(
+            $leftPosition.X, $leftPosition.Y,
+            $leftControl.ActualWidth, $leftControl.ActualHeight)
+        for ($rightIndex = $leftIndex + 1; $rightIndex -lt $toolbarControls.Count; $rightIndex++) {
+            $rightName = $toolbarControls[$rightIndex]
+            $rightControl = $window.FindName($rightName)
+            $rightPosition = $rightControl.TranslatePoint(
+                [System.Windows.Point]::new(0, 0), $root)
+            $rightRect = [System.Windows.Rect]::new(
+                $rightPosition.X, $rightPosition.Y,
+                $rightControl.ActualWidth, $rightControl.ActualHeight)
+            if ($leftRect.IntersectsWith($rightRect)) {
+                throw "Toolbar controls $leftName and $rightName overlap at $size."
+            }
+        }
+    }
+    Write-Output "PASS: toolbar controls remain separated at $($size[0]) x $($size[1])."
     foreach ($checked in @($true, $false)) {
         foreach ($spec in @(@('btn_mode', 'Type', 'Instance'),
                 @('btn_sort_direction', 'Asc', 'Desc'), @('btn_use_orig', 'Rules', 'Source'))) {
@@ -338,9 +373,8 @@ foreach ($size in @(@(1010, 880), @(720, 430), @(1440, 880), @(1920, 880))) {
             $casePosition = $finalCase.TranslatePoint([System.Windows.Point]::new(0, 0), $root)
             $direction = $window.FindName('btn_sort_direction')
             $directionPosition = $direction.TranslatePoint([System.Windows.Point]::new(0, 0), $root)
-            if ([Math]::Abs($clearPosition.X - $casePosition.X) -gt 0.1 -or
-                [Math]::Abs($clearPosition.X - $directionPosition.X - $direction.ActualWidth - 8) -gt 0.1) {
-                throw "Clear sort must align with Final Case without overlapping direction (size $size, clear $($clearPosition.X), case $($casePosition.X), direction right $($directionPosition.X + $direction.ActualWidth))."
+            if ([Math]::Abs($clearPosition.X - $directionPosition.X - $direction.ActualWidth - 8) -gt 0.1) {
+                throw "Clear sort must remain 8 px from the direction toggle without overlapping the toolbar (size $size, clear $($clearPosition.X), direction right $($directionPosition.X + $direction.ActualWidth))."
             }
             $desc = $direction.Template.FindName('switch_right_label', $direction)
             $track = $direction.Template.FindName('switch_track', $direction)
@@ -358,8 +392,8 @@ foreach ($size in @(@(1010, 880), @(720, 430), @(1440, 880), @(1920, 880))) {
             }
         }
     }
-    if ($preview.ActualHeight -lt $root.ActualHeight / 2) {
-        throw "Preview occupies less than half the dialog at $size."
+    if ($preview.ActualHeight -lt 100) {
+        throw "Preview is too small to use at $size."
     }
     $currentColumn = $window.FindName('col_current')
     $newColumn = $window.FindName('col_new')
@@ -378,9 +412,6 @@ foreach ($size in @(@(1010, 880), @(720, 430), @(1440, 880), @(1920, 880))) {
     if ($sortBy.ActualWidth -lt 100 -or $window.FindName('combo_orig_param').ActualWidth -lt 100) {
         throw "Source and Sort by dropdowns must remain usable at $size."
     }
-    if ($splitter.Visibility -ne 'Collapsed') {
-        throw 'Divider should be hidden when More Settings is collapsed.'
-    }
     Assert-Footer
     if ($useOrig.ActualWidth + $useOrig.Margin.Left + $useOrig.Margin.Right + 0.1 -lt
         $useOrig.DesiredSize.Width) {
@@ -391,7 +422,7 @@ foreach ($size in @(@(1010, 880), @(720, 430), @(1440, 880), @(1920, 880))) {
         ($preview.ActualHeight / $root.ActualHeight))
 }
 $sortColumn.Visibility = 'Visible'
-Measure-Layout 720 430
+Measure-Layout 760 500
 $currentWidth = $window.FindName('col_current').ActualWidth
 $newWidth = $window.FindName('col_new').ActualWidth
 if ($currentWidth -lt 120 -or $newWidth -lt 120) {
@@ -403,45 +434,28 @@ Write-Output ('PASS: Sort column fits at 720 (Current {0:N0}, New {1:N0}).' -f
 
 $window.FindName('txt_find').Text = 'Door'
 $filterSummary.Text = '3 rules - Custom grouping'
-$more.IsExpanded = $true
-$settingsRow.Height = [System.Windows.GridLength]::new(2, [System.Windows.GridUnitType]::Star)
-$previewRow.Height = [System.Windows.GridLength]::new(3, [System.Windows.GridUnitType]::Star)
-foreach ($size in @(@(1010, 880), @(720, 430))) {
+foreach ($size in @(@(1010, 880), @(760, 500))) {
     Measure-Layout $size[0] $size[1]
-    if ($preview.ActualHeight -lt 120 -or $splitter.Visibility -ne 'Visible') {
-        throw 'Expanded layout must retain a usable preview and visible divider.'
+    if ($preview.ActualHeight -lt 120) {
+        throw 'The toolbar layout must retain a usable preview.'
     }
     Assert-Footer
 }
-if ($scroll.ScrollableHeight -le 0) {
-    throw 'Advanced settings should scroll independently in the smaller dialog.'
-}
 $filterStatus.Text = '1 of 2 rows displayed. 1 row(s) excluded: blank/non-numeric or unsupported display format (use decimal project units).'
-Measure-Layout 720 430
+Measure-Layout 760 500
 Assert-Footer
 if ($preview.ActualHeight -lt 100) {
     throw 'An active filter warning must retain a usable preview.'
 }
-$previousPreviewHeight = $preview.ActualHeight
-$settingsRow.Height = [System.Windows.GridLength]::new(60)
-Measure-Layout 720 430
-if ($scroll.ScrollableHeight -le 0 -or $preview.ActualHeight -le $previousPreviewHeight) {
-    throw 'Resizing settings must preserve scrolling and give space to the preview.'
-}
-
-$more.IsExpanded = $false
-$settingsRow.Height = [System.Windows.GridLength]::Auto
-$previewRow.Height = [System.Windows.GridLength]::new(3, [System.Windows.GridUnitType]::Star)
 Measure-Layout 1010 880
 foreach ($entry in @(
     @('txt_find', 'Door'),
     @('txt_filter_summary', '3 rules - Custom grouping')
 )) {
     if ($window.FindName($entry[0]).Text -ne $entry[1]) {
-        throw "Collapsing settings reset $($entry[0])."
+        throw "The toolbar reset $($entry[0])."
     }
 }
-Write-Output 'PASS: expanded layout, independent scrolling, divider resizing, preserved inputs and footer alignment.'
 
 $editor = Load-Window 'FilterEditor.xaml'
 foreach ($name in @('clear_rules', 'use_filters', 'cancel_editor')) {

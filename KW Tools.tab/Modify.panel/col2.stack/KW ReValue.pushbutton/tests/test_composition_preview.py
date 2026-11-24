@@ -8,7 +8,7 @@ import unittest
 COMMAND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, COMMAND_DIR)
 
-from rule_model import operation, validate_composition
+from rule_model import operation, selection, validate_composition
 
 with io.open(os.path.join(COMMAND_DIR, 'script.py'), encoding='utf-8') as source:
     SCRIPT_TREE = ast.parse(source.read())
@@ -16,7 +16,10 @@ with io.open(os.path.join(COMMAND_DIR, 'script.py'), encoding='utf-8') as source
 
 def load_evaluator():
     names = {
-        'evaluate_composition', '_resolve_source_window',
+        'build_tokenizer', 'evaluate_composition', '_resolve_source_window',
+        '_resolve_source_selection',
+        '_resolve_selected_tokens', '_resolve_tokenized_parameter',
+        '_operation_progression_ref',
         '_resolve_progression_source', '_increment_value',
         '_alpha_to_int', '_int_to_alpha', 'apply_case_conversion',
         '_composition_uses_counter', '_sequence_source_refs',
@@ -36,6 +39,8 @@ def load_evaluator():
         'MIXED_SUFFIX_NUM_REGEX': __import__('re').compile(r'^(.*?)(\d+)$'),
         'SIGNED_NUMERIC_REGEX': __import__('re').compile(r'^-?\d+$'),
         'SIGNED_SUFFIX_NUM_REGEX': __import__('re').compile(r'^(.*?)(-?\d+)$'),
+        'DEFAULT_DELIMITERS': r'-_/,\|',
+        'CANONICAL_DELIM': '|',
     }
     exec(compile(module, '<composition evaluator>', 'exec'), namespace)
     return namespace
@@ -57,8 +62,10 @@ class CompositionPreviewTests(unittest.TestCase):
         operations = [
             operation('text', text='{'),
             operation('source',
-                      start={'direction': 'start', 'index': 1},
-                      end={'direction': 'start', 'index': 3},
+                      selections=[selection(
+                          'range',
+                          start={'direction': 'start', 'index': 1},
+                          end={'direction': 'start', 'index': 3})],
                       separator=' '),
             operation('text', text='}'),
         ]
@@ -80,18 +87,32 @@ class CompositionPreviewTests(unittest.TestCase):
         self.assertEqual(('source-MIXED-abc', []),
                          self.evaluate(operations, 'source', params))
 
+    def test_original_supports_increment_and_sequence(self):
+        operations = [
+            operation('original', progression={'kind': 'inc', 'step': 2}),
+        ]
+        self.assertEqual(('RM11', []), self.evaluate(operations, 'RM09'))
+
+        operations[0]['progression'] = {'kind': 'seq', 'step': 3}
+        self.assertEqual(('RM15', []), self.evaluate(
+            operations, 'RM12', seeds={'orig': 'RM09'}, row=2))
+
     def test_end_and_following_positions(self):
         operations = [
             operation('source',
-                      start={'direction': 'end', 'index': 2},
-                      end={'direction': 'end', 'index': 1},
+                      selections=[selection(
+                          'range',
+                          start={'direction': 'end', 'index': 2},
+                          end={'direction': 'end', 'index': 1})],
                       separator=' '),
         ]
         self.assertEqual(('b c', []), self.evaluate(operations))
         operations = [
             operation('source',
-                      start={'direction': 'start', 'index': 2},
-                      end={'direction': 'following', 'count': 1},
+                      selections=[selection(
+                          'range',
+                          start={'direction': 'start', 'index': 2},
+                          end={'direction': 'following', 'count': 1})],
                       separator='/'),
         ]
         self.assertEqual(('b/c', []), self.evaluate(operations))
@@ -99,7 +120,9 @@ class CompositionPreviewTests(unittest.TestCase):
     def test_numeric_alpha_prefixed_and_negative_progression(self):
         operations = [
             operation('source',
-                      start={'direction': 'start', 'index': 1},
+                      selections=[selection(
+                          'single',
+                          position={'direction': 'start', 'index': 1})],
                       progression={'kind': 'inc', 'step': 2}),
         ]
         for source, expected in [('009', '011'), ('A', 'C'), ('Z', 'AB'),
@@ -113,7 +136,9 @@ class CompositionPreviewTests(unittest.TestCase):
     def test_sequence_seed_and_blank_warning(self):
         operations = [
             operation('source',
-                      start={'direction': 'start', 'index': 1},
+                      selections=[selection(
+                          'single',
+                          position={'direction': 'start', 'index': 1})],
                       progression={'kind': 'seq', 'step': 2}),
         ]
         result, warnings = self.evaluate(
@@ -129,7 +154,9 @@ class CompositionPreviewTests(unittest.TestCase):
     def test_missing_source_position_is_blank(self):
         operations = [
             operation('source',
-                      start={'direction': 'start', 'index': 5}),
+                      selections=[selection(
+                          'single',
+                          position={'direction': 'start', 'index': 5})]),
         ]
         self.assertEqual(('', []), self.evaluate(operations, 'a-b-c'))
 
@@ -142,6 +169,69 @@ class CompositionPreviewTests(unittest.TestCase):
         params = {'counter': 'RM03'}
         self.assertEqual(('RM03/RM03', []),
                          self.evaluate(operations, 'a-b-c', params))
+
+    def test_mixed_range_and_single_selection_join(self):
+        operations = [
+            operation(
+                'source',
+                selections=[
+                    selection('range',
+                              start={'direction': 'start', 'index': 1},
+                              end={'direction': 'start', 'index': 3}),
+                    selection('single',
+                              position={'direction': 'end', 'index': 1}),
+                ],
+                separator='-'),
+        ]
+        self.assertEqual(('a-b-c-c', []),
+                         self.evaluate(operations, 'a-b-c'))
+
+    def test_parameter_value_can_be_tokenized_and_grouped(self):
+        operations = [
+            operation(
+                'parameter',
+                parameter='Description',
+                tokenize=True,
+                delimiters='/',
+                selections=[
+                    selection('range',
+                              start={'direction': 'start', 'index': 1},
+                              end={'direction': 'start', 'index': 2}),
+                    selection('single',
+                              position={'direction': 'end', 'index': 1}),
+                ],
+                separator='-'),
+        ]
+        self.assertEqual(('A-B-D', []), self.evaluate(
+            operations, params={'Description': 'A/B/C/D'}))
+
+    def test_tokenized_parameter_supports_progression(self):
+        operations = [
+            operation(
+                'parameter',
+                parameter='Mark',
+                tokenize=True,
+                delimiters='-',
+                selections=[
+                    selection('single',
+                              position={'direction': 'start', 'index': 2}),
+                ],
+                progression={'kind': 'inc', 'step': 2}),
+        ]
+        self.assertEqual(('RM11', []), self.evaluate(
+            operations, params={'Mark': 'Area-RM09'}))
+
+        operations[0]['progression'] = {'kind': 'seq', 'step': 3}
+        refs = self.engine['_sequence_source_refs']({
+            'version': 1, 'operations': operations})
+        self.assertEqual(['ptoken0'], refs)
+        self.assertEqual(('RM15', []), self.evaluate(
+            operations, params={'Mark': 'Area-RM12'},
+            seeds={'ptoken0': 'RM09'}, row=2))
+
+    def test_empty_composition_is_not_using_counter(self):
+        self.assertFalse(self.engine['_composition_uses_counter'](
+            {'version': 1, 'operations': []}))
 
 
 if __name__ == '__main__':

@@ -10,7 +10,7 @@ sys.path.insert(0, COMMAND_DIR)
 from rule_model import (
     CASES, default_composition, edit_operation, insert_operation,
     operation, original_composition, serialize_composition,
-    deserialize_composition, validate_composition,
+    deserialize_composition, selection, validate_composition,
 )
 
 
@@ -20,7 +20,7 @@ class RuleModelTests(unittest.TestCase):
         validate_composition(default)
         self.assertEqual('source', default['operations'][0]['kind'])
         self.assertEqual({'direction': 'start', 'index': 1},
-                         default['operations'][0]['start'])
+                         default['operations'][0]['selections'][0]['position'])
         validate_composition(original_composition())
         self.assertEqual('original',
                          original_composition()['operations'][0]['kind'])
@@ -28,8 +28,10 @@ class RuleModelTests(unittest.TestCase):
     def test_supported_operations_and_literal_text(self):
         operations = [
             operation('source',
-                      start={'direction': 'end', 'index': 2},
-                      end={'direction': 'following', 'count': 2},
+                      selections=[selection(
+                          'range',
+                          start={'direction': 'end', 'index': 2},
+                          end={'direction': 'following', 'count': 2})],
                       separator=' - '),
             operation('parameter', parameter='Comments', case='upper'),
             operation('original', case='sentence'),
@@ -46,7 +48,8 @@ class RuleModelTests(unittest.TestCase):
                 {'direction': 'end', 'index': 3},
                 {'direction': 'following', 'count': 0},
                 {'direction': 'following', 'count': 4}):
-            item = operation('source', start=position)
+            item = operation('source', selections=[
+                selection('single', position=position)])
             validate_composition({'version': 1, 'operations': [item]})
 
     def test_case_and_progression_validation(self):
@@ -67,22 +70,51 @@ class RuleModelTests(unittest.TestCase):
                 'parameter', parameter='Mark',
                 progression={'kind': 'seq', 'step': 1})],
         })
+        validate_composition({
+            'version': 1,
+            'operations': [operation(
+                'original',
+                progression={'kind': 'inc', 'step': 1})],
+        })
+        validate_composition({
+            'version': 1,
+            'operations': [operation(
+                'parameter',
+                parameter='Mark',
+                tokenize=True,
+                delimiters='-',
+                selections=[selection(
+                    'single',
+                    position={'direction': 'start', 'index': 1})],
+                progression={'kind': 'seq', 'step': 1})],
+        })
 
     def test_validation_rejects_bad_operations(self):
         bad = [
             {'version': 1, 'operations': [{'kind': 'unknown'}]},
             {'version': 1, 'operations': [operation('parameter', parameter='')]},
+            {'version': 1, 'operations': [{
+                'kind': 'source',
+                'start': {'direction': 'start', 'index': 1},
+                'end': None,
+                'separator': '',
+                'progression': None,
+            }]},
             {'version': 1, 'operations': [operation(
-                'source', start={'direction': 'start', 'index': 0})]},
+                'source', selections=[selection(
+                    'single',
+                    position={'direction': 'start', 'index': 0})])]},
             {'version': 1, 'operations': [operation(
-                'source', start={'direction': 'sideways', 'index': 1})]},
+                'source', selections=[selection(
+                    'single',
+                    position={'direction': 'sideways', 'index': 1})])]},
             {'version': 1, 'operations': [operation(
-                'source', start={'direction': 'start', 'index': 1},
-                end={'direction': 'following', 'count': -1})]},
+                'source', selections=[selection(
+                    'range',
+                    start={'direction': 'start', 'index': 1},
+                    end={'direction': 'following', 'count': -1})])]},
             {'version': 1, 'operations': [operation(
                 'parameter', parameter='Mark', case='sideways')]},
-            {'version': 1, 'operations': [operation(
-                'original', progression={'kind': 'inc', 'step': 1})]},
             {'version': 1, 'operations': [operation(
                 'text', text=3)]},
             {'version': 1, 'operations': []},
@@ -113,8 +145,10 @@ class RuleModelTests(unittest.TestCase):
     def test_json_round_trip_and_schema_rejection(self):
         composition = {'version': 1, 'operations': [
             operation('source',
-                      start={'direction': 'start', 'index': 1},
-                      end={'direction': 'end', 'index': 1},
+                      selections=[selection(
+                          'range',
+                          start={'direction': 'start', 'index': 1},
+                          end={'direction': 'end', 'index': 1})],
                       separator=' '),
             operation('parameter', parameter='Mark', case='upper'),
         ]}
@@ -124,6 +158,60 @@ class RuleModelTests(unittest.TestCase):
         self.assertIsInstance(json.loads(raw), dict)
         with self.assertRaises(ValueError):
             deserialize_composition('{"version":3,"operations":[]}')
+
+    def test_mixed_range_and_single_selections(self):
+        composition = {
+            'version': 1,
+            'operations': [operation(
+                'source',
+                selections=[
+                    selection('range',
+                              start={'direction': 'start', 'index': 1},
+                              end={'direction': 'start', 'index': 3}),
+                    selection('single',
+                              position={'direction': 'end', 'index': 1}),
+                ],
+                separator='-')],
+        }
+        validate_composition(composition)
+
+    def test_selection_validation_rejects_bad_entries(self):
+        bad = [
+            {'version': 1, 'operations': [operation(
+                'source',
+                selections=[{'kind': 'range',
+                             'start': {'direction': 'start', 'index': 1},
+                             'end': {'direction': 'start', 'index': 0}}],
+                separator='-')]},
+            {'version': 1, 'operations': [operation(
+                'source',
+                selections=[{'kind': 'single',
+                             'position': {'direction': 'start', 'index': 0}}],
+                separator='-')]},
+            {'version': 1, 'operations': [operation(
+                'source',
+                selections=[{'kind': 'unknown'}],
+                separator='-')]},
+            {'version': 1, 'operations': [operation(
+                'parameter',
+                parameter='Mark',
+                tokenize=True,
+                delimiters='',
+                selections=[selection('single')])]},
+            {'version': 1, 'operations': [operation(
+                'source',
+                selections=[
+                    selection('single',
+                              position={'direction': 'start', 'index': 1}),
+                    selection('single',
+                              position={'direction': 'start', 'index': 2}),
+                ],
+                progression={'kind': 'inc', 'step': 1})]},
+        ]
+        for composition in bad:
+            with self.subTest(composition=composition):
+                with self.assertRaises(ValueError):
+                    validate_composition(composition)
 
 
 if __name__ == '__main__':

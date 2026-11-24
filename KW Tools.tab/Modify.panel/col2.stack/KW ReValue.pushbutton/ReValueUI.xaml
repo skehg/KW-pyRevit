@@ -132,9 +132,7 @@
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition x:Name="settings_row" Height="Auto" MinHeight="28"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition x:Name="preview_row" Height="3*" MinHeight="150"/>
+            <RowDefinition Height="*" MinHeight="150"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -219,13 +217,24 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="105"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="Delimiters:" Grid.Column="0" Margin="0,0,6,0"/>
                 <TextBox x:Name="txt_delimiters" Grid.Column="1" Width="95"
                          FontSize="11" FontFamily="Courier New"
                          ToolTip="Characters used to split the source into chips: default - _ / , |"
                          AutomationProperties.Name="Source token delimiters"/>
-                <ToggleButton x:Name="btn_use_orig" Grid.Column="3"
+                <TextBlock x:Name="txt_filter_summary" Grid.Column="2"
+                           Text="No parameter filters" Foreground="DimGray"
+                           Margin="12,0,6,0" TextTrimming="CharacterEllipsis"/>
+                <Button x:Name="btn_edit_filters" Grid.Column="3"
+                        Content="Edit Filters" Margin="3,0" Padding="6,3"
+                        ToolTip="Edit independent parameter filter rules."/>
+                <Button x:Name="btn_clear_filters" Grid.Column="4"
+                        Content="Clear" Margin="3,0" Padding="6,3"
+                        ToolTip="Clear all parameter filter rules."/>
+                <ToggleButton x:Name="btn_use_orig" Grid.Column="5"
                               Margin="5,0" Padding="3,3" IsChecked="False"
                               AutomationProperties.Name="Composition: Rules or Source">
                     <ToggleButton.Style>
@@ -242,8 +251,8 @@
                         </Style>
                     </ToggleButton.Style>
                 </ToggleButton>
-                <TextBlock Text="Final Case:" Grid.Column="4" Margin="12,0,6,0"/>
-                <ComboBox x:Name="combo_final_case" Grid.Column="5" Width="105"
+                <TextBlock x:Name="txt_final_case" Text="Final Case:" Grid.Column="6" Margin="12,0,6,0"/>
+                <ComboBox x:Name="combo_final_case" Grid.Column="7" Width="105"
                           ToolTip="Convert the complete generated value after Find/Replace.">
                     <ComboBoxItem Content="None" Tag="None"/>
                     <ComboBoxItem Content="UPPER" Tag="upper"/>
@@ -318,40 +327,7 @@
             </StackPanel>
         </Grid>
 
-        <Expander x:Name="more_settings" Grid.Row="1" IsExpanded="False"
-                  Header="More Settings - Parameter Filters"
-                  Margin="3,0">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                          Margin="0,4,0,0">
-                <StackPanel Margin="3,0,6,3">
-                    <GroupBox Header="Filter by Parameter (independent of the value being modified)">
-                        <DockPanel>
-                            <Button x:Name="btn_clear_filters" Content="Clear" DockPanel.Dock="Right"/>
-                            <Button x:Name="btn_edit_filters" Content="Edit Filters..." DockPanel.Dock="Right"/>
-                            <TextBlock x:Name="txt_filter_summary" Text="No parameter filters" TextWrapping="Wrap"/>
-                        </DockPanel>
-                    </GroupBox>
-                </StackPanel>
-            </ScrollViewer>
-        </Expander>
-
-        <GridSplitter Grid.Row="2" Height="6" HorizontalAlignment="Stretch"
-                      ResizeDirection="Rows" ResizeBehavior="PreviousAndNext"
-                      Background="LightGray" ShowsPreview="True"
-                      ToolTip="Drag to resize More Settings and Preview.">
-            <GridSplitter.Style>
-                <Style TargetType="GridSplitter">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsExpanded, ElementName=more_settings}" Value="True">
-                            <Setter Property="Visibility" Value="Visible"/>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </GridSplitter.Style>
-        </GridSplitter>
-
-        <GroupBox Grid.Row="3" Margin="0,3">
+        <GroupBox Grid.Row="1" Margin="0,3">
             <GroupBox.Header>
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="Preview"/>
@@ -430,7 +406,7 @@
             </DataGrid>
         </GroupBox>
 
-        <DockPanel Grid.Row="4" LastChildFill="False">
+        <DockPanel Grid.Row="2" LastChildFill="False">
             <Button x:Name="btn_help" Content="Help" Width="80" DockPanel.Dock="Left"
                     Foreground="#492709" BorderBrush="#C96A12" FontWeight="Bold">
                 <Button.Background>
