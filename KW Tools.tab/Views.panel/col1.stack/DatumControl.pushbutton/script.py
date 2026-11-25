@@ -205,7 +205,7 @@ def _get_ref_curve(datum, v):
 
 def _set_datum_extent(datum, v, corners, local_x, local_y, bb, offsets_ft, bubbles,
                       edit_offset=True, edit_bubbles=True):
-    """Set ViewSpecific extents and bubble visibility using per-side settings."""
+    """Set view-specific extents and bubble visibility only where enabled."""
     ref_curve = _get_ref_curve(datum, v)
     if ref_curve is None:
         return False
@@ -234,25 +234,24 @@ def _set_datum_extent(datum, v, corners, local_x, local_y, bb, offsets_ft, bubbl
     side_min = _nearest_side(t_min_raw)
     side_max = _nearest_side(t_max_raw)
 
-    t_min = t_min_raw - offsets_ft[side_min]
-    t_max = t_max_raw + offsets_ft[side_max]
-
-    if (t_max - t_min) < 1e-6:
-        t_min -= 1.0 / 304.8
-        t_max += 1.0 / 304.8
-
-    try:
-        new_line = Line.CreateBound(
-            ref_pt + direction.Multiply(t_min),
-            ref_pt + direction.Multiply(t_max),
-        )
-    except Exception:
-        return False
-
-    datum.SetDatumExtentType(DatumEnds.End0, v, DatumExtentType.ViewSpecific)
-    datum.SetDatumExtentType(DatumEnds.End1, v, DatumExtentType.ViewSpecific)
-
     if edit_offset:
+        t_min = t_min_raw - offsets_ft[side_min]
+        t_max = t_max_raw + offsets_ft[side_max]
+
+        if (t_max - t_min) < 1e-6:
+            t_min -= 1.0 / 304.8
+            t_max += 1.0 / 304.8
+
+        try:
+            new_line = Line.CreateBound(
+                ref_pt + direction.Multiply(t_min),
+                ref_pt + direction.Multiply(t_max),
+            )
+        except Exception:
+            return False
+
+        datum.SetDatumExtentType(DatumEnds.End0, v, DatumExtentType.ViewSpecific)
+        datum.SetDatumExtentType(DatumEnds.End1, v, DatumExtentType.ViewSpecific)
         datum.SetCurveInView(DatumExtentType.ViewSpecific, v, new_line)
 
     if edit_bubbles:
