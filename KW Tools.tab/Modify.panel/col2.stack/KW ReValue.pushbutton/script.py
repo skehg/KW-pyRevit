@@ -804,6 +804,63 @@ def _get_element_type(element):
     return None
 
 
+def _preview_elements_for_mode(elements, is_instance_mode):
+    """Keep instances intact, or return each selected type once in selection order."""
+    if is_instance_mode:
+        return list(elements)
+
+    preview_elements = []
+    seen_type_ids = set()
+    for element in elements:
+        elem_type = _get_element_type(element)
+        if elem_type is None:
+            continue
+        type_id = element_id_value(elem_type.Id)
+        if type_id in seen_type_ids:
+            continue
+        seen_type_ids.add(type_id)
+        preview_elements.append(elem_type)
+    return preview_elements
+
+
+def _element_identity_tooltip(element, fallback_name, cache=None):
+    """Describe the underlying type independently of the preview warning tooltip."""
+    elem_type = None
+    if isinstance(element, ElementType):
+        elem_type = element
+        type_id = element_id_value(elem_type.Id)
+        type_id_object = elem_type.Id
+    else:
+        try:
+            type_id_object = element.GetTypeId()
+            type_id = element_id_value(type_id_object)
+        except Exception:
+            return fallback_name or ''
+        if type_id == -1:
+            return fallback_name or ''
+
+    if cache is not None and type_id in cache:
+        return cache[type_id]
+
+    if elem_type is None:
+        elem_type = doc.GetElement(type_id_object)
+    if elem_type is None:
+        return fallback_name or ''
+
+    type_name = _safe_type_name(elem_type)
+    if not type_name:
+        type_name = '<Unnamed Type {}>'.format(type_id)
+
+    family_name = getattr(elem_type, 'FamilyName', None)
+    if family_name:
+        tooltip = '{} : {}'.format(str(family_name), type_name)
+    else:
+        tooltip = type_name
+    if cache is not None:
+        cache[type_id] = tooltip
+    return tooltip
+
+
 def _elementid_param_to_text(param):
     """Convert an ElementId parameter value into readable text."""
     try:
@@ -1031,6 +1088,7 @@ class PreviewItem(object):
         self.NewName = current_name
         self.final = False
         self.tooltip = ''
+        self.identity_tooltip = ''
         self.FilterMatch = True
         self.SortValue = ''
         self.SelectionIndex = 0
@@ -1103,6 +1161,7 @@ class ReValueDialog(object):
         self.elements = elements
         self.is_instance_mode = is_instance_mode
         self.preview_items = ObservableCollection[object]()
+        self.preview_elements = []
         self.available_params = []
         self.param_values_map = {}
         self._suspend_events = False
@@ -1206,6 +1265,39 @@ class ReValueDialog(object):
         self.initialize_data()
         from token_editor import TokenEditor
         self.token_editor = TokenEditor(self, build_counter_generator)
+
+    def _rebuild_preview_items(self):
+        self.preview_items.Clear()
+        identity_tooltip_cache = {}
+        for elem in self.preview_elements:
+            if self.is_filter_name_context:
+                current_name = self.get_original_source_text(elem)
+            elif self.is_instance_mode:
+                current_name = _safe_element_name(elem)
+                if not current_name:
+                    try:
+                        current_name = "<Instance {}>".format(elem.Id.IntegerValue)
+                    except:
+                        current_name = "<Unnamed Instance>"
+            else:
+                current_name = _safe_type_name(elem)
+                if not current_name:
+                    try:
+                        current_name = "<Unnamed Type {}>".format(elem.Id.IntegerValue)
+                    except:
+                        current_name = "<Unnamed Type>"
+
+            preview_item = PreviewItem(elem, current_name)
+            preview_item.identity_tooltip = _element_identity_tooltip(
+                elem, current_name, identity_tooltip_cache)
+            preview_item.SelectionIndex = len(self.preview_items)
+            self.preview_items.Add(preview_item)
+
+    def _refresh_identity_tooltips(self):
+        identity_tooltip_cache = {}
+        for item in self.preview_items:
+            item.identity_tooltip = _element_identity_tooltip(
+                item.Element, item.CurrentName, identity_tooltip_cache)
         
     def initialize_data(self):
         """Initialize parameter list and preview items"""
@@ -1227,6 +1319,8 @@ class ReValueDialog(object):
         self.is_instance_mode = (self.is_filter_name_context or
                                 str(session_settings.get('mode', 'type')).lower() == 'instance')
         self.btn_mode.IsChecked = self.is_instance_mode
+        self.preview_elements = _preview_elements_for_mode(
+            self.elements, self.is_instance_mode)
 
         if self.txt_delimiters:
             saved_delims = session_settings.get('delimiters', DEFAULT_DELIMITERS)
@@ -1252,46 +1346,13 @@ class ReValueDialog(object):
             self.available_params, self.param_values_map = [], {}
         else:
             self.available_params, self.param_values_map = collect_all_parameters(
-                self.elements, self.is_instance_mode)
+                self.preview_elements, self.is_instance_mode)
         
         self.populate_source_parameters(session_settings.get('orig_param', ''))
         self.populate_sort_options(session_settings)
         
         # Create preview items
-        for elem in self.elements:
-            if self.is_filter_name_context:
-                current_name = self.get_original_source_text(elem)
-            elif self.is_instance_mode:
-                current_name = _safe_element_name(elem)
-                if not current_name:
-                    try:
-                        current_name = "<Instance {}>".format(elem.Id.IntegerValue)
-                    except:
-                        current_name = "<Unnamed Instance>"
-            else:
-                # Type mode - get the type
-                elem_type = None
-                if isinstance(elem, ElementType):
-                    elem_type = elem
-                else:
-                    try:
-                        type_id = elem.GetTypeId()
-                        if type_id.Value != -1:
-                            elem_type = doc.GetElement(type_id)
-                    except:
-                        pass
-                
-                if elem_type:
-                    current_name = _safe_type_name(elem_type)
-                    if not current_name:
-                        current_name = "<Unnamed Type {}>".format(elem_type.Id.IntegerValue)
-                    elem = elem_type
-                else:
-                    continue
-            
-            preview_item = PreviewItem(elem, current_name)
-            preview_item.SelectionIndex = len(self.preview_items)
-            self.preview_items.Add(preview_item)
+        self._rebuild_preview_items()
         
         # Set grid data source
         self.preview_grid.ItemsSource = self.preview_items
@@ -1316,7 +1377,7 @@ class ReValueDialog(object):
         self.default_source_item = ComboBoxItem()
         self.default_source_item.Content = (
             '<Filter Name>' if getattr(self, 'is_filter_name_context', False)
-            else get_default_source_label(self.elements, self.is_instance_mode))
+            else get_default_source_label(self.preview_elements, self.is_instance_mode))
         self.default_source_item.ToolTip = (
             'System default: use each element/type name, not a selected parameter.')
         self.combo_orig_param.Items.Add(self.default_source_item)
@@ -1788,10 +1849,12 @@ class ReValueDialog(object):
         self.is_instance_mode = bool(self.btn_mode.IsChecked)
 
         self._suspend_events = True
+        self.preview_elements = _preview_elements_for_mode(
+            self.elements, self.is_instance_mode)
         
         # Recollect parameters and reinitialize
         self.available_params, self.param_values_map = collect_all_parameters(
-            self.elements, self.is_instance_mode)
+            self.preview_elements, self.is_instance_mode)
 
         session_settings = load_session_settings()
 
@@ -1799,38 +1862,7 @@ class ReValueDialog(object):
         self.populate_sort_options(session_settings)
         
         # Rebuild preview items
-        self.preview_items.Clear()
-        for elem in self.elements:
-            if self.is_instance_mode:
-                current_name = _safe_element_name(elem)
-                if not current_name:
-                    try:
-                        current_name = "<Instance {}>".format(elem.Id.IntegerValue)
-                    except:
-                        current_name = "<Unnamed Instance>"
-            else:
-                elem_type = None
-                if isinstance(elem, ElementType):
-                    elem_type = elem
-                else:
-                    try:
-                        type_id = elem.GetTypeId()
-                        if type_id.Value != -1:
-                            elem_type = doc.GetElement(type_id)
-                    except:
-                        pass
-                
-                if elem_type:
-                    current_name = _safe_type_name(elem_type)
-                    if not current_name:
-                        current_name = "<Unnamed Type {}>".format(elem_type.Id.IntegerValue)
-                    elem = elem_type
-                else:
-                    continue
-            
-            preview_item = PreviewItem(elem, current_name)
-            preview_item.SelectionIndex = len(self.preview_items)
-            self.preview_items.Add(preview_item)
+        self._rebuild_preview_items()
 
         self._suspend_events = False
         self.persist_settings()
@@ -2019,6 +2051,7 @@ class ReValueDialog(object):
                     self.get_selected_original_param_name())
                 if not revalue_elements(revalue_map, self.is_instance_mode, target_param_name):
                     return
+                self._refresh_identity_tooltips()
 
             self._suspend_events = True
             try:

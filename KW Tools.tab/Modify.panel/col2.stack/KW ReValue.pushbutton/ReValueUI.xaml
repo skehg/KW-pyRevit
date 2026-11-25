@@ -369,6 +369,12 @@
                                         SortMemberPath="SortValue" Width="150" IsReadOnly="True"
                                         Visibility="Collapsed" Header="Sort Value"/>
                     <DataGridTextColumn x:Name="col_current" Binding="{Binding CurrentName}" SortMemberPath="CurrentName" Width="*" IsReadOnly="True">
+                        <DataGridTextColumn.CellStyle>
+                            <Style TargetType="DataGridCell">
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="ToolTip" Value="{Binding identity_tooltip}"/>
+                            </Style>
+                        </DataGridTextColumn.CellStyle>
                         <DataGridTextColumn.Header>
                             <StackPanel>
                                 <StackPanel x:Name="current_header_sort_hint" Orientation="Horizontal"

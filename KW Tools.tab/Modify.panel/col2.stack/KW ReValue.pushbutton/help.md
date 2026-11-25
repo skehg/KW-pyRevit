@@ -56,7 +56,9 @@ off.
 
 1. Optionally select elements in Revit.
 2. Open KW ReValue.
-3. Choose Type or Instance mode.
+3. Choose Type or Instance mode. Type mode shows one row per distinct selected
+   type; hover over **Current Value** to see its family and type when available.
+   Instance mode shows each selected instance.
 4. Choose the source parameter or keep the default Name source.
 5. Edit **Delimiters** in the toolbar to control how source text is split.
    The default is `-_/,|`. The composition panel shows the resulting
