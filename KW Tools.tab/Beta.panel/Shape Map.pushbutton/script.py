@@ -2,7 +2,7 @@
 __title__ = "Shape Map"
 __min_revit_ver__ = 2024
 __version__ = 1.0
-__beta__ = True
+__beta__ = False
 __doc__ = """Date    = 06.07.2026
 _____________________________________________________________________
 Description:
