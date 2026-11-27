@@ -1469,11 +1469,11 @@ class WorkspaceDialog(ui.Dialog):
             controls.ColumnDefinitions.Add(column)
         if kind in ('bool', 'boolean'):
             value_control = CheckBox()
-            value_control.IsThreeState = True
+            value_control.IsThreeState = value == ('mixed',)
             value_control.IsChecked = value if isinstance(value, bool) else None
             value_control.HorizontalAlignment = HorizontalAlignment.Center
-            # Attach after populating. Mixed is indeterminate, never Unset and
-            # never an automatic proposal. Off is an explicit False.
+            # Attach after populating. Ordinary booleans use the direct
+            # Checked/Unchecked path; Mixed is the only tri-state value.
             value_control.Checked += lambda s, e: self.field_boolean(key, s, pairs)
             value_control.Unchecked += lambda s, e: self.field_boolean(key, s, pairs)
             value_control.Indeterminate += lambda s, e: self.indeterminate_edited(key, pairs)
@@ -1831,6 +1831,7 @@ class WorkspaceDialog(ui.Dialog):
                 for pair, key, reason in invalid))
         self.plan = self.read(lambda: self.graphics.plan(self.request(), completed=self.receipts,
             cancel=lambda: self.cancelled, progress=self.progress))
+        self.approve_current_view_updates()
         for fid in self.ordered_checked():
             pending = any(r['key'][1] == fid and r['action'] in ('Add', 'Update', 'Blocked', 'Invalid')
                           and not r.get('excluded') for r in self.plan['rows'])
@@ -1844,6 +1845,24 @@ class WorkspaceDialog(ui.Dialog):
         self.sync_graphics_dirty()
         self.update_summary()
         return self.plan
+
+    def approve_current_view_updates(self):
+        """Auto-approve only an operation scoped entirely to the active view."""
+        current_view = self.uidoc.ActiveView
+        if (current_view is None or current_view.IsTemplate or
+                self.targets.checked != set([model.id_value(current_view.Id)])):
+            return False
+        updates = [row for row in self.plan['rows']
+                   if row['action'] == 'Update' and not row.get('excluded')]
+        if not updates or any(row['key'][0] != model.id_value(current_view.Id)
+                              for row in self.plan['rows']):
+            return False
+        self.plan = self.graphics.approve_updates(self.plan)
+        self.status.Text = (
+            'Current view only: {} existing attachment update{} approved automatically. '
+            'Click Apply to update the view.'.format(
+                len(updates), '' if len(updates) == 1 else 's'))
+        return True
 
     def show_changes(self):
         if self.busy:
@@ -1939,21 +1958,29 @@ class WorkspaceDialog(ui.Dialog):
 
     def apply_attachments(self):
         if self.busy:
-            return
+            return False
         if self.plan is None:
             self.build_plan()
         active = [r for r in self.plan['rows'] if not r.get('excluded')]
-        blocked = any(r['action'] in ('Blocked', 'Invalid') for r in active)
+        blocked = [r for r in active if r['action'] in ('Blocked', 'Invalid')]
+        pending = [r for r in active if r['action'] == 'Update' and not r.get('approved')]
         ready = any(r['action'] == 'Add' or (r['action'] == 'Update' and r.get('approved')) for r in active)
         if blocked or not ready:
             self.changes.IsExpanded = True
             self.render_changes()
             if blocked:
-                raise ValueError('Blocked/invalid pairs require correction or explicit exclusion in Changes. No model changes.')
-            if any(r['action'] == 'Update' for r in active):
-                raise ValueError('Only existing updates remain. Approve individual rows or Approve All Updates in Changes.')
+                self.status.Text = (
+                    '{} blocked/invalid pair(s) require correction or explicit exclusion in Changes. '
+                    'No model changes.'.format(len(blocked)))
+                return False
+            if pending:
+                self.status.Text = (
+                    '{} existing attachment update(s) await approval. '
+                    'Approve individual rows or Approve All Updates in Changes. '
+                    'No model changes.'.format(len(pending)))
+                return False
             self.status.Text = 'All selected pairs are unchanged or already completed. No model changes.'
-            return
+            return True
         result = self.graphics.apply(self.plan)
         self.receipts.extend(result.get('receipts', []))
         counts = result.get('counts', {})
@@ -1976,6 +2003,7 @@ class WorkspaceDialog(ui.Dialog):
         self.render_changes()
         self.sync_graphics_dirty()
         self.refresh_after_definition(False)
+        return True
 
     def update_summary(self):
         if not hasattr(self, 'attachment_summary'):
@@ -1993,15 +2021,30 @@ class WorkspaceDialog(ui.Dialog):
         self.apply_button.IsEnabled = bool(count_f and count_t and not self.busy and not self.service.doc.IsReadOnly)
         if self.plan is None:
             self.attachment_summary.Text = '{} checked filter(s) × {} destinations · not yet compared; Apply checks exact differences.'.format(count_f, count_t)
+            self.changes.Header = 'Changes (optional details and existing-update approvals)'
         else:
             rows = self.plan['rows']
             adds = sum(r['action'] == 'Add' and not r.get('excluded') for r in rows)
             updates = sum(r['action'] == 'Update' and r.get('approved') and not r.get('excluded') for r in rows)
             pending = sum(r['action'] == 'Update' and not r.get('approved') and not r.get('excluded') for r in rows)
             blocked = sum(r['action'] in ('Blocked', 'Invalid') and not r.get('excluded') for r in rows)
-            self.attachment_summary.Text = '{} ready additions · {} approved updates · {} await approval · {} blocked'.format(adds, updates, pending, blocked)
-            self.apply_button.IsEnabled = bool((adds or updates) and not blocked and not self.busy and not self.service.doc.IsReadOnly)
-            if not adds and (graphics or visibility):
+            if pending:
+                self.changes.Header = 'Changes — {} update{} need{} additional approval'.format(
+                    pending, '' if pending == 1 else 's', 's' if pending == 1 else '')
+                self.attachment_summary.Text = (
+                    '{} ready additions · {} approved updates · Additional approval required for {} '
+                    'existing update{} · {} blocked. Review Changes before applying.'.format(
+                        adds, updates, pending, '' if pending == 1 else 's', blocked))
+            else:
+                self.changes.Header = 'Changes (optional details and existing-update approvals)'
+                self.attachment_summary.Text = '{} ready additions · {} approved updates · {} await approval · {} blocked'.format(
+                    adds, updates, pending, blocked)
+            self.apply_button.IsEnabled = bool((adds or updates or pending) and not blocked and
+                                               not self.busy and not self.service.doc.IsReadOnly)
+            if pending and not adds and not updates:
+                self.apply_button.Content = 'Review {} Existing Update{}'.format(
+                    pending, '' if pending == 1 else 's')
+            elif not adds and (graphics or visibility):
                 self.apply_button.Content = 'Apply Graphic Changes' if graphics else 'Apply Visibility Changes'
         if hasattr(self, 'source_summary'):
             self.source_summary.Text = '{} effective source(s) · {} checked filter(s) · {}'.format(
@@ -2589,7 +2632,8 @@ class WorkspaceDialog(ui.Dialog):
         if self.busy:
             return
         if self.filters.checked and self.targets.checked:
-            self.apply_attachments()
+            if self.apply_attachments() is False:
+                return
         if self.has_pending():
             self.status.Text = ('Unapplied drafts remain. Resolve rules, names, inactive graphics or '
                                 'unapproved updates before closing, or Cancel to discard them.')

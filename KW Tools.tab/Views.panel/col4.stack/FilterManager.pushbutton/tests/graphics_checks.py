@@ -395,6 +395,23 @@ def _fake_checks():
         assert doc.events[-2:] == ['tx-commit', 'group-assimilate']
         checks.append('ready Adds proceed, Updates pending, exact approval/clear and retained receipts')
 
+        # Turning an existing True override Off is an explicit Update, not Unset.
+        service.invalidate()
+        request = _request(patches={101: _set(halftone=False)})
+        pending_off = service.plan(request)
+        assert pending_off['rows'][0]['action'] == 'Update'
+        writes_before = list(doc.writes)
+        result = service.apply(pending_off)
+        assert result['counts']['unapproved'] == 1 and result['counts']['updated'] == 0
+        assert doc.writes == writes_before
+        assert doc.elements[2].attachments[101]['ogs'].values['Halftone']
+        approved_off = service.approve_updates(
+            service.plan(request, completed=result['receipts']))
+        result = service.apply(approved_off)
+        assert result['counts']['updated'] == 1
+        assert not doc.elements[2].attachments[101]['ogs'].values['Halftone']
+        checks.append('explicit Halftone True-to-False update remains pending without a write, then commits after approval')
+
         # Native cloning preserves protected DetailLevel and unrequested values.
         doc.elements[2].attachments[101]['ogs'].values['DetailLevel'] = 'Fine'
         doc.elements[2].attachments[101]['enabled'] = False

@@ -111,6 +111,67 @@ def run_close_actions(doc, uidoc):
         finally:
             dispose(dialog)
 
+    for action in ('Blocked', 'Update'):
+        dialog = selected()
+        try:
+            native = dialog.graphics
+            writes = []
+            class PendingApproval(object):
+                def __getattr__(self, key):
+                    return getattr(native, key)
+                def apply(self, plan):
+                    writes.append(plan)
+                    raise AssertionError('Pending {} plan attempted a write'.format(action))
+            dialog.graphics = PendingApproval()
+            dialog.plan = {'rows': [
+                {'key': pair, 'action': action, 'approved': False,
+                 'reason': 'fixture pending {}'.format(action), 'delta': {}, 'impact': []}]}
+            assert dialog.apply_attachments() is False
+            assert not writes and dialog.changes.IsExpanded and not dialog._allow_close
+            assert 'No model changes.' in dialog.status.Text
+            if action == 'Update':
+                assert dialog.apply_button.IsEnabled
+                assert dialog.apply_button.Content == 'Review 1 Existing Update'
+                assert 'additional approval' in dialog.changes.Header
+            dialog.apply_close_button.RaiseEvent(RoutedEventArgs(Button.ClickEvent))
+            assert not writes and not dialog._allow_close
+            checks.append('{} remains inline pending with no write/traceback path and Apply and Close stays open'.format(action))
+        finally:
+            dispose(dialog)
+
+    dialog = selected()
+    try:
+        native = dialog.graphics
+        calls = []
+        class AutoApproval(object):
+            def __getattr__(self, key):
+                return getattr(native, key)
+            def approve_updates(self, plan, row_keys=None):
+                calls.append(plan)
+                return {'rows': [
+                    dict(row, approved=True) for row in plan['rows']]}
+        dialog.graphics = AutoApproval()
+        dialog.plan = {'rows': [
+            {'key': pair, 'action': 'Update', 'approved': False,
+             'reason': 'fixture current view update'}]}
+        if uidoc.ActiveView.IsTemplate:
+            assert not dialog.approve_current_view_updates()
+        else:
+            assert dialog.approve_current_view_updates()
+        expected_calls = [] if uidoc.ActiveView.IsTemplate else [dict(rows=[
+            {'key': pair, 'action': 'Update', 'approved': False,
+             'reason': 'fixture current view update'}])]
+        assert calls == expected_calls
+        if not uidoc.ActiveView.IsTemplate:
+            assert dialog.plan['rows'][0]['approved']
+            assert 'approved automatically' in dialog.status.Text
+        dialog.targets.checked.add(tid + 1)
+        dialog.plan['rows'][0]['approved'] = False
+        assert not dialog.approve_current_view_updates()
+        checks.append('current-view-only scope auto-approves existing Updates; additional targets retain explicit approval')
+    finally:
+        dispose(dialog)
+
     for action in ('Add', 'Unchanged'):
         dialog = selected()
         try:
@@ -239,6 +300,7 @@ def run_graphics_selection(doc, uidoc):
         assert not dialog.graphics_read_errors and dialog._graphics_editable, dialog.status.Text
         for key in ('transparency', 'visibility', 'halftone', 'projection_line_color', 'projection_line_pattern_id'):
             assert dialog.field_controls[key][1].IsEnabled, 'Disabled after Checked: ' + key
+        assert not dialog.field_controls['halftone'][1].IsThreeState
         assert not any(dialog.pair_patches.values()) and not any(
             dialog.source_values(pair) for pair in dialog.pair_sources), 'Checking manufactured a proposal'
 
@@ -258,6 +320,11 @@ def run_graphics_selection(doc, uidoc):
             control.Text = '37'
             assert dialog.pair_patches[(tid, first.id)]['transparency']['value'] == 37
             dialog.revert_field('transparency')
+            halftone = dialog.field_controls['halftone'][1]
+            original_halftone = bool(halftone.IsChecked)
+            halftone.IsChecked = not original_halftone
+            assert dialog.pair_patches[(tid, first.id)]['halftone']['value'] is (not original_halftone)
+            dialog.revert_field('halftone')
             results.append('actual {}-first checkbox events immediately load editable Per Filter TARGET cells; native numeric event creates scoped patch without mode toggle'.format(
                 'target' if target_first else 'filter'))
             if not target_first:
@@ -1211,13 +1278,15 @@ def run(doc, uidoc):
                     approved.patch_field('halftone', {'op': 'set', 'value': True})
                     assert approved.plan is None
                     approved.build_plan()
-                    assert not any(r.get('approved') for r in approved.plan['rows'])
+                    current_view_only = (not uidoc.ActiveView.IsTemplate and
+                                         tid == model.id_value(uidoc.ActiveView.Id))
+                    assert any(r.get('approved') for r in approved.plan['rows']) == current_view_only
                     approved.approve()
                     approved.selection_changed(False, tid, False)
                     assert approved.plan is None and (tid, record.id) in approved.pair_patches
                     approved.selection_changed(False, tid, True)
                     approved.build_plan()
-                    assert not any(r.get('approved') for r in approved.plan['rows'])
+                    assert any(r.get('approved') for r in approved.plan['rows']) == current_view_only
                     checks.append('native read-only existing-update plan approval survives mode toggle only; pair edits and uncheck/recheck invalidate approval while retaining inactive drafts')
             finally:
                 approved._allow_close = True
@@ -1315,8 +1384,11 @@ def run(doc, uidoc):
                     assert receipts.applied and not fixture.changes.IsExpanded
                     assert fixture.plan['rows'][0]['action'] == 'Completed'
                     assert fixture.plan['rows'][1]['action'] == 'Update'
-                    assert not fixture.apply_button.IsEnabled
-                    checks.append('controller receipt stub: ready Add bypasses optional Changes/unapproved update; completed Add stays completed, pending Update retained')
+                    assert fixture.apply_button.IsEnabled
+                    assert fixture.apply_button.Content == 'Review 1 Existing Update'
+                    assert 'Additional approval required for 1' in fixture.attachment_summary.Text
+                    assert 'additional approval' in fixture.changes.Header
+                    checks.append('controller receipt stub: ready Add bypasses optional Changes/unapproved update; pending Update gets explicit review notification and action')
                 finally:
                     fixture._allow_close = True
                     fixture.Close()
